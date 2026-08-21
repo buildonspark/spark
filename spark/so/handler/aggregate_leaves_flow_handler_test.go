@@ -413,7 +413,7 @@ func TestValidateAggregateLeavesSubtreeChecks(t *testing.T) {
 		reloaded, err := loadAggregateLeavesSubtree(ctx, f.target.ID, f.leafIDs(), false)
 		require.NoError(t, err)
 		_, err = validateAggregateLeavesSubtree(ctx, reloaded, f.ownerIdentity.Public())
-		require.ErrorContains(t, err, "expected AVAILABLE or CONSOLIDATED")
+		require.ErrorContains(t, err, "expected AVAILABLE, CONSOLIDATED, or PARENT_EXITED")
 		_, err = dbClient.TreeNode.UpdateOne(f.leaves[0]).SetStatus(st.TreeNodeStatusAvailable).Save(ctx)
 		require.NoError(t, err)
 	})
@@ -448,6 +448,288 @@ func TestValidateAggregateLeavesSubtreeChecks(t *testing.T) {
 		require.NoError(t, err)
 		_, err = validateAggregateLeavesSubtree(ctx, reloaded, mismatched.ownerIdentity.Public())
 		require.ErrorContains(t, err, "sum of leaf verifying keys does not equal target")
+	})
+}
+
+// TestValidateAggregateLeavesUnderExitingParent covers the subtree the SSP's
+// aggregation task met in production: the target's parent has already
+// confirmed on chain, so the sweep marked the target and everything under it
+// PARENT_EXITED.
+//
+// That status is not evidence the exit package is dead. The package spends the
+// parent's node tx output at the target's vout, so a confirmed parent node tx
+// is what brings that outpoint into existence — and it is the same event the
+// watchtower's consolidated broadcast waits for. Only a confirmed parent
+// refund tx takes the output away.
+func TestValidateAggregateLeavesUnderExitingParent(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{57})
+	f := createAggregateLeavesFixture(t, ctx, rng)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// The shape the sweep leaves behind when a parent's node tx confirms and
+	// the target carries a timelocked direct tx: the target and every node
+	// below it are swept, while the leaves' own transactions stay unconfirmed.
+	_, err = dbClient.TreeNode.UpdateOne(f.target).SetStatus(st.TreeNodeStatusParentExited).Save(ctx)
+	require.NoError(t, err)
+	for _, leaf := range f.leaves {
+		_, err := dbClient.TreeNode.UpdateOne(leaf).SetStatus(st.TreeNodeStatusParentExited).Save(ctx)
+		require.NoError(t, err)
+	}
+	revalidate := func(t *testing.T) (keys.Public, error) {
+		t.Helper()
+		subtree, err := loadAggregateLeavesSubtree(ctx, f.target.ID, f.leafIDs(), false)
+		require.NoError(t, err)
+		return validateAggregateLeavesSubtree(ctx, subtree, f.ownerIdentity.Public())
+	}
+	confirmParentNodeTx := func(t *testing.T) {
+		t.Helper()
+		_, err := dbClient.TreeNode.UpdateOne(f.parent).
+			SetStatus(st.TreeNodeStatusOnChain).
+			SetNodeConfirmationHeight(900).
+			ClearRefundConfirmationHeight().
+			Save(ctx)
+		require.NoError(t, err)
+	}
+
+	t.Run("parent node tx confirmed is aggregatable", func(t *testing.T) {
+		confirmParentNodeTx(t)
+		aggregated, err := revalidate(t)
+		require.NoError(t, err)
+		assert.True(t, aggregated.Equals(f.aggregatedUserKey()),
+			"a swept subtree still aggregates to the same key; the exit above it created the outpoint the package spends")
+	})
+
+	t.Run("parent refund confirmed is not", func(t *testing.T) {
+		// The parent's refund spends its node tx output at vout 0 — the
+		// target's own defining outpoint when the target sits there.
+		_, err := dbClient.TreeNode.UpdateOne(f.parent).
+			SetStatus(st.TreeNodeStatusExited).
+			SetRefundConfirmationHeight(901).
+			Save(ctx)
+		require.NoError(t, err)
+		_, err = revalidate(t)
+		require.ErrorContains(t, err, "no live parent node tx output to spend")
+	})
+
+	t.Run("parent with nothing confirmed fails closed", func(t *testing.T) {
+		// PARENT_EXITED with no confirmation recorded above it is state the
+		// sweep does not produce, so it is refused rather than guessed at.
+		_, err := dbClient.TreeNode.UpdateOne(f.parent).
+			SetStatus(st.TreeNodeStatusSplitted).
+			ClearNodeConfirmationHeight().
+			ClearRefundConfirmationHeight().
+			Save(ctx)
+		require.NoError(t, err)
+		_, err = revalidate(t)
+		require.ErrorContains(t, err, "no live parent node tx output to spend")
+		confirmParentNodeTx(t)
+	})
+
+	t.Run("target that went on chain itself is still rejected", func(t *testing.T) {
+		// Its own node tx won the spend, so the package's input is gone.
+		_, err := dbClient.TreeNode.UpdateOne(f.target).SetStatus(st.TreeNodeStatusOnChain).Save(ctx)
+		require.NoError(t, err)
+		_, err = revalidate(t)
+		require.ErrorContains(t, err, "expected SPLITTED or PARENT_EXITED")
+		_, err = dbClient.TreeNode.UpdateOne(f.target).SetStatus(st.TreeNodeStatusParentExited).Save(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("leaf whose own value left for L1 is still rejected", func(t *testing.T) {
+		_, err := dbClient.TreeNode.UpdateOne(f.leaves[0]).SetStatus(st.TreeNodeStatusWatchtowerExited).Save(ctx)
+		require.NoError(t, err)
+		_, err = revalidate(t)
+		require.ErrorContains(t, err, "expected AVAILABLE, CONSOLIDATED, or PARENT_EXITED")
+	})
+}
+
+// TestValidateAggregateLeavesParentExitedRootIsRefused covers the arm that has
+// no chain state to judge: the sweep matches on a parent edge, so a root
+// carrying PARENT_EXITED is state no path produces.
+func TestValidateAggregateLeavesParentExitedRootIsRefused(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	f := createAggregateLeavesFixture(t, ctx, rand.NewChaCha8([32]byte{60}))
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	_, err = dbClient.TreeNode.UpdateOne(f.target).
+		SetStatus(st.TreeNodeStatusParentExited).
+		ClearParent().
+		Save(ctx)
+	require.NoError(t, err)
+
+	subtree, err := loadAggregateLeavesSubtree(ctx, f.target.ID, f.leafIDs(), false)
+	require.NoError(t, err)
+	_, err = validateAggregateLeavesSubtree(ctx, subtree, f.ownerIdentity.Public())
+	require.ErrorContains(t, err, "has no parent")
+	assert.Equal(t, codes.Internal, status.Code(err),
+		"a root in this status is corruption, not a caller error")
+}
+
+// TestValidateAggregateLeavesSweptRenewIntermediate covers the subtree shape
+// TestValidateAggregateLeavesUnderExitingParent leaves out: one whose target
+// reaches a leaf through a renew-created split node.
+//
+// That node rests at SPLIT_LOCKED, and ShouldMarkParentExited sweeps
+// SPLIT_LOCKED, so a confirming parent marks the intermediate PARENT_EXITED
+// alongside the target and the leaves. Admitting the target and the leaves but
+// not the node between them would leave aggregation refused for exactly the
+// renew chains this flow exists to collapse.
+func TestValidateAggregateLeavesSweptRenewIntermediate(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	f := createAggregateLeavesFixture(t, ctx, rand.NewChaCha8([32]byte{59}))
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	intermediate, err := dbClient.TreeNode.Create().
+		SetTree(f.tree).
+		SetParent(f.target).
+		SetNetwork(btcnetwork.Regtest).
+		SetSigningKeyshare(f.leafKeyshares[0]).
+		SetValue(f.leaves[0].Value).
+		SetVerifyingPubkey(f.leaves[0].VerifyingPubkey).
+		SetOwnerIdentityPubkey(f.ownerIdentity.Public()).
+		SetOwnerSigningPubkey(f.leafUserPrivs[0].Public()).
+		SetRawTx(f.leaves[0].RawTx).
+		SetVout(0).
+		SetStatus(st.TreeNodeStatusSplitLocked).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = dbClient.TreeNode.UpdateOne(f.leaves[0]).SetParent(intermediate).Save(ctx)
+	require.NoError(t, err)
+
+	// The parent's node tx confirmed, so the sweep marked the target and
+	// everything below it that ShouldMarkParentExited admits.
+	_, err = dbClient.TreeNode.UpdateOne(f.parent).
+		SetStatus(st.TreeNodeStatusOnChain).
+		SetNodeConfirmationHeight(900).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = dbClient.TreeNode.UpdateOne(f.target).SetStatus(st.TreeNodeStatusParentExited).Save(ctx)
+	require.NoError(t, err)
+	_, err = dbClient.TreeNode.UpdateOne(intermediate).SetStatus(st.TreeNodeStatusParentExited).Save(ctx)
+	require.NoError(t, err)
+	for _, leaf := range f.leaves {
+		_, err := dbClient.TreeNode.UpdateOne(leaf).SetStatus(st.TreeNodeStatusParentExited).Save(ctx)
+		require.NoError(t, err)
+	}
+
+	revalidate := func(t *testing.T) (keys.Public, error) {
+		t.Helper()
+		subtree, err := loadAggregateLeavesSubtree(ctx, f.target.ID, f.leafIDs(), false)
+		require.NoError(t, err)
+		require.Len(t, subtree.intermediates, 1)
+		return validateAggregateLeavesSubtree(ctx, subtree, f.ownerIdentity.Public())
+	}
+
+	t.Run("swept renew intermediate is aggregatable", func(t *testing.T) {
+		aggregated, err := revalidate(t)
+		require.NoError(t, err)
+		assert.True(t, aggregated.Equals(f.aggregatedUserKey()))
+	})
+
+	t.Run("intermediate whose own value left for L1 is still rejected", func(t *testing.T) {
+		// Its own node tx confirming is a different event from the sweep, and
+		// it kills the leaf below rather than the package above.
+		_, err := dbClient.TreeNode.UpdateOne(intermediate).SetStatus(st.TreeNodeStatusOnChain).Save(ctx)
+		require.NoError(t, err)
+		_, err = revalidate(t)
+		require.ErrorContains(t, err, "expected SPLITTED, SPLIT_LOCKED, or PARENT_EXITED")
+	})
+}
+
+// TestApplyAggregateLeavesCommitUnderExitingParent is the commit half of
+// TestValidateAggregateLeavesUnderExitingParent: a subtree swept PARENT_EXITED
+// consolidates, and a parent refund confirming in the gossip window declines
+// as AlreadyExists rather than being redelivered forever.
+func TestApplyAggregateLeavesCommitUnderExitingParent(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	rng := rand.NewChaCha8([32]byte{58})
+	f := createAggregateLeavesFixture(t, ctx, rng)
+	dbClient, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	refundRaw, watchtowerRaw := buildAggregateLeavesUserTxs(t, f)
+	txs, err := constructAggregateLeavesTransactions(ctx, f.target, f.aggregatedUserKey(), &pbspark.UserSignedTxSigningJob{RawTx: refundRaw}, &pbspark.UserSignedTxSigningJob{RawTx: watchtowerRaw})
+	require.NoError(t, err)
+	_, signedRefundBytes, err := applyAndVerifySignature(txs.RefundTx, signRenewVoutResetTx(t, txs.RefundTx, txs.PrevOut, f.verifyingPriv), txs.PrevOut, 0)
+	require.NoError(t, err)
+	_, signedWatchtowerBytes, err := applyAndVerifySignature(txs.WatchtowerRefundTx, signRenewVoutResetTx(t, txs.WatchtowerRefundTx, txs.PrevOut, f.verifyingPriv), txs.PrevOut, 0)
+	require.NoError(t, err)
+
+	_, err = dbClient.TreeNode.UpdateOne(f.parent).
+		SetStatus(st.TreeNodeStatusOnChain).
+		SetNodeConfirmationHeight(900).
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = dbClient.TreeNode.UpdateOne(f.target).SetStatus(st.TreeNodeStatusParentExited).Save(ctx)
+	require.NoError(t, err)
+
+	lockLeaves := func(t *testing.T) {
+		t.Helper()
+		for _, leaf := range f.leaves {
+			_, err := dbClient.TreeNode.UpdateOne(leaf).SetStatus(st.TreeNodeStatusAggregateLock).Save(ctx)
+			require.NoError(t, err)
+		}
+	}
+	commitReq := &pbinternal.AggregateLeavesCommitRequest{
+		TargetNodeId:                    f.target.ID.String(),
+		LeafIds:                         []string{f.leaves[0].ID.String(), f.leaves[1].ID.String()},
+		SignedRefundTx:                  signedRefundBytes,
+		SignedWatchtowerRefundTx:        signedWatchtowerBytes,
+		AggregatedOwnerSigningPublicKey: f.aggregatedUserKey().Serialize(),
+		OwnerIdentityPublicKey:          f.ownerIdentity.Public().Serialize(),
+	}
+
+	t.Run("parent refund confirming in the gossip window declines", func(t *testing.T) {
+		// A concurrent interleaving is unreachable here: the fixture rows live
+		// in this test's own uncommitted transaction. The FOR SHARE closes it.
+		subtree, err := loadAggregateLeavesSubtree(ctx, f.target.ID, f.leafIDs(), true)
+		require.NoError(t, err)
+		_, err = validateAggregateLeavesSubtree(ctx, subtree, f.ownerIdentity.Public())
+		require.NoError(t, err, "prepare admits the target while the parent's node tx output is unspent")
+
+		lockLeaves(t)
+		_, err = dbClient.TreeNode.UpdateOne(f.parent).SetRefundConfirmationHeight(901).Save(ctx)
+		require.NoError(t, err)
+
+		err = applyAggregateLeavesCommit(ctx, nil, commitReq)
+		require.Error(t, err)
+		assert.Equal(t, codes.AlreadyExists, status.Code(err),
+			"the decline must be AlreadyExists so gossip marks the row terminal instead of redelivering forever")
+		require.ErrorContains(t, err, "already spent")
+
+		target, err := dbClient.TreeNode.Get(ctx, f.target.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TreeNodeStatusParentExited, target.Status, "the target must not be consolidated")
+		for _, leaf := range f.leaves {
+			reloaded, err := dbClient.TreeNode.Get(ctx, leaf.ID)
+			require.NoError(t, err)
+			assert.Equal(t, st.TreeNodeStatusParentExited, reloaded.Status,
+				"a released leaf under an exiting target must not be handed back to transfers as AVAILABLE")
+		}
+	})
+
+	t.Run("parent node tx alone consolidates", func(t *testing.T) {
+		_, err := dbClient.TreeNode.UpdateOne(f.parent).ClearRefundConfirmationHeight().Save(ctx)
+		require.NoError(t, err)
+		lockLeaves(t)
+
+		require.NoError(t, applyAggregateLeavesCommit(ctx, nil, commitReq))
+
+		target, err := dbClient.TreeNode.Get(ctx, f.target.ID)
+		require.NoError(t, err)
+		assert.Equal(t, st.TreeNodeStatusConsolidated, target.Status)
+		assert.Equal(t, signedRefundBytes, target.RawRefundTx)
+		assert.Equal(t, signedWatchtowerBytes, target.DirectFromCpfpRefundTx)
+		assert.Empty(t, target.DirectTx, "the consolidated package replaces the target's own direct tx")
+		for _, leaf := range f.leaves {
+			reloaded, err := dbClient.TreeNode.Get(ctx, leaf.ID)
+			require.NoError(t, err)
+			assert.Equal(t, st.TreeNodeStatusAggregated, reloaded.Status)
+		}
 	})
 }
 
@@ -1005,6 +1287,58 @@ func TestAggregateLeavesRollback(t *testing.T) {
 		leaf1, err := dbClient.TreeNode.Get(ctx, f.leaves[1].ID)
 		require.NoError(t, err)
 		assert.Equal(t, st.TreeNodeStatusTransferLocked, leaf1.Status)
+	})
+
+	// The two ways the target cannot be resolved. Releasing the locks is the
+	// whole job of a rollback, so neither may abort it — a returned error
+	// leaves every named leaf stuck in AGGREGATE_LOCK with nothing else in the
+	// system that clears it.
+	t.Run("unparseable target id still releases the locks", func(t *testing.T) {
+		ctx, dbClient, f, lockAll := setup(t, 21)
+		lockAll()
+		require.NoError(t, handler.Rollback(ctx, &pbinternal.AggregateLeavesRollbackRequest{
+			TargetNodeId: "not-a-uuid",
+			LeafIds:      []string{f.leaves[0].ID.String(), f.leaves[1].ID.String()},
+		}))
+		for _, leaf := range f.leaves {
+			reloaded, err := dbClient.TreeNode.Get(ctx, leaf.ID)
+			require.NoError(t, err)
+			assert.Equal(t, st.TreeNodeStatusAvailable, reloaded.Status,
+				"with no target to read, the leaf's own parent decides")
+		}
+	})
+
+	t.Run("target row gone still releases the locks", func(t *testing.T) {
+		ctx, dbClient, f, lockAll := setup(t, 22)
+		lockAll()
+		require.NoError(t, handler.Rollback(ctx, &pbinternal.AggregateLeavesRollbackRequest{
+			TargetNodeId: uuid.New().String(),
+			LeafIds:      []string{f.leaves[0].ID.String(), f.leaves[1].ID.String()},
+		}))
+		for _, leaf := range f.leaves {
+			reloaded, err := dbClient.TreeNode.Get(ctx, leaf.ID)
+			require.NoError(t, err)
+			assert.Equal(t, st.TreeNodeStatusAvailable, reloaded.Status)
+		}
+	})
+
+	t.Run("unresolvable target does not mask an exited parent of the leaf", func(t *testing.T) {
+		// The target arm is a supplement to the leaf's own parent read, not a
+		// replacement: losing it must not hand a leaf back as AVAILABLE when
+		// its own parent already confirmed.
+		ctx, dbClient, f, lockAll := setup(t, 23)
+		lockAll()
+		_, err := dbClient.TreeNode.UpdateOne(f.target).SetRefundConfirmationHeight(1_000).Save(ctx)
+		require.NoError(t, err)
+		require.NoError(t, handler.Rollback(ctx, &pbinternal.AggregateLeavesRollbackRequest{
+			TargetNodeId: "not-a-uuid",
+			LeafIds:      []string{f.leaves[0].ID.String(), f.leaves[1].ID.String()},
+		}))
+		for _, leaf := range f.leaves {
+			reloaded, err := dbClient.TreeNode.Get(ctx, leaf.ID)
+			require.NoError(t, err)
+			assert.Equal(t, st.TreeNodeStatusParentExited, reloaded.Status)
+		}
 	})
 }
 
