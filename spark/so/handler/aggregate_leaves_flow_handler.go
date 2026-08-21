@@ -92,6 +92,28 @@ func (s *aggregateLeavesSubtree) descendants() []*ent.TreeNode {
 	return append(out, s.leaves...)
 }
 
+// lockAggregateLeavesTargetParent share-locks the target's parent so
+// aggregateLeavesParentExitedInputLive reads a row no writer can change before
+// this transaction commits.
+//
+// Taken ahead of the subtree because MarkExitingNodes updates a confirmed node
+// before cascading to its descendants: locking the parent after the target
+// would invert that order and deadlock aggregation against block processing.
+// The parent edge never moves, so resolving it unlocked cannot pick a stale row.
+func lockAggregateLeavesTargetParent(ctx context.Context, db *ent.Client, targetID uuid.UUID) error {
+	parentID, err := db.TreeNode.Query().Where(enttreenode.ID(targetID)).QueryParent().OnlyID(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil
+		}
+		return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to resolve parent of target %s: %w", targetID, err))
+	}
+	if _, err := db.TreeNode.Query().Where(enttreenode.ID(parentID)).ForShare().Only(ctx); err != nil {
+		return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to lock parent %s of target %s: %w", parentID, targetID, err))
+	}
+	return nil
+}
+
 // loadAggregateLeavesSubtree loads the target and every node below it and
 // validates the v1 shape: the target branches into two or more child chains,
 // each chain passes only one-child intermediate nodes, and each chain ends in
@@ -108,6 +130,12 @@ func loadAggregateLeavesSubtree(ctx context.Context, targetID uuid.UUID, leafIDs
 			q = q.ForUpdate()
 		}
 		return q.All(ctx)
+	}
+
+	if forUpdate {
+		if err := lockAggregateLeavesTargetParent(ctx, db, targetID); err != nil {
+			return nil, err
+		}
 	}
 
 	targets, err := load(func(q *ent.TreeNodeQuery) *ent.TreeNodeQuery {
@@ -202,15 +230,70 @@ func loadAggregateLeavesSubtree(ctx context.Context, targetID uuid.UUID, leafIDs
 	return subtree, nil
 }
 
+// validateAggregateLeavesTargetStatus admits the two target statuses whose
+// exit package still has a live input.
+//
+// SPLITTED is the resting case: the target's own node tx is unconfirmed, so
+// the outpoint that tx spends — the outpoint the package spends — is unspent.
+//
+// PARENT_EXITED is written by the sweep for two opposite events. A confirmed
+// parent node tx is what brings the package's outpoint into existence, since
+// the package spends that tx's output at the target's vout. A confirmed parent
+// refund tx takes it away: it spends the parent's node tx output at vout 0,
+// which is the target's own defining outpoint when the target sits there, and
+// for a consolidated parent it conflict-spends the node tx that would have
+// created the outpoint at all. The status cannot tell the two apart, so the
+// parent's confirmation heights do.
+func validateAggregateLeavesTargetStatus(ctx context.Context, target *ent.TreeNode) error {
+	switch target.Status {
+	case st.TreeNodeStatusSplitted:
+		return nil
+	case st.TreeNodeStatusParentExited:
+		live, err := aggregateLeavesParentExitedInputLive(ctx, target)
+		if err != nil {
+			return err
+		}
+		if !live {
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("target node %s is %s with no live parent node tx output to spend", target.ID, target.Status))
+		}
+		return nil
+	default:
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("target node %s status is %s, expected %s or %s", target.ID, target.Status, st.TreeNodeStatusSplitted, st.TreeNodeStatusParentExited))
+	}
+}
+
+// aggregateLeavesParentExitedInputLive reports whether a PARENT_EXITED target
+// still has an outpoint to spend: its parent's node tx confirmed and no refund
+// of the parent's has taken that output.
+//
+// Unlocked: every path that writes has already share-locked this row through
+// lockAggregateLeavesTargetParent, so the read cannot go stale before commit.
+func aggregateLeavesParentExitedInputLive(ctx context.Context, target *ent.TreeNode) (bool, error) {
+	parent, err := target.QueryParent().Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			// The sweep matches on a parent edge, so a root carrying this
+			// status is state no path produces.
+			return false, sparkerrors.InternalDataInconsistency(fmt.Errorf("target %s is %s but has no parent", target.ID, target.Status))
+		}
+		return false, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to query parent of target %s: %w", target.ID, err))
+	}
+	return parent.NodeConfirmationHeight > 0 && parent.RefundConfirmationHeight == 0, nil
+}
+
 // validateAggregateLeavesSubtree runs the status, ownership, and key-sum
 // checks every SO must agree on before signing.
 func validateAggregateLeavesSubtree(ctx context.Context, subtree *aggregateLeavesSubtree, ownerIdentityPubKey keys.Public) (aggregatedUserKey keys.Public, err error) {
-	if subtree.target.Status != st.TreeNodeStatusSplitted {
-		return keys.Public{}, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("target node %s status is %s, expected %s", subtree.target.ID, subtree.target.Status, st.TreeNodeStatusSplitted))
+	if err := validateAggregateLeavesTargetStatus(ctx, subtree.target); err != nil {
+		return keys.Public{}, err
 	}
 	for _, node := range subtree.intermediates {
-		if node.Status != st.TreeNodeStatusSplitted && node.Status != st.TreeNodeStatusSplitLocked {
-			return keys.Public{}, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("intermediate node %s status is %s, expected %s or %s", node.ID, node.Status, st.TreeNodeStatusSplitted, st.TreeNodeStatusSplitLocked))
+		// ShouldMarkParentExited sweeps SPLIT_LOCKED, so a confirming parent
+		// marks renew-chain intermediates alongside the target and leaves.
+		if node.Status != st.TreeNodeStatusSplitted &&
+			node.Status != st.TreeNodeStatusSplitLocked &&
+			node.Status != st.TreeNodeStatusParentExited {
+			return keys.Public{}, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("intermediate node %s status is %s, expected %s, %s, or %s", node.ID, node.Status, st.TreeNodeStatusSplitted, st.TreeNodeStatusSplitLocked, st.TreeNodeStatusParentExited))
 		}
 	}
 
@@ -218,8 +301,14 @@ func validateAggregateLeavesSubtree(ctx context.Context, subtree *aggregateLeave
 	userKeySum := keys.Public{}
 	keyshareSum := keys.Public{}
 	for i, leaf := range subtree.leaves {
-		if leaf.Status != st.TreeNodeStatusAvailable && leaf.Status != st.TreeNodeStatusConsolidated {
-			return keys.Public{}, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s status is %s, expected %s or %s", leaf.ID, leaf.Status, st.TreeNodeStatusAvailable, st.TreeNodeStatusConsolidated))
+		// PARENT_EXITED records a confirmation above the leaf, not one of its
+		// own, and every ancestor it can have been swept from is checked here
+		// too: the target and the intermediates above, or the exit above the
+		// target that the target's own arm admits.
+		if leaf.Status != st.TreeNodeStatusAvailable &&
+			leaf.Status != st.TreeNodeStatusConsolidated &&
+			leaf.Status != st.TreeNodeStatusParentExited {
+			return keys.Public{}, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s status is %s, expected %s, %s, or %s", leaf.ID, leaf.Status, st.TreeNodeStatusAvailable, st.TreeNodeStatusConsolidated, st.TreeNodeStatusParentExited))
 		}
 		if !leaf.OwnerIdentityPubkey.Equals(ownerIdentityPubKey) {
 			return keys.Public{}, sparkerrors.PermissionDeniedNoReadAccess(fmt.Errorf("leaf %s is not owned by the initiator", leaf.ID))
@@ -702,22 +791,27 @@ func applyAggregateLeavesCommit(ctx context.Context, config *so.Config, req *pbi
 	// install an unspendable package, retire the leaves, and clear the direct tx
 	// that is the actual remaining way out.
 	//
-	// Prepare rejects all of these statuses, so reaching here means the chain
-	// watcher recorded a confirmation after Prepare and before a delayed gossip
-	// commit. AlreadyExists rather than a bare error because gossip treats it as
-	// success and marks the participant row terminal; anything else would be
-	// redelivered forever.
-	if node := firstAggregateLeavesOnChainNode(subtree); node != nil {
+	// Prepare rejects all of these, so reaching here means the chain watcher
+	// recorded a confirmation after Prepare and before a delayed gossip commit.
+	// AlreadyExists rather than a bare error because gossip treats it as success
+	// and marks the participant row terminal; anything else would be redelivered
+	// forever. A parent refund confirming in that window belongs in this arm for
+	// the same reason, which is why the check needs the parent's rows.
+	deadNode, err := firstAggregateLeavesSpentInputNode(ctx, subtree)
+	if err != nil {
+		return err
+	}
+	if deadNode != nil {
 		// AlreadyExists marks the flow terminal, so no rollback follows and
 		// nothing else ever clears AGGREGATE_LOCK.
-		if _, err := releaseAggregateLeavesLocks(ctx, subtree.leaves, "commit declined"); err != nil {
+		if _, err := releaseAggregateLeavesLocks(ctx, target, subtree.leaves, "commit declined"); err != nil {
 			return err
 		}
-		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("aggregate leaves commit: declining to consolidate target %s, node %s is %s so the exit package's input is already spent", target.ID, node.ID, node.Status))
+		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("aggregate leaves commit: declining to consolidate target %s, node %s is %s so the exit package's input is already spent", target.ID, deadNode.ID, deadNode.Status))
 	}
 
-	if target.Status != st.TreeNodeStatusSplitted {
-		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("target %s status is %s, expected %s", target.ID, target.Status, st.TreeNodeStatusSplitted))
+	if target.Status != st.TreeNodeStatusSplitted && target.Status != st.TreeNodeStatusParentExited {
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("target %s status is %s, expected %s or %s", target.ID, target.Status, st.TreeNodeStatusSplitted, st.TreeNodeStatusParentExited))
 	}
 	for _, leaf := range subtree.leaves {
 		if leaf.Status != st.TreeNodeStatusAggregateLock {
@@ -828,23 +922,38 @@ func applyAggregateLeavesCommit(ctx context.Context, config *so.Config, req *pbi
 	return nil
 }
 
-// firstAggregateLeavesOnChainNode returns any node in the subtree whose status
-// records that its value has left for L1, or nil. The target counts too: it is
-// the node whose outpoint the exit package spends.
+// firstAggregateLeavesSpentInputNode returns any node in the subtree whose
+// recorded chain state proves the exit package's input is gone, or nil. The
+// target counts too: it is the node whose outpoint the package spends.
 //
-// IsExitedToL1 rather than a list held here: the two were the same set, and a
-// status added to schematype without being classified into a copy kept in this
-// file would silently read as still-aggregatable.
-func firstAggregateLeavesOnChainNode(subtree *aggregateLeavesSubtree) *ent.TreeNode {
-	if subtree.target.Status.IsExitedToL1() {
-		return subtree.target
+// IsExitedToL1 rather than a list held here: the two are otherwise the same
+// set, and a status added to schematype without being classified into a copy
+// kept in this file would silently read as still-aggregatable. PARENT_EXITED is
+// the carve-out — it records a confirmation above the node rather than one of
+// its own, which for the target is what creates the outpoint being spent; see
+// validateAggregateLeavesTargetStatus.
+func firstAggregateLeavesSpentInputNode(ctx context.Context, subtree *aggregateLeavesSubtree) (*ent.TreeNode, error) {
+	spent := func(status st.TreeNodeStatus) bool {
+		return status.IsExitedToL1() && status != st.TreeNodeStatusParentExited
 	}
-	for _, node := range subtree.descendants() {
-		if node.Status.IsExitedToL1() {
-			return node
+	if spent(subtree.target.Status) {
+		return subtree.target, nil
+	}
+	if subtree.target.Status == st.TreeNodeStatusParentExited {
+		live, err := aggregateLeavesParentExitedInputLive(ctx, subtree.target)
+		if err != nil {
+			return nil, err
+		}
+		if !live {
+			return subtree.target, nil
 		}
 	}
-	return nil
+	for _, node := range subtree.descendants() {
+		if spent(node.Status) {
+			return node, nil
+		}
+	}
+	return nil, nil
 }
 
 // Rollback unlocks the leaves this flow locked in Prepare. Accepts both the
@@ -871,6 +980,24 @@ func (h *AggregateLeavesFlowHandler) Rollback(ctx context.Context, op proto.Mess
 		return err
 	}
 	logger := logging.GetLoggerFromContext(ctx)
+	// Share-locked: the restore reads this status, and the watcher can sweep the
+	// target between here and the leaf locks taken below.
+	//
+	// A target that cannot be read is logged rather than returned — releasing the
+	// locks is the whole job here, and leaving them held is worse than restoring a
+	// leaf from its own parent alone.
+	var target *ent.TreeNode
+	if targetID, parseErr := uuid.Parse(targetNodeID); parseErr != nil {
+		logger.Sugar().Errorf("aggregate leaves rollback: unparseable target node id %q, restoring leaves from their own shape: %v", targetNodeID, parseErr)
+	} else {
+		target, err = db.TreeNode.Query().Where(enttreenode.ID(targetID)).ForShare().Only(ctx)
+		if err != nil {
+			if !ent.IsNotFound(err) {
+				return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to query target %s in rollback: %w", targetID, err))
+			}
+			target = nil
+		}
+	}
 	leaves := make([]*ent.TreeNode, 0, len(leafIDStrs))
 	for _, idStr := range leafIDStrs {
 		leafID, err := uuid.Parse(idStr)
@@ -886,7 +1013,7 @@ func (h *AggregateLeavesFlowHandler) Rollback(ctx context.Context, op proto.Mess
 		}
 		leaves = append(leaves, leaf)
 	}
-	released, err := releaseAggregateLeavesLocks(ctx, leaves, "rollback")
+	released, err := releaseAggregateLeavesLocks(ctx, target, leaves, "rollback")
 	if err != nil {
 		return err
 	}
@@ -896,7 +1023,7 @@ func (h *AggregateLeavesFlowHandler) Rollback(ctx context.Context, op proto.Mess
 
 // releaseAggregateLeavesLocks unlocks the leaves this flow locked. Skipping any
 // leaf not in AGGREGATE_LOCK keeps it from disturbing another flow's lock.
-func releaseAggregateLeavesLocks(ctx context.Context, leaves []*ent.TreeNode, reason string) (int, error) {
+func releaseAggregateLeavesLocks(ctx context.Context, target *ent.TreeNode, leaves []*ent.TreeNode, reason string) (int, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return 0, err
@@ -908,7 +1035,7 @@ func releaseAggregateLeavesLocks(ctx context.Context, leaves []*ent.TreeNode, re
 			logger.Sugar().Infof("aggregate leaves %s: leaf %s is %s, not %s, leaving it alone", reason, leaf.ID, leaf.Status, st.TreeNodeStatusAggregateLock)
 			continue
 		}
-		prior, err := aggregateLeavesPriorLeafStatus(ctx, db, leaf)
+		prior, err := aggregateLeavesPriorLeafStatus(ctx, db, target, leaf)
 		if err != nil {
 			return released, err
 		}
@@ -923,7 +1050,10 @@ func releaseAggregateLeavesLocks(ctx context.Context, leaves []*ent.TreeNode, re
 
 // The parent-exit sweep skips locked nodes and runs only in the block carrying
 // the parent's transaction, so this is the last chance to record an exited parent.
-func aggregateLeavesPriorLeafStatus(ctx context.Context, db *ent.Client, leaf *ent.TreeNode) (st.TreeNodeStatus, error) {
+//
+// target may be nil when the row has since gone; the leaf's own parent still
+// decides the common case.
+func aggregateLeavesPriorLeafStatus(ctx context.Context, db *ent.Client, target, leaf *ent.TreeNode) (st.TreeNodeStatus, error) {
 	children, err := db.TreeNode.Query().Where(enttreenode.HasParentWith(enttreenode.ID(leaf.ID))).Count(ctx)
 	if err != nil {
 		return "", sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to count children of leaf %s: %w", leaf.ID, err))
@@ -932,6 +1062,14 @@ func aggregateLeavesPriorLeafStatus(ctx context.Context, db *ent.Client, leaf *e
 	// watchtower finds the node's exit package, and its direct tx is gone.
 	if children > 0 {
 		return st.TreeNodeStatusConsolidated, nil
+	}
+
+	// An exit above the target is what let this leaf into the flow already
+	// carrying PARENT_EXITED, and the sweep runs only in the block that confirmed
+	// the transaction. Restoring off the leaf's own parent alone would hand it
+	// back to transfers under an exiting ancestor.
+	if target != nil && target.Status.IsExitedToL1() {
+		return st.TreeNodeStatusParentExited, nil
 	}
 
 	// Share-locked: the sweep filters this leaf out while it is locked and
