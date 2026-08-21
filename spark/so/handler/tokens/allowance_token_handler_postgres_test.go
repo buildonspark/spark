@@ -29,6 +29,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokenallowance"
 	"github.com/lightsparkdev/spark/so/entfixtures"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
@@ -1521,4 +1522,186 @@ func TestValidateAndApplyRevokeAllowance_RejectsFutureDatedTimestamp(t *testing.
 	err := ValidateAndApplyRevokeAllowance(ctx, cfg, revokePayload, signRevokeAllowance(t, revokePayload, allowanceOwnerKey))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "too far in the future")
+}
+
+// loadAllowanceRowTx reads inside the caller's transaction, for tests that drive
+// ValidateAndApplyCreateAllowance directly rather than through the committing handler.
+func loadAllowanceRowTx(t *testing.T, ctx context.Context, allowanceID uuid.UUID) *ent.TokenAllowance {
+	t.Helper()
+	dbtx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	row, err := dbtx.TokenAllowance.Query().Where(tokenallowance.AllowanceID(allowanceID)).Only(ctx)
+	require.NoError(t, err)
+	return row
+}
+
+// backdateAllowanceExpiry rewrites a grant's expiry directly, since the create path refuses a
+// payload whose expiry is already in the past.
+func backdateAllowanceExpiry(t *testing.T, ctx context.Context, allowanceID uuid.UUID, expiredAgo time.Duration) {
+	t.Helper()
+	// expiry_time is immutable in the schema because it is owner-signed, so ent generates no
+	// setter; age the row through SQL to reach a state only the passage of time produces.
+	dbtx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	//nolint:forbidigo // the signed expiry has no ent setter by design.
+	_, err = dbtx.ExecContext(ctx,
+		`UPDATE token_allowances SET expiry_time = $1 WHERE allowance_id = $2`,
+		time.Now().Add(-expiredAgo), allowanceID)
+	require.NoError(t, err)
+}
+
+// An expired grant holds no quota slot: it is retired on the next create rather than forcing the
+// owner to revoke something that is already dead.
+func TestCreateTokenAllowance_ExpiredGrantFreesTheQuotaSlot(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobTokenAllowancesEnabled:           1.0,
+		knobs.KnobTokenMaxActiveAllowancesPerOwner: 1,
+	}))
+	token1 := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+	token2 := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	create := func(tokenCreate *ent.TokenCreate, allowanceID uuid.UUID) error {
+		payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+		_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+			AllowancePayload: payload,
+			OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+		})
+		return err
+	}
+
+	firstID := uuid.New()
+	require.NoError(t, create(token1, firstID))
+	// At the cap, a second grant is refused.
+	require.Error(t, create(token2, uuid.New()))
+
+	backdateAllowanceExpiry(t, ctx, firstID, 2*time.Hour)
+
+	require.NoError(t, create(token2, uuid.New()), "an expired grant must not hold the owner's last slot")
+	assert.Equal(t, schematype.TokenAllowanceStatusExpired, loadAllowanceRow(t, tc, firstID).Status)
+}
+
+// The (owner, spender, token) uniqueness slot is released too, so an owner can replace a grant
+// for the same merchant without revoking the dead one first.
+func TestCreateTokenAllowance_ExpiredGrantFreesTheUniquenessSlot(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	create := func(allowanceID uuid.UUID) error {
+		payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+		_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+			AllowancePayload: payload,
+			OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+		})
+		return err
+	}
+
+	firstID := uuid.New()
+	require.NoError(t, create(firstID))
+	// Same owner, spender and token: the partial unique index rejects a second ACTIVE grant.
+	require.Error(t, create(uuid.New()))
+
+	backdateAllowanceExpiry(t, ctx, firstID, 2*time.Hour)
+
+	replacementID := uuid.New()
+	require.NoError(t, create(replacementID), "a replacement grant must be allowed once the old one expired")
+	assert.Equal(t, schematype.TokenAllowanceStatusExpired, loadAllowanceRow(t, tc, firstID).Status)
+	assert.Equal(t, schematype.TokenAllowanceStatusActive, loadAllowanceRow(t, tc, replacementID).Status)
+}
+
+// Grants inside the skew margin are left alone: expiry is wall-clock and creation runs through
+// consensus, so operators must only act on grants that are unambiguously expired.
+func TestCreateTokenAllowance_RecentlyExpiredGrantIsNotReclaimed(t *testing.T) {
+	ctx, tc, _, handler := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	create := func(allowanceID uuid.UUID) error {
+		payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+		_, err := handler.CreateTokenAllowance(ctx, &tokenpb.CreateTokenAllowanceRequest{
+			AllowancePayload: payload,
+			OwnerSignature:   signCreateAllowance(t, payload, allowanceOwnerKey),
+		})
+		return err
+	}
+
+	firstID := uuid.New()
+	require.NoError(t, create(firstID))
+	// Expired, but only just: still inside allowanceExpiryReclaimSkew.
+	backdateAllowanceExpiry(t, ctx, firstID, allowanceExpiryReclaimSkew/2)
+
+	require.Error(t, create(uuid.New()), "a grant inside the skew margin must not be reclaimed yet")
+	assert.Equal(t, schematype.TokenAllowanceStatusActive, loadAllowanceRow(t, tc, firstID).Status)
+}
+
+// The participant path retires the owner's dead grants on its own. The coordinator admitted the
+// replacement against its own database; a peer that still held the old grant as ACTIVE would
+// reject it through the local partial unique index.
+func TestValidateAndApplyCreateAllowance_ParticipantReclaimsExpiredGrant(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	apply := func(allowanceID uuid.UUID) error {
+		payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+		return ValidateAndApplyCreateAllowance(ctx, cfg, payload, signCreateAllowance(t, payload, allowanceOwnerKey))
+	}
+
+	firstID := uuid.New()
+	require.NoError(t, apply(firstID))
+	// The live-grant refusal is covered by TestCreateTokenAllowance_ExpiredGrantFreesTheUniquenessSlot;
+	// asserting it here would abort this test's transaction on the unique violation.
+	backdateAllowanceExpiry(t, ctx, firstID, 2*time.Hour)
+
+	replacementID := uuid.New()
+	require.NoError(t, apply(replacementID), "a participant must admit the replacement the coordinator already accepted")
+	assert.Equal(t, schematype.TokenAllowanceStatusExpired, loadAllowanceRowTx(t, ctx, firstID).Status)
+	assert.Equal(t, schematype.TokenAllowanceStatusActive, loadAllowanceRowTx(t, ctx, replacementID).Status)
+}
+
+// Coordinator quota admission reclaims on its own, independently of the participant path: a dead
+// grant must not hold a quota slot even when nothing else in the flow has retired it yet.
+func TestEnforceAllowanceCreateQuota_ReclaimsExpiredGrant(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	ctx = knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobTokenAllowancesEnabled:           1.0,
+		knobs.KnobTokenMaxActiveAllowancesPerOwner: 1,
+	}))
+	token1 := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+	token2 := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	firstID := uuid.New()
+	firstPayload := newAllowancePayload(token1, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), firstID, recentTimestamp(10*time.Second))
+	require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, firstPayload, signCreateAllowance(t, firstPayload, allowanceOwnerKey)))
+
+	nextPayload := newAllowancePayload(token2, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), uuid.New(), recentTimestamp(10*time.Second))
+	require.Error(t, EnforceAllowanceCreateQuota(ctx, allowanceOwnerKey.Public(), nextPayload), "the live grant fills the owner's only slot")
+
+	backdateAllowanceExpiry(t, ctx, firstID, 2*time.Hour)
+
+	require.NoError(t, EnforceAllowanceCreateQuota(ctx, allowanceOwnerKey.Public(), nextPayload))
+	assert.Equal(t, schematype.TokenAllowanceStatusExpired, loadAllowanceRowTx(t, ctx, firstID).Status)
+}
+
+// A retired grant reports expiry to the spend path. Without its own arm it would fall through to
+// the unrecognized-status arm, which exists for values a newer operator wrote, and report a
+// different reason for a state this build understands.
+func TestCheckAllowanceSpendable_RejectsExpiredStatus(t *testing.T) {
+	ctx, tc, cfg, _ := setupAllowanceTest(t)
+	tokenCreate := createAllowanceTestTokenCreate(t, ctx, tc.Client)
+
+	allowanceID := uuid.New()
+	payload := newAllowancePayload(tokenCreate, allowanceOwnerKey.Public(), allowanceSpenderKey.Public(), allowanceID, recentTimestamp(10*time.Second))
+	require.NoError(t, ValidateAndApplyCreateAllowance(ctx, cfg, payload, signCreateAllowance(t, payload, allowanceOwnerKey)))
+
+	// Status alone must decide: the signed expiry stays in the future, so the wall-clock check
+	// below the switch would accept this row.
+	row := loadAllowanceRowTx(t, ctx, allowanceID)
+	require.True(t, row.ExpiryTime.After(time.Now()))
+	dbtx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	require.NoError(t, dbtx.TokenAllowance.UpdateOne(row).SetStatus(schematype.TokenAllowanceStatusExpired).Exec(ctx))
+
+	spendErr := checkAllowanceSpendable(loadAllowanceRowTx(t, ctx, allowanceID))
+	require.Error(t, spendErr)
+	assert.Contains(t, spendErr.Error(), tokens.ErrAllowanceExpired)
+	assert.NotContains(t, spendErr.Error(), tokens.ErrAllowanceNotSpendable)
 }

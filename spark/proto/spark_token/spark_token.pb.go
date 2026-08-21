@@ -243,6 +243,10 @@ const (
 	TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_ACTIVE      TokenAllowanceStatus = 1
 	TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_REVOKED     TokenAllowanceStatus = 2
 	TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_EXHAUSTED   TokenAllowanceStatus = 3
+	// The owner-signed expiry has passed and an operator retired the grant. Spends past the
+	// expiry are refused regardless of stored status; this value exists so a retired grant
+	// stops occupying the owner's quota and uniqueness slots.
+	TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_EXPIRED TokenAllowanceStatus = 4
 )
 
 // Enum value maps for TokenAllowanceStatus.
@@ -252,12 +256,14 @@ var (
 		1: "TOKEN_ALLOWANCE_STATUS_ACTIVE",
 		2: "TOKEN_ALLOWANCE_STATUS_REVOKED",
 		3: "TOKEN_ALLOWANCE_STATUS_EXHAUSTED",
+		4: "TOKEN_ALLOWANCE_STATUS_EXPIRED",
 	}
 	TokenAllowanceStatus_value = map[string]int32{
 		"TOKEN_ALLOWANCE_STATUS_UNSPECIFIED": 0,
 		"TOKEN_ALLOWANCE_STATUS_ACTIVE":      1,
 		"TOKEN_ALLOWANCE_STATUS_REVOKED":     2,
 		"TOKEN_ALLOWANCE_STATUS_EXHAUSTED":   3,
+		"TOKEN_ALLOWANCE_STATUS_EXPIRED":     4,
 	}
 )
 
@@ -4300,12 +4306,13 @@ const file_spark_token_proto_rawDesc = "" +
 	"#TOKEN_TRANSACTION_STARTED_CANCELLED\x10\x03\x12&\n" +
 	"\"TOKEN_TRANSACTION_SIGNED_CANCELLED\x10\x04\x12\x1d\n" +
 	"\x19TOKEN_TRANSACTION_UNKNOWN\x10\n" +
-	"*\xab\x01\n" +
+	"*\xcf\x01\n" +
 	"\x14TokenAllowanceStatus\x12&\n" +
 	"\"TOKEN_ALLOWANCE_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dTOKEN_ALLOWANCE_STATUS_ACTIVE\x10\x01\x12\"\n" +
 	"\x1eTOKEN_ALLOWANCE_STATUS_REVOKED\x10\x02\x12$\n" +
-	" TOKEN_ALLOWANCE_STATUS_EXHAUSTED\x10\x032\xc3\b\n" +
+	" TOKEN_ALLOWANCE_STATUS_EXHAUSTED\x10\x03\x12\"\n" +
+	"\x1eTOKEN_ALLOWANCE_STATUS_EXPIRED\x10\x042\xc3\b\n" +
 	"\x11SparkTokenService\x12b\n" +
 	"\x11start_transaction\x12$.spark_token.StartTransactionRequest\x1a%.spark_token.StartTransactionResponse\"\x00\x12e\n" +
 	"\x12commit_transaction\x12%.spark_token.CommitTransactionRequest\x1a&.spark_token.CommitTransactionResponse\"\x00\x12i\n" +

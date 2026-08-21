@@ -541,6 +541,10 @@ enum TokenAllowanceStatus {
     TOKEN_ALLOWANCE_STATUS_ACTIVE = 1;
     TOKEN_ALLOWANCE_STATUS_REVOKED = 2;
     TOKEN_ALLOWANCE_STATUS_EXHAUSTED = 3;
+    // The owner-signed expiry has passed and an operator retired the grant. Spends past the
+    // expiry are refused regardless of stored status; this value exists so a retired grant
+    // stops occupying the owner's quota and uniqueness slots.
+    TOKEN_ALLOWANCE_STATUS_EXPIRED = 4;
 }
 
 message TokenAllowanceInfo {

@@ -151,7 +151,7 @@ const DefaultStatus schematype.TokenAllowanceStatus = "ACTIVE"
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schematype.TokenAllowanceStatus) error {
 	switch s {
-	case "ACTIVE", "REVOKED", "EXHAUSTED":
+	case "ACTIVE", "REVOKED", "EXHAUSTED", "EXPIRED":
 		return nil
 	default:
 		return fmt.Errorf("tokenallowance: invalid enum value for status field: %q", s)
