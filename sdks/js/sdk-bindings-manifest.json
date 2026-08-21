@@ -3,68 +3,68 @@
     "frost-android": {
       "artifacts": {
         "sdks/js/packages/spark-sdk/android/src/main/java/uniffi/uniffi/spark_frost/spark_frost.kt": "c4e75b84e3d011821a58c7519eebbe340df38102095c594bea2e27fcae907201",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_frost.so": "e28a9064b006766f145e8fe7ce1b986dc17591c618d3505a0430245e5846b55b",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_frost.so": "8d946d95668bc17d36035ba70224bad39640d61dfaa29516564aebe4daec64bd",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_frost.so": "c8008d06a338fa96eeb58a1cadf714f03ef898dba835bc7a14148cc282ab0fc4",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_frost.so": "1be68713f46f5e75727f86b4c68766265eb0bb748c210ba8c4e82384e20f3acf"
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_frost.so": "dec449369bdf1dfed9eb54e38fe4a4d0870123fcaa0eddea46ecac397ecb3176",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_frost.so": "16faf7e5faee5e43a2d0d3ff9f816349136518de102d768953eb541aa706e2c4",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_frost.so": "6fc047d40d427a0ed70f0cd901ee0edea4501b309574dabee8a46b5e1b021157",
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_frost.so": "f6c969f8c2601b977f98462ad538acc656dc755b0591ea45009d7111f9edd3f1"
       },
       "input_file_count": 28,
-      "input_sha256": "4cbc622e605901114e66ff6523d241f56e0ac55df82b709576dfd8b5ebc03d0e"
+      "input_sha256": "da93b5c1c0ffed9ebde9c3fabcbef9428695ad6b6f8c1bc59524b1d9a6dce328"
     },
     "frost-bare": {
       "artifacts": {
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/buildonspark__spark-frost-bare-addon.bare": "2f0832c4d1037e43135f13e025d459c1a671110b71b6a61e2353e66aff8aa8f8",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/buildonspark__spark-frost-bare-addon.bare": "93c04968ee9e6908996e6841904614c54109f52ac023d957e6188c8d7aabbb53",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/buildonspark__spark-frost-bare-addon.bare": "b93fac29b13a5e5d3a5d1981e07ce606c9ee98113be3383ab9da084dbffd5d59",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/buildonspark__spark-frost-bare-addon.bare": "7fba8ca1c0debc6f7abf01cda1d273183feaba54e47a42c4aea340b4acc11aae",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/buildonspark__spark-frost-bare-addon.bare": "39379277713927abcce5b68cd905ca2afcc3e7014c95936a4d05252b5010d2ab",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/buildonspark__spark-frost-bare-addon.bare": "c1943c9494077b2814a1dfca5613311a42c394e5ccf2fcc3c87dd6eaac5a0d92",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/buildonspark__spark-frost-bare-addon.bare": "0e27377714e1e6f9010aea01b625803df5006de4a0aa51a93cef213d131429bf",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/buildonspark__spark-frost-bare-addon.bare": "27e7c95ee25bfa57e6ec5d7f6e3429720e4fd0ab2e462bd3e24864de689c0889",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/buildonspark__spark-frost-bare-addon.bare": "e82d360bfa2d953620535cdd97a06f4ebb78aec4a43f1bcfb9e40a8381ce1c00",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/buildonspark__spark-frost-bare-addon.bare": "b9ae3fc265e251a2721a31277dea6ff2eaab6d263261debfd0a5176c4b048157",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/buildonspark__spark-frost-bare-addon.bare": "82f7674f10f36f3adba3653ffa8ea7c5523c1f40bed51f264ad2a86d1e4f16c0",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/buildonspark__spark-frost-bare-addon.bare": "a288039a48d0da17824f12fc9b2f818defc927b47bb95c3bab59946ae14044d9",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/buildonspark__spark-frost-bare-addon.bare": "9934c7f21b5a0e2320374b3eb483a87536019d8b1d3d27b0913232dcb61dccd9"
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/buildonspark__spark-frost-bare-addon.bare": "f65770782a091f21d1e717c14a1a0769b10b0e1afc7983f5dd8b02662f5052ac",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/buildonspark__spark-frost-bare-addon.bare": "bfd47aad208ff0695e4349c58930c72ebab153f103a21473b4641d6063d08c80",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/buildonspark__spark-frost-bare-addon.bare": "0a06d77bb63622840d605b490652ac75f13d8fb2c0578d1096f53fd5790459f8",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/buildonspark__spark-frost-bare-addon.bare": "19bb1080e149ecd39eab3ddebb0e1763f36b3ce7e4dae387f4f5d10dc392b910",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/buildonspark__spark-frost-bare-addon.bare": "958f010d519a00beff7a846bf03aea318ceff0c98bf97d15b63ef1df4901d3c7",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/buildonspark__spark-frost-bare-addon.bare": "3b2b47d3319fb53667ef4c91f5c122d472e5b292a9981869dc8428115e3ec9c3",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/buildonspark__spark-frost-bare-addon.bare": "d5acaafb4bd8d17eb39d7de27bf7288b055c1f93cf14e31c7e427710039fab5b",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/buildonspark__spark-frost-bare-addon.bare": "68f5e82966f8cb5f02847a97e3226aae5a91189e0d228b949d59c5888596a51a",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/buildonspark__spark-frost-bare-addon.bare": "6a96c211b4707930db20a1f12d602244c80d20298553208e0fa3ad420dc184f8",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/buildonspark__spark-frost-bare-addon.bare": "7ba59fbc9cec77dd845f428ce265233167fe3eada491bf9347948c3cb35c7e18",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/buildonspark__spark-frost-bare-addon.bare": "9b6eb92f7da38c33f76a31031e5b2725b886b2962da384998500e3b1a34e7a54",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/buildonspark__spark-frost-bare-addon.bare": "ed5000d64b138e08b575edc8fc2517c645cd927d7a5f83fce0be2775a7421fda",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/buildonspark__spark-frost-bare-addon.bare": "0f54120461ee6830d50a9901ca237b9f3b36300e66dd39d711055f33f3303338"
       },
       "input_file_count": 34,
-      "input_sha256": "732aeda50e9ab0a82a812d3213986e868580dffa5376176354305809ccae6432"
+      "input_sha256": "e9de6ca489e52dfefdfda8a2a145918efba61eeef73ddc54fca3238cb509c1b4"
     },
     "frost-ios": {
       "artifacts": {
         "sdks/js/packages/spark-sdk/ios/spark_frost.swift": "ada70432f08834e938ce105ff0ec5f95f5a8e135bac2b27a42ca19ee6fa50d01",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/Info.plist": "eb420ebdd4f7c9377b3cdc86111b51b2d3a184a72151899ca7f69ccc990bc202",
-        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/SparkFrost": "fc2f4836ad549033829b886be87749789e16c751a2bfdd44bd4224fd3603ab9a",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/SparkFrost": "cef7e10733b1da918ba253c572d641b1418ccb9ebd71c9b933838bf041bd27ec",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h": "ec3b3b20c54bc2dc5e410273d566adcc0c66249bd776c7d0f868ac3be74b544b",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/Headers/spark_frostFFI.h": "34a22281ef6fe86ddd66768c586753bc404cd7d3d75022c6cacfd42f3a03d151",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/Modules/module.modulemap": "bcbfbc370bdae9ca7b964bae8fd007d883001d9e0a956d67024eee7da2324934",
-        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/spark_frostFFI": "fc2f4836ad549033829b886be87749789e16c751a2bfdd44bd4224fd3603ab9a",
-        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/SparkFrost": "a2cbfadbffda60189930e57f3830ea91e36c9c34aaffc7a9b0e108b454dc9ae9",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/spark_frostFFI": "cef7e10733b1da918ba253c572d641b1418ccb9ebd71c9b933838bf041bd27ec",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/SparkFrost": "9e8538ab10ac1942fb8c5551cfb93522085dddc00a50ef135926f2afa40befc1",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h": "ec3b3b20c54bc2dc5e410273d566adcc0c66249bd776c7d0f868ac3be74b544b",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/Headers/spark_frostFFI.h": "34a22281ef6fe86ddd66768c586753bc404cd7d3d75022c6cacfd42f3a03d151",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/Modules/module.modulemap": "bcbfbc370bdae9ca7b964bae8fd007d883001d9e0a956d67024eee7da2324934",
-        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/spark_frostFFI": "a2cbfadbffda60189930e57f3830ea91e36c9c34aaffc7a9b0e108b454dc9ae9",
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/spark_frostFFI": "9e8538ab10ac1942fb8c5551cfb93522085dddc00a50ef135926f2afa40befc1",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h": "ec3b3b20c54bc2dc5e410273d566adcc0c66249bd776c7d0f868ac3be74b544b",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI.h": "34a22281ef6fe86ddd66768c586753bc404cd7d3d75022c6cacfd42f3a03d151",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Modules/module.modulemap": "bcbfbc370bdae9ca7b964bae8fd007d883001d9e0a956d67024eee7da2324934",
-        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/spark_frostFFI": "fa991286b0a56b617f3b8b946fd53954a4f83118a0aec1e76561055a832172df"
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/spark_frostFFI": "7b0412c4597dcbf66d09ef6f43eb5c578701e64c55a9b20f21ba70e3c4eca453"
       },
       "input_file_count": 33,
-      "input_sha256": "8773c74a4d858d2a70806f86ac11ed1ab9017235e0f7295ebeb1ff0303811811"
+      "input_sha256": "86a416de960a301707b342cec2236afc76abc1d4acf0e8ce358b404995ca1217"
     },
     "frost-wasm": {
       "artifacts": {
-        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser-bg.wasm": "952dcd20b9130293cb27f238d63075bfa9fdfe495caaf85c0e8825265e9be441",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser-bg.wasm": "b7b8bd3faf52bf36effaf75b041ee12b4f6490089b47b7a517a982fb67ba9d59",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser-bg.wasm.d.ts": "48f8a3a54bc1150f7397354135d30e8f550211a8662113dd2b34eb2dfca95cbd",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser.d.ts": "7743be6a3056d111c2dc98973dcd6203afff9ff6493171c9bd7bcdcd257e209f",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser.js": "9abd5ab46789f78f385dcfa0c63fca6bb05ed766c33089d3ef66d4e008778411",
-        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm": "4efe3f83f7711e1c749f6e61512d9ca4a9da769dd471b8ab73d8da60d202ad20",
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm": "4520ee6dcc89049eb2abb7c67216a1baeb5af25a42ecf9e44bd7efacac5a0037",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm.d.ts": "48f8a3a54bc1150f7397354135d30e8f550211a8662113dd2b34eb2dfca95cbd",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.d.ts": "e602f86f3cebffc4d7e6eb77d397e57fd6eaf05bc8b557d78110f093bd4387ce",
-        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.js": "5e604c009f73b748a2d06249421df834a51838b363c81bc80f4a8236fb9e3bb6"
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.js": "e7e787f3fd271065bbecb72a3971262933c838e936abb5d547866d1170da5367"
       },
       "input_file_count": 30,
-      "input_sha256": "12de182dadae7dbc13c4d244a2041a0c3840794513aa0802e4e41d3ebc7e26d2"
+      "input_sha256": "474b956a0fa74089695248007dfc2ff4c50c0f0d5e5595979b1aab9a1bb1562b"
     },
     "token-android": {
       "artifacts": {
