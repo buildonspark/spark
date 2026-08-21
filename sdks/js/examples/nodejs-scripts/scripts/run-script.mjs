@@ -11,6 +11,9 @@ const VALID_SCRIPTS = new Set([
   "get-transfers-with-time-filter",
   "pay-invoices",
   "send-transfer",
+  "token-allowance-pull",
+  "token-allowance-negative",
+  "token-allowance-multi-merchant",
 ]);
 
 const [scriptName, ...scriptArgs] = process.argv.slice(2);
