@@ -5,8 +5,11 @@ build-oss = "go build ./bin/operator"
 # newer than the binary: either plugin package or the pinned golangci-lint version (.custom-gcl.yml). So edits to a
 # plugin or a version bump rebuild automatically — no stale binary, no manual delete.
 lint-build = { sources = ["tools/fmtlint/*.go", "tools/namelint/*.go", ".custom-gcl.yml"], outputs = ["bin/golangci-lint-spark"], run = "golangci-lint custom" }
+# Builds entfieldlint ahead of running it, on the same sources/outputs caching as lint-build: `go run` re-links the
+# binary on every invocation, which costs more than the check itself does.
+entfieldlint-build = { sources = ["tools/entfieldlint/*.go", "tools/entfieldlint/cmd/entfieldlint/*.go"], outputs = ["bin/entfieldlint"], run = "go build -o bin/entfieldlint ./tools/entfieldlint/cmd/entfieldlint" }
 # golangci-lint runs last so extra CLI args (e.g. `mise lint --fix`) are appended to it, not entfieldlint.
-lint = { depends = ["lint-build"], run = "go run ./tools/entfieldlint/cmd/entfieldlint check && ./bin/golangci-lint-spark run" }
+lint = { depends = ["lint-build", "entfieldlint-build"], run = "./bin/entfieldlint check && ./bin/golangci-lint-spark run" }
 # Sadly, `mise fmt` is a built in command
 format = "golangci-lint fmt"
 test-unit = """
@@ -64,8 +67,8 @@ test-grpc-k8s-oss = """
     -p 1
 """
 # Ent field deprecation lint - checks that fields are deprecated before removal
-ent-field-lint = "go run ./tools/entfieldlint/cmd/entfieldlint check"
-ent-field-diff = "go run ./tools/entfieldlint/cmd/entfieldlint diff"
+ent-field-lint = { depends = ["entfieldlint-build"], run = "./bin/entfieldlint check" }
+ent-field-diff = { depends = ["entfieldlint-build"], run = "./bin/entfieldlint diff" }
 
 [tasks.atlas-hash]
 dir = "so/ent"
