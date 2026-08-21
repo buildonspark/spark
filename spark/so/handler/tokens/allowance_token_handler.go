@@ -336,6 +336,8 @@ func allowanceStatusToProto(status schematype.TokenAllowanceStatus) tokenpb.Toke
 		return tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_REVOKED
 	case schematype.TokenAllowanceStatusExhausted:
 		return tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_EXHAUSTED
+	case schematype.TokenAllowanceStatusExpired:
+		return tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_EXPIRED
 	default:
 		return tokenpb.TokenAllowanceStatus_TOKEN_ALLOWANCE_STATUS_UNSPECIFIED
 	}

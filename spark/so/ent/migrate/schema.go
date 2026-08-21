@@ -747,7 +747,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "allowance_id", Type: field.TypeUUID, Unique: true},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "REVOKED", "EXHAUSTED"}, Default: "ACTIVE"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "REVOKED", "EXHAUSTED", "EXPIRED"}, Default: "ACTIVE"},
 		{Name: "owner_public_key", Type: field.TypeBytes},
 		{Name: "spender_public_key", Type: field.TypeBytes},
 		{Name: "token_identifier", Type: field.TypeBytes},

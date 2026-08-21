@@ -476,6 +476,11 @@ func checkAllowanceSpendable(allowance *ent.TokenAllowance) error {
 	case st.TokenAllowanceStatusRevoked:
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
 			"%s: %s", tokens.ErrAllowanceRevoked, allowance.AllowanceID))
+	case st.TokenAllowanceStatusExpired:
+		// Retired grants report expiry rather than falling through to the unrecognized-status
+		// arm, which exists for values written by a newer operator.
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+			"%s: %s (expired at %s)", tokens.ErrAllowanceExpired, allowance.AllowanceID, allowance.ExpiryTime.UTC().Format(time.RFC3339)))
 	default:
 		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
 			"%s: allowance %s has unrecognized status %q", tokens.ErrAllowanceNotSpendable, allowance.AllowanceID, allowance.Status))

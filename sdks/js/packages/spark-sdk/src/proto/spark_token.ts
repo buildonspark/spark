@@ -214,6 +214,12 @@ export enum TokenAllowanceStatus {
   TOKEN_ALLOWANCE_STATUS_ACTIVE = 1,
   TOKEN_ALLOWANCE_STATUS_REVOKED = 2,
   TOKEN_ALLOWANCE_STATUS_EXHAUSTED = 3,
+  /**
+   * TOKEN_ALLOWANCE_STATUS_EXPIRED - The owner-signed expiry has passed and an operator retired the grant. Spends past the
+   * expiry are refused regardless of stored status; this value exists so a retired grant
+   * stops occupying the owner's quota and uniqueness slots.
+   */
+  TOKEN_ALLOWANCE_STATUS_EXPIRED = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -231,6 +237,9 @@ export function tokenAllowanceStatusFromJSON(object: any): TokenAllowanceStatus 
     case 3:
     case "TOKEN_ALLOWANCE_STATUS_EXHAUSTED":
       return TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_EXHAUSTED;
+    case 4:
+    case "TOKEN_ALLOWANCE_STATUS_EXPIRED":
+      return TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_EXPIRED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -248,6 +257,8 @@ export function tokenAllowanceStatusToJSON(object: TokenAllowanceStatus): string
       return "TOKEN_ALLOWANCE_STATUS_REVOKED";
     case TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_EXHAUSTED:
       return "TOKEN_ALLOWANCE_STATUS_EXHAUSTED";
+    case TokenAllowanceStatus.TOKEN_ALLOWANCE_STATUS_EXPIRED:
+      return "TOKEN_ALLOWANCE_STATUS_EXPIRED";
     case TokenAllowanceStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

@@ -93,12 +93,15 @@ func validateAllowanceCreatePreflight(
 	if err != nil {
 		return errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse spender public key: %w", err))
 	}
+	// The preflight is a cheap fail-fast, so it must not reject on a grant the authoritative
+	// path is about to retire: ignore rows already past the reclaim cutoff.
 	activeGrantExists, err := db.TokenAllowance.Query().
 		Where(
 			tokenallowance.OwnerPublicKey(ownerPublicKey),
 			tokenallowance.SpenderPublicKey(spenderPublicKey),
 			tokenallowance.TokenCreateID(tokenCreateEnt.ID),
 			tokenallowance.StatusEQ(st.TokenAllowanceStatusActive),
+			tokenallowance.ExpiryTimeGTE(expiredAllowanceCutoff()),
 		).
 		Exist(ctx)
 	if err != nil {
@@ -111,6 +114,7 @@ func validateAllowanceCreatePreflight(
 		Where(
 			tokenallowance.OwnerPublicKey(ownerPublicKey),
 			tokenallowance.StatusEQ(st.TokenAllowanceStatusActive),
+			tokenallowance.ExpiryTimeGTE(expiredAllowanceCutoff()),
 		).
 		Count(ctx)
 	if err != nil {
@@ -121,6 +125,60 @@ func validateAllowanceCreatePreflight(
 		return errors.ResourceExhaustedQuotaExceeded(fmt.Errorf("owner already has %d ACTIVE token allowances, the per-owner cap is %d; revoke an existing allowance first", activeCount, maxAllowances))
 	}
 	return nil
+}
+
+// allowanceExpiryReclaimSkew is how far past its signed expiry a grant must be before an
+// operator retires it.
+//
+// Expiry is wall-clock, evaluated against each operator's own clock, and creation runs through
+// the consensus engine. Without a margin two operators could disagree about a grant that expired
+// a moment ago: one frees the slot and admits the create, the other still sees ACTIVE and
+// rejects, and the flow aborts. The margin is far wider than any tolerable skew between
+// operators, so they only ever act on grants that are unambiguously expired.
+const allowanceExpiryReclaimSkew = 10 * time.Minute
+
+// reclaimExpiredAllowances retires the owner's ACTIVE grants whose signed expiry passed more
+// than allowanceExpiryReclaimSkew ago, returning how many it moved off ACTIVE.
+//
+// This is bookkeeping, not enforcement: checkAllowanceSpendable already refuses to authorize a
+// spend past the expiry whatever the stored status says, so a grant that has not been retired
+// yet is inert either way. What retirement buys is release of the two slots the partial unique
+// index and the per-owner quota reserve for an ACTIVE row, so an owner can create a replacement
+// grant for the same spender and token without first revoking a grant that is already dead.
+//
+// Every operator runs this on the create path rather than only the coordinator: the uniqueness
+// index is enforced locally on each operator, so a peer that still held the expired row as
+// ACTIVE would reject the replacement the coordinator admitted.
+//
+// Convergence: an operator that retires a grant during a flow that later rolls back keeps the
+// retirement, because rollback only removes the row the flow inserted. That is safe. Expiry only
+// moves further into the past, so every other operator retires the same grant the next time it
+// looks, and the status converges without any coordination.
+func reclaimExpiredAllowances(ctx context.Context, ownerPublicKey keys.Public) (int, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	retired, err := db.TokenAllowance.Update().
+		Where(
+			tokenallowance.OwnerPublicKey(ownerPublicKey),
+			tokenallowance.StatusEQ(st.TokenAllowanceStatusActive),
+			tokenallowance.ExpiryTimeLT(expiredAllowanceCutoff()),
+		).
+		SetStatus(st.TokenAllowanceStatusExpired).
+		Save(ctx)
+	if err != nil {
+		return 0, errors.InternalDatabaseWriteError(fmt.Errorf("failed to retire expired allowances for owner: %w", err))
+	}
+	if retired > 0 {
+		logging.GetLoggerFromContext(ctx).Sugar().Infof("retired %d expired token allowance(s) while admitting a new grant", retired)
+	}
+	return retired, nil
+}
+
+// expiredAllowanceCutoff is the newest expiry an operator will treat as unambiguously past.
+func expiredAllowanceCutoff() time.Time {
+	return time.Now().Add(-allowanceExpiryReclaimSkew)
 }
 
 // EnforceAllowanceCreateQuota rejects a create that would push the owner over
@@ -139,6 +197,11 @@ func validateAllowanceCreatePreflight(
 func EnforceAllowanceCreateQuota(ctx context.Context, ownerPublicKey keys.Public, payload *tokenpb.TokenAllowancePayload) error {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
+		return err
+	}
+	// Retire unambiguously expired grants before counting so a dead grant cannot hold a slot
+	// against its owner forever.
+	if _, err := reclaimExpiredAllowances(ctx, ownerPublicKey); err != nil {
 		return err
 	}
 	if _, err := db.TokenAllowance.Query().
@@ -244,6 +307,18 @@ func ValidateAndApplyCreateAllowance(
 	allowanceID, err := uuid.FromBytes(payload.GetAllowanceId())
 	if err != nil {
 		return errors.InvalidArgumentMalformedField(fmt.Errorf("invalid allowance_id: %w", err))
+	}
+
+	// Every operator retires the owner's dead grants, not just the coordinator: the
+	// (owner, spender, token) uniqueness index is enforced locally, so a peer still holding an
+	// expired grant as ACTIVE would reject the replacement the coordinator admitted.
+	//
+	// This runs before the token row is locked to keep one lock order across both paths. The
+	// coordinator reaches Prepare with the owner's allowance rows already locked by the quota
+	// check, so taking the token row first here would invert the order and let two concurrent
+	// creates for the same owner and token deadlock.
+	if _, err := reclaimExpiredAllowances(ctx, ownerPublicKey); err != nil {
+		return err
 	}
 
 	// Lock the token row so a concurrent create for the same token serializes here and the

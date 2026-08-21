@@ -39,7 +39,7 @@ func (TokenAllowance) Fields() []ent.Field {
 		field.Enum("status").
 			GoType(st.TokenAllowanceStatus("")).
 			Default(string(st.TokenAllowanceStatusActive)).
-			Comment("Current lifecycle status of the allowance (ACTIVE, REVOKED, EXHAUSTED)."),
+			Comment("Current lifecycle status of the allowance (ACTIVE, REVOKED, EXHAUSTED, EXPIRED)."),
 		field.Bytes("owner_public_key").
 			Immutable().
 			GoType(keys.Public{}).

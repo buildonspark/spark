@@ -29,7 +29,7 @@ type TokenAllowance struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// Client-generated identifier for the allowance, shared across all SOs.
 	AllowanceID uuid.UUID `json:"allowance_id,omitempty"`
-	// Current lifecycle status of the allowance (ACTIVE, REVOKED, EXHAUSTED).
+	// Current lifecycle status of the allowance (ACTIVE, REVOKED, EXHAUSTED, EXPIRED).
 	Status schematype.TokenAllowanceStatus `json:"status,omitempty"`
 	// The public key of the token owner that signed this allowance.
 	OwnerPublicKey keys.Public `json:"owner_public_key,omitempty"`
