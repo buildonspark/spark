@@ -67,6 +67,8 @@ func consensusFlowHandler(config *so.Config, opType pbgossip.ConsensusOperationT
 		return NewAggregateLeavesFlowHandler(config), nil
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_RECOVER_WATCHTOWER_EXITED_LEAF:
 		return NewRecoverWatchtowerExitedLeafFlowHandler(config), nil
+	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_SWEEP:
+		return NewStaticDepositSweepFlowHandler(config), nil
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_CREATE_TOKEN_ALLOWANCE:
 		return tokenhandler.NewCreateTokenAllowanceFlowHandler(config), nil
 	case pbgossip.ConsensusOperationType_CONSENSUS_OPERATION_TYPE_TOKEN_TRANSACTION:
