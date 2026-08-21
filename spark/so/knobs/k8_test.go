@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestKnobsK8ValuesProvider_HandleConfigMap(t *testing.T) {
@@ -86,11 +85,9 @@ func TestKnobsK8ValuesProvider_HandleConfigMap(t *testing.T) {
 			provider.lock.Unlock()
 
 			configMap := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "knobs",
-					Namespace: "knobs",
-				},
-				Data: tt.configMapData,
+				Name:      "knobs",
+				Namespace: "knobs",
+				Data:      tt.configMapData,
 			}
 
 			provider.handleConfigMap(configMap)
@@ -119,11 +116,9 @@ func TestKnobsK8ValuesProvider_HandleConfigMap_NilData(t *testing.T) {
 	provider.lock.Unlock()
 
 	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "knobs",
-			Namespace: "knobs",
-		},
-		Data: nil,
+		Name:      "knobs",
+		Namespace: "knobs",
+		Data:      nil,
 	}
 
 	provider.handleConfigMap(configMap)

@@ -434,14 +434,12 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 
 	// Step 8: Operator signing
 	signingJobs := []*helper.SigningJobWithPregeneratedNonce{{
-		SigningJob: helper.SigningJob{
-			JobID:             uuid.New(),
-			SigningKeyshareID: operatorKeyShare.ID,
-			Message:           sighash.Hash(msgHash),
-			VerifyingKey:      &verifyingKey,
-			UserCommitment:    &userNonceCommitment,
-		},
-		Round1Packages: operatorNonceCommitmentArray[0],
+		JobID:             uuid.New(),
+		SigningKeyshareID: operatorKeyShare.ID,
+		Message:           sighash.Hash(msgHash),
+		VerifyingKey:      &verifyingKey,
+		UserCommitment:    &userNonceCommitment,
+		Round1Packages:    operatorNonceCommitmentArray[0],
 	}}
 	signingResult, err := helper.SignFrostWithPregeneratedNonce(ctx, config, signingJobs)
 	require.NoError(t, err)

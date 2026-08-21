@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/entephemeral"
 )

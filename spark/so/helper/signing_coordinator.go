@@ -397,14 +397,12 @@ func NewSigningJobWithPregeneratedNonce(
 	}
 
 	signingJob := &SigningJobWithPregeneratedNonce{
-		SigningJob: SigningJob{
-			JobID:             uuid.New(),
-			SigningKeyshareID: signingKeyshare.ID,
-			Message:           sigHash,
-			VerifyingKey:      &verifyingPubKey,
-			UserCommitment:    &userNonceCommitment,
-		},
-		Round1Packages: round1Packages,
+		JobID:             uuid.New(),
+		SigningKeyshareID: signingKeyshare.ID,
+		Message:           sigHash,
+		VerifyingKey:      &verifyingPubKey,
+		UserCommitment:    &userNonceCommitment,
+		Round1Packages:    round1Packages,
 	}
 
 	return signingJob, nil

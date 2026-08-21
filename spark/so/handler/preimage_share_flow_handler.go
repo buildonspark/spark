@@ -139,13 +139,11 @@ func validatePreimageShare(config *so.Config, req *pb.StorePreimageShareV2Reques
 
 	err = secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
-			SecretShare: secretsharing.SecretShare{
-				FieldModulus: secp256k1.S256().N,
-				Threshold:    int(config.Threshold),
-				Index:        big.NewInt(int64(config.Index + 1)),
-				Share:        new(big.Int).SetBytes(secretShare.GetSecretShare()),
-			},
-			Proofs: secretShare.GetProofs(),
+			FieldModulus: secp256k1.S256().N,
+			Threshold:    int(config.Threshold),
+			Index:        big.NewInt(int64(config.Index + 1)),
+			Share:        new(big.Int).SetBytes(secretShare.GetSecretShare()),
+			Proofs:       secretShare.GetProofs(),
 		},
 	)
 	if err != nil {

@@ -17,10 +17,8 @@ import (
 func TestKnobController_SetKnob(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      knobsConfigMap,
-				Namespace: knobsNamespace,
-			},
+			Name:      knobsConfigMap,
+			Namespace: knobsNamespace,
 			Data: map[string]string{
 				"existing.knob": "50",
 			},
@@ -48,10 +46,8 @@ func TestKnobController_SetKnob(t *testing.T) {
 func TestKnobController_GetKnob(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      knobsConfigMap,
-				Namespace: knobsNamespace,
-			},
+			Name:      knobsConfigMap,
+			Namespace: knobsNamespace,
 			Data: map[string]string{
 				"existing.knob": "42.5",
 			},
@@ -80,10 +76,8 @@ func TestKnobController_GetKnob(t *testing.T) {
 func TestKnobController_DeleteKnob(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      knobsConfigMap,
-				Namespace: knobsNamespace,
-			},
+			Name:      knobsConfigMap,
+			Namespace: knobsNamespace,
 			Data: map[string]string{
 				"to.delete":   "100",
 				"to.preserve": "200",
@@ -112,10 +106,8 @@ func TestKnobController_DeleteKnob(t *testing.T) {
 func TestKnobController_RestoreOriginal(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      knobsConfigMap,
-				Namespace: knobsNamespace,
-			},
+			Name:      knobsConfigMap,
+			Namespace: knobsNamespace,
 			Data: map[string]string{
 				"modified.knob": "999",
 				"added.knob":    "123",
@@ -150,10 +142,8 @@ func TestKnobController_RestoreOriginal(t *testing.T) {
 func TestKnobController_RunWithKnob(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      knobsConfigMap,
-				Namespace: knobsNamespace,
-			},
+			Name:      knobsConfigMap,
+			Namespace: knobsNamespace,
 			Data: map[string]string{
 				"existing.knob": "50",
 			},
@@ -200,11 +190,9 @@ func TestKnobController_RunWithKnob(t *testing.T) {
 func TestKnobController_SetKnobWithTarget(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      knobsConfigMap,
-				Namespace: knobsNamespace,
-			},
-			Data: map[string]string{},
+			Name:      knobsConfigMap,
+			Namespace: knobsNamespace,
+			Data:      map[string]string{},
 		},
 	)
 
@@ -227,10 +215,8 @@ func TestKnobController_SetKnobWithTarget(t *testing.T) {
 func TestKnobController_restoreOriginal_UsesProvidedContext(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      knobsConfigMap,
-				Namespace: knobsNamespace,
-			},
+			Name:      knobsConfigMap,
+			Namespace: knobsNamespace,
 			Data: map[string]string{
 				"knob": "modified",
 			},
@@ -259,11 +245,9 @@ func TestKnobController_restoreOriginal_UsesProvidedContext(t *testing.T) {
 func TestKnobController_ConcurrentAccess(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      knobsConfigMap,
-				Namespace: knobsNamespace,
-			},
-			Data: map[string]string{},
+			Name:      knobsConfigMap,
+			Namespace: knobsNamespace,
+			Data:      map[string]string{},
 		},
 	)
 

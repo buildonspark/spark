@@ -873,15 +873,13 @@ func buildSigningJobForRefund(
 		adaptorPubKeyRef = &adaptorPubKey
 	}
 	return &helper.SigningJobWithPregeneratedNonce{
-		SigningJob: helper.SigningJob{
-			JobID:             jobID,
-			SigningKeyshareID: signingKeyshareID,
-			Message:           sigHash,
-			VerifyingKey:      new(leaf.VerifyingPubkey),
-			UserCommitment:    &userCommitment,
-			AdaptorPublicKey:  adaptorPubKeyRef,
-		},
-		Round1Packages: round1,
+		JobID:             jobID,
+		SigningKeyshareID: signingKeyshareID,
+		Message:           sigHash,
+		VerifyingKey:      new(leaf.VerifyingPubkey),
+		UserCommitment:    &userCommitment,
+		AdaptorPublicKey:  adaptorPubKeyRef,
+		Round1Packages:    round1,
 	}, nil
 }
 

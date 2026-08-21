@@ -4,7 +4,7 @@ package ent
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
@@ -72,8 +72,8 @@ func (ikc *IdempotencyKeyCreate) SetIdentityPublicKey(b []byte) *IdempotencyKeyC
 }
 
 // SetResponse sets the "response" field.
-func (ikc *IdempotencyKeyCreate) SetResponse(jm json.RawMessage) *IdempotencyKeyCreate {
-	ikc.mutation.SetResponse(jm)
+func (ikc *IdempotencyKeyCreate) SetResponse(j jsontext.Value) *IdempotencyKeyCreate {
+	ikc.mutation.SetResponse(j)
 	return ikc
 }
 
@@ -299,7 +299,7 @@ func (u *IdempotencyKeyUpsert) UpdateUpdateTime() *IdempotencyKeyUpsert {
 }
 
 // SetResponse sets the "response" field.
-func (u *IdempotencyKeyUpsert) SetResponse(v json.RawMessage) *IdempotencyKeyUpsert {
+func (u *IdempotencyKeyUpsert) SetResponse(v jsontext.Value) *IdempotencyKeyUpsert {
 	u.Set(idempotencykey.FieldResponse, v)
 	return u
 }
@@ -391,7 +391,7 @@ func (u *IdempotencyKeyUpsertOne) UpdateUpdateTime() *IdempotencyKeyUpsertOne {
 }
 
 // SetResponse sets the "response" field.
-func (u *IdempotencyKeyUpsertOne) SetResponse(v json.RawMessage) *IdempotencyKeyUpsertOne {
+func (u *IdempotencyKeyUpsertOne) SetResponse(v jsontext.Value) *IdempotencyKeyUpsertOne {
 	return u.Update(func(s *IdempotencyKeyUpsert) {
 		s.SetResponse(v)
 	})
@@ -653,7 +653,7 @@ func (u *IdempotencyKeyUpsertBulk) UpdateUpdateTime() *IdempotencyKeyUpsertBulk 
 }
 
 // SetResponse sets the "response" field.
-func (u *IdempotencyKeyUpsertBulk) SetResponse(v json.RawMessage) *IdempotencyKeyUpsertBulk {
+func (u *IdempotencyKeyUpsertBulk) SetResponse(v jsontext.Value) *IdempotencyKeyUpsertBulk {
 	return u.Update(func(s *IdempotencyKeyUpsert) {
 		s.SetResponse(v)
 	})

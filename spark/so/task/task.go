@@ -164,456 +164,430 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 	return []ScheduledTaskSpec{
 		{
 			ExecutionInterval: backfillSigningKeyshareSecretsInterval,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "backfill_signing_keyshare_secrets",
-				Timeout:      &backfillSigningKeyshareSecretsTaskTimeout,
-				RunInTestEnv: false,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					return backfillSigningKeyshareSecrets(ctx, knobsService)
-				},
+			Name:              "backfill_signing_keyshare_secrets",
+			Timeout:           &backfillSigningKeyshareSecretsTaskTimeout,
+			RunInTestEnv:      false,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				return backfillSigningKeyshareSecrets(ctx, knobsService)
 			},
 		},
 		{
 			ExecutionInterval: clearSigningKeyshareSecretSharesInterval,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "clear_signing_keyshare_secret_shares",
-				Timeout:      &clearSigningKeyshareSecretSharesTaskTimeout,
-				RunInTestEnv: false,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					return clearSigningKeyshareSecretShares(ctx, knobsService)
-				},
+			Name:              "clear_signing_keyshare_secret_shares",
+			Timeout:           &clearSigningKeyshareSecretSharesTaskTimeout,
+			RunInTestEnv:      false,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				return clearSigningKeyshareSecretShares(ctx, knobsService)
 			},
 		},
 		{
-			ExecutionInterval: 10 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:                "dkg",
-				Timeout:             &dkgTaskTimeout,
-				RunInTestEnv:        true,
-				RequiresRawDBClient: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // The readiness check must run outside a task transaction: RunDKG blocks on the full cross-operator DKG protocol, which would hold a transaction idle past Postgres's idle_in_transaction_session_timeout.
-					if err != nil {
-						return fmt.Errorf("failed to get raw db client from context: %w", err)
-					}
-					return ent.RunDKGIfNeeded(ctx, config, rawDB)
-				},
+			ExecutionInterval:   10 * time.Second,
+			Name:                "dkg",
+			Timeout:             &dkgTaskTimeout,
+			RunInTestEnv:        true,
+			RequiresRawDBClient: true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // The readiness check must run outside a task transaction: RunDKG blocks on the full cross-operator DKG protocol, which would hold a transaction idle past Postgres's idle_in_transaction_session_timeout.
+				if err != nil {
+					return fmt.Errorf("failed to get raw db client from context: %w", err)
+				}
+				return ent.RunDKGIfNeeded(ctx, config, rawDB)
 			},
 		},
 		{
 			ExecutionInterval: 5 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "confirm_pending_dkg_keys",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					cutoff := time.Now().Add(-confirmPendingDKGKeysCutoffAge)
+			Name:              "confirm_pending_dkg_keys",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx)
+				cutoff := time.Now().Add(-confirmPendingDKGKeysCutoffAge)
 
-					// Find local coordinator PENDING keyshares and attempt confirmation fanout
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-					if abandonedCount, err := tx.SigningKeyshare.Update().
+				// Find local coordinator PENDING keyshares and attempt confirmation fanout
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+				if abandonedCount, err := tx.SigningKeyshare.Update().
+					Where(
+						signingkeyshare.StatusEQ(st.KeyshareStatusPending),
+						signingkeyshare.CoordinatorIndexEQ(config.Index),
+						signingkeyshare.CreateTimeLT(cutoff),
+					).
+					SetStatus(st.KeyshareStatusAbandoned).
+					Save(ctx); err != nil {
+					return err
+				} else if abandonedCount > 0 {
+					logger.Sugar().Errorf("Abandoned %d stale pending DKG keyshares (older than %s)", abandonedCount, cutoff)
+				}
+
+				// Attempt to confirm keys with all operators.
+				// Use best-effort mode: if some keys are missing on some operators
+				// (e.g., due to transaction rollback), we still mark the keys that
+				// ARE available across all operators as AVAILABLE.
+				// Paginate at the DB level to avoid building a huge in-memory list.
+				const chunkSize = 1000
+				var lastID uuid.UUID
+				for {
+					query := tx.SigningKeyshare.Query().
 						Where(
 							signingkeyshare.StatusEQ(st.KeyshareStatusPending),
 							signingkeyshare.CoordinatorIndexEQ(config.Index),
-							signingkeyshare.CreateTimeLT(cutoff),
+							signingkeyshare.CreateTimeGTE(cutoff),
+						)
+					if lastID != uuid.Nil {
+						query = query.Where(signingkeyshare.IDGT(lastID))
+					}
+					rows, err := query.
+						Order(
+							signingkeyshare.ByID(sql.OrderAsc()),
 						).
-						SetStatus(st.KeyshareStatusAbandoned).
-						Save(ctx); err != nil {
+						Limit(chunkSize).
+						All(ctx)
+					if err != nil {
 						return err
-					} else if abandonedCount > 0 {
-						logger.Sugar().Errorf("Abandoned %d stale pending DKG keyshares (older than %s)", abandonedCount, cutoff)
+					}
+					if len(rows) == 0 {
+						return nil
 					}
 
-					// Attempt to confirm keys with all operators.
-					// Use best-effort mode: if some keys are missing on some operators
-					// (e.g., due to transaction rollback), we still mark the keys that
-					// ARE available across all operators as AVAILABLE.
-					// Paginate at the DB level to avoid building a huge in-memory list.
-					const chunkSize = 1000
-					var lastID uuid.UUID
-					for {
-						query := tx.SigningKeyshare.Query().
-							Where(
-								signingkeyshare.StatusEQ(st.KeyshareStatusPending),
-								signingkeyshare.CoordinatorIndexEQ(config.Index),
-								signingkeyshare.CreateTimeGTE(cutoff),
-							)
-						if lastID != uuid.Nil {
-							query = query.Where(signingkeyshare.IDGT(lastID))
-						}
-						rows, err := query.
-							Order(
-								signingkeyshare.ByID(sql.OrderAsc()),
-							).
-							Limit(chunkSize).
-							All(ctx)
-						if err != nil {
-							return err
-						}
-						if len(rows) == 0 {
-							return nil
-						}
-
-						keyIDs := make([]uuid.UUID, 0, len(rows))
-						for _, r := range rows {
-							keyIDs = append(keyIDs, r.ID)
-						}
-
-						batchID := uuid.New()
-						logger.Sugar().Warnf("Confirming batch of %d pending DKG keys (batch_id: %s)", len(keyIDs), batchID)
-						if err := sodkg.ConfirmAndMarkAvailableKeys(ctx, config, keyIDs, batchID); err != nil {
-							// Log error but continue with next batch
-							logger.With(zap.Error(err)).Sugar().Warnf("Failed to confirm batch of %d keys (batch_id: %s)", len(keyIDs), batchID)
-						}
-
-						last := rows[len(rows)-1]
-						lastID = last.ID
+					keyIDs := make([]uuid.UUID, 0, len(rows))
+					for _, r := range rows {
+						keyIDs = append(keyIDs, r.ID)
 					}
-				},
+
+					batchID := uuid.New()
+					logger.Sugar().Warnf("Confirming batch of %d pending DKG keys (batch_id: %s)", len(keyIDs), batchID)
+					if err := sodkg.ConfirmAndMarkAvailableKeys(ctx, config, keyIDs, batchID); err != nil {
+						// Log error but continue with next batch
+						logger.With(zap.Error(err)).Sugar().Warnf("Failed to confirm batch of %d keys (batch_id: %s)", len(keyIDs), batchID)
+					}
+
+					last := rows[len(rows)-1]
+					lastID = last.ID
+				}
 			},
 		},
 		{
 			ExecutionInterval: 1 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "cancel_expired_transfers",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					h := handler.NewTransferHandler(config)
+			Name:              "cancel_expired_transfers",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx)
+				h := handler.NewTransferHandler(config)
 
-					tx, err := ent.GetDbFromContext(ctx)
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+
+				// Split OR query into two separate queries for better index usage
+				// Query 1: SENDER_INITIATED transfers (not COUNTER_SWAP)
+				// Order by expiry_time ASC to cancel oldest expired transfers first
+				const maxTransfers = 1000
+				senderInitiatedTransferQuery := tx.Transfer.Query().Where(
+					transfer.StatusEQ(st.TransferStatusSenderInitiated),
+					transfer.TypeNEQ(st.TransferTypeCounterSwap),
+					transfer.ExpiryTimeLT(time.Now()),
+					transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
+				).Order(ent.Asc(transfer.FieldExpiryTime)).Limit(maxTransfers)
+
+				senderInitiatedTransfers, err := senderInitiatedTransferQuery.All(ctx)
+				if err != nil {
+					return err
+				}
+
+				// Query 2: SENDER_KEY_TWEAK_PENDING transfers of the 2PC-routed
+				// types whose participant Prepare persists this status durably
+				// (PREIMAGE_SWAP; UTXO_SWAP for the static-deposit flows). An
+				// aborted round can strand such a transfer with its leaves
+				// locked; expiry is the recovery that returns them.
+				// PRIMARY/COUNTER_SWAP_V3 are deliberately excluded even though
+				// their consensus flows also persist this status: cancelling a
+				// counter requires reverting the primary's
+				// APPLYING_SENDER_KEY_TWEAK fence, which only the flow's own
+				// Rollback knows how to do — the FlowExecution reconciler (which
+				// replays that Rollback via presumed-abort) owns their recovery,
+				// and the swap-v3 primary has its own expiry sweep below.
+				// Order by expiry_time ASC to cancel oldest expired transfers first
+				senderKeyTweakPendingTransferQuery := tx.Transfer.Query().Where(
+					transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
+					transfer.TypeIn(st.TransferTypePreimageSwap, st.TransferTypeUtxoSwap),
+					transfer.ExpiryTimeLT(time.Now()),
+					transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
+				).Order(ent.Asc(transfer.FieldExpiryTime)).Limit(maxTransfers)
+
+				senderKeyTweakPendingTransfers, err := senderKeyTweakPendingTransferQuery.All(ctx)
+				if err != nil {
+					return err
+				}
+				transfers := append(senderInitiatedTransfers, senderKeyTweakPendingTransfers...)
+
+				for _, dbTransfer := range transfers {
+					logger.Sugar().Infof("Cancelling transfer %s", dbTransfer.ID)
+					err := h.CancelTransferInternal(ctx, dbTransfer.ID)
 					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+						logger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer %s", dbTransfer.ID)
 					}
+				}
 
-					// Split OR query into two separate queries for better index usage
-					// Query 1: SENDER_INITIATED transfers (not COUNTER_SWAP)
-					// Order by expiry_time ASC to cancel oldest expired transfers first
-					const maxTransfers = 1000
-					senderInitiatedTransferQuery := tx.Transfer.Query().Where(
-						transfer.StatusEQ(st.TransferStatusSenderInitiated),
-						transfer.TypeNEQ(st.TransferTypeCounterSwap),
-						transfer.ExpiryTimeLT(time.Now()),
-						transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
-					).Order(ent.Asc(transfer.FieldExpiryTime)).Limit(maxTransfers)
-
-					senderInitiatedTransfers, err := senderInitiatedTransferQuery.All(ctx)
-					if err != nil {
-						return err
-					}
-
-					// Query 2: SENDER_KEY_TWEAK_PENDING transfers of the 2PC-routed
-					// types whose participant Prepare persists this status durably
-					// (PREIMAGE_SWAP; UTXO_SWAP for the static-deposit flows). An
-					// aborted round can strand such a transfer with its leaves
-					// locked; expiry is the recovery that returns them.
-					// PRIMARY/COUNTER_SWAP_V3 are deliberately excluded even though
-					// their consensus flows also persist this status: cancelling a
-					// counter requires reverting the primary's
-					// APPLYING_SENDER_KEY_TWEAK fence, which only the flow's own
-					// Rollback knows how to do — the FlowExecution reconciler (which
-					// replays that Rollback via presumed-abort) owns their recovery,
-					// and the swap-v3 primary has its own expiry sweep below.
-					// Order by expiry_time ASC to cancel oldest expired transfers first
-					senderKeyTweakPendingTransferQuery := tx.Transfer.Query().Where(
-						transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
-						transfer.TypeIn(st.TransferTypePreimageSwap, st.TransferTypeUtxoSwap),
-						transfer.ExpiryTimeLT(time.Now()),
-						transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
-					).Order(ent.Asc(transfer.FieldExpiryTime)).Limit(maxTransfers)
-
-					senderKeyTweakPendingTransfers, err := senderKeyTweakPendingTransferQuery.All(ctx)
-					if err != nil {
-						return err
-					}
-					transfers := append(senderInitiatedTransfers, senderKeyTweakPendingTransfers...)
-
-					for _, dbTransfer := range transfers {
-						logger.Sugar().Infof("Cancelling transfer %s", dbTransfer.ID)
-						err := h.CancelTransferInternal(ctx, dbTransfer.ID)
-						if err != nil {
-							logger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer %s", dbTransfer.ID)
-						}
-					}
-
-					return nil
-				},
+				return nil
 			},
 		},
 		{
 			ExecutionInterval: 1 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "cancel_expired_primary_transfers_swap_v3",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					// Cancel primary transfers for Swap V3 before they started to settle the key tweaks
+			Name:              "cancel_expired_primary_transfers_swap_v3",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				// Cancel primary transfers for Swap V3 before they started to settle the key tweaks
 
-					logger := logging.GetLoggerFromContext(ctx)
-					h := handler.NewTransferHandler(config)
+				logger := logging.GetLoggerFromContext(ctx)
+				h := handler.NewTransferHandler(config)
 
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
 
-					query := tx.Transfer.Query().Where(
-						transfer.And(
-							transfer.Or(
-								transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
-								transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
-							),
-							transfer.TypeEQ(st.TransferTypePrimarySwapV3),
-							transfer.ExpiryTimeLT(time.Now()),
-							transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
+				query := tx.Transfer.Query().Where(
+					transfer.And(
+						transfer.Or(
+							transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
+							transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
 						),
-					)
+						transfer.TypeEQ(st.TransferTypePrimarySwapV3),
+						transfer.ExpiryTimeLT(time.Now()),
+						transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
+					),
+				)
 
-					transfers, err := query.All(ctx)
+				transfers, err := query.All(ctx)
+				if err != nil {
+					return err
+				}
+
+				for _, dbTransfer := range transfers {
+					logger.Sugar().Infof("Cancelling transfer %s", dbTransfer.ID)
+					// Checking for an active counter transfer is not required since a counter
+					// transfer creation will move both transfer to a non-cancellable status
+					// `TransferStatusApplyingSenderKeyTweak`.
+					err := h.CancelTransferInternal(ctx, dbTransfer.ID)
 					if err != nil {
-						return err
+						logger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer %s", dbTransfer.ID)
 					}
+				}
 
-					for _, dbTransfer := range transfers {
-						logger.Sugar().Infof("Cancelling transfer %s", dbTransfer.ID)
-						// Checking for an active counter transfer is not required since a counter
-						// transfer creation will move both transfer to a non-cancellable status
-						// `TransferStatusApplyingSenderKeyTweak`.
-						err := h.CancelTransferInternal(ctx, dbTransfer.ID)
-						if err != nil {
-							logger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer %s", dbTransfer.ID)
-						}
-					}
-
-					return nil
-				},
+				return nil
 			},
 		},
 		{
 			ExecutionInterval: 1 * time.Hour,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "retire_abandoned_pending_trees",
-				Timeout:      &retireAbandonedPendingTreesTimeout,
-				RunInTestEnv: false,
-				Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
-					return retireAbandonedPendingTrees(ctx)
-				},
+			Name:              "retire_abandoned_pending_trees",
+			Timeout:           &retireAbandonedPendingTreesTimeout,
+			RunInTestEnv:      false,
+			Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
+				return retireAbandonedPendingTrees(ctx)
 			},
 		},
 		{
 			ExecutionInterval: 1 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name: "resume_send_transfer",
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					h := handler.NewTransferHandler(config)
+			Name:              "resume_send_transfer",
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx)
+				h := handler.NewTransferHandler(config)
 
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-					resumeSendTransferLimit := knobsService.GetValue(knobs.KnobResumeSendTransferLimit, 100)
-					transfers, err := tx.Transfer.Query().Where(
-						transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
-						transfer.TypeNEQ(st.TransferTypeCooperativeExit),
-					).Limit(int(resumeSendTransferLimit)).ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
-					if err != nil {
-						return err
-					}
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+				resumeSendTransferLimit := knobsService.GetValue(knobs.KnobResumeSendTransferLimit, 100)
+				transfers, err := tx.Transfer.Query().Where(
+					transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
+					transfer.TypeNEQ(st.TransferTypeCooperativeExit),
+				).Limit(int(resumeSendTransferLimit)).ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
+				if err != nil {
+					return err
+				}
 
-					for _, dbTransfer := range transfers {
-						if dbTransfer.Type == st.TransferTypePreimageSwap {
-							preimageRequest, err := tx.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(transfer.IDEQ(dbTransfer.ID))).Only(ctx)
-							if err != nil {
-								logger.Error("Failed to get preimage request for transfer", zap.Error(err))
-								continue
-							}
-							if preimageRequest.Status != st.PreimageRequestStatusPreimageShared {
-								continue
-							}
-						}
-						err := h.ResumeSendTransfer(ctx, dbTransfer)
+				for _, dbTransfer := range transfers {
+					if dbTransfer.Type == st.TransferTypePreimageSwap {
+						preimageRequest, err := tx.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(transfer.IDEQ(dbTransfer.ID))).Only(ctx)
 						if err != nil {
-							logger.Error("Failed to resume send transfer", zap.Error(err))
+							logger.Error("Failed to get preimage request for transfer", zap.Error(err))
+							continue
+						}
+						if preimageRequest.Status != st.PreimageRequestStatusPreimageShared {
+							continue
 						}
 					}
-					return nil
-				},
+					err := h.ResumeSendTransfer(ctx, dbTransfer)
+					if err != nil {
+						logger.Error("Failed to resume send transfer", zap.Error(err))
+					}
+				}
+				return nil
 			},
 		},
 		{
 			ExecutionInterval: 5 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "finalize_revealed_token_transactions",
-				RunInTestEnv: true,
-				Timeout:      &finalizeRevealedTokenTransactionsTimeout,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
+			Name:              "finalize_revealed_token_transactions",
+			RunInTestEnv:      true,
+			Timeout:           &finalizeRevealedTokenTransactionsTimeout,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx)
 
-					batchLimit := int(knobsService.GetValue(
-						knobs.KnobFinalizeRevealedTokenTransactionsBatchLimit,
-						float64(defaultFinalizeRevealedTokenTransactionsBatchLimit),
-					))
-					if batchLimit <= 0 {
-						batchLimit = defaultFinalizeRevealedTokenTransactionsBatchLimit
+				batchLimit := int(knobsService.GetValue(
+					knobs.KnobFinalizeRevealedTokenTransactionsBatchLimit,
+					float64(defaultFinalizeRevealedTokenTransactionsBatchLimit),
+				))
+				if batchLimit <= 0 {
+					batchLimit = defaultFinalizeRevealedTokenTransactionsBatchLimit
+				}
+				maxRuntime := time.Duration(knobsService.GetValue(
+					knobs.KnobFinalizeRevealedTokenTransactionsMaxRuntimeSeconds,
+					float64(defaultFinalizeRevealedTokenTransactionsMaxRuntimeSec),
+				)) * time.Second
+
+				signTokenHandler := tokens.NewSignTokenHandler(config)
+				var errs []error
+				var cursor uuid.UUID
+				start := time.Now()
+				for {
+					// Finalization commits the session tx mid-run, so re-fetch the live
+					// client each iteration rather than reuse a committed one.
+					dbTX, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						errs = append(errs, fmt.Errorf("[cron] failed to get or create current tx for request: %w", err))
+						break
 					}
-					maxRuntime := time.Duration(knobsService.GetValue(
-						knobs.KnobFinalizeRevealedTokenTransactionsMaxRuntimeSeconds,
-						float64(defaultFinalizeRevealedTokenTransactionsMaxRuntimeSec),
-					)) * time.Second
+					tokenTransactions, err := dbTX.TokenTransaction.Query().
+						Where(
+							tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),
+							tokentransaction.UpdateTimeLT(
+								time.Now().Add(-5*time.Minute).UTC(),
+							),
+							tokentransaction.HasSpentOutput(),
+							tokentransaction.IDGT(cursor),
+						).
+						WithPeerSignatures().
+						WithSparkInvoice().
+						WithSpentOutput(func(q *ent.TokenOutputQuery) {
+							q.WithOutputCreatedTokenTransaction()
+							q.WithTokenPartialRevocationSecretShares()
+							q.WithRevocationKeyshare()
+							q.ForUpdate()
+						}).
+						WithCreatedOutput(func(q *ent.TokenOutputQuery) {
+							q.ForUpdate()
+						}).
+						Order(ent.Asc(tokentransaction.FieldID)).
+						Limit(batchLimit).
+						ForUpdate(sql.WithLockAction(sql.SkipLocked)).
+						All(ctx)
+					if err != nil {
+						errs = append(errs, fmt.Errorf("[cron] failed to query revealed token transactions: %w", err))
+						break
+					}
+					if len(tokenTransactions) == 0 {
+						break
+					}
+					logger.Sugar().Infof("[cron] Finalizing batch of %d revealed token transactions", len(tokenTransactions))
 
-					signTokenHandler := tokens.NewSignTokenHandler(config)
-					var errs []error
-					var cursor uuid.UUID
-					start := time.Now()
-					for {
-						// Finalization commits the session tx mid-run, so re-fetch the live
-						// client each iteration rather than reuse a committed one.
-						dbTX, err := ent.GetDbFromContext(ctx)
-						if err != nil {
-							errs = append(errs, fmt.Errorf("[cron] failed to get or create current tx for request: %w", err))
-							break
-						}
-						tokenTransactions, err := dbTX.TokenTransaction.Query().
-							Where(
-								tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),
-								tokentransaction.UpdateTimeLT(
-									time.Now().Add(-5*time.Minute).UTC(),
-								),
-								tokentransaction.HasSpentOutput(),
-								tokentransaction.IDGT(cursor),
-							).
-							WithPeerSignatures().
-							WithSparkInvoice().
-							WithSpentOutput(func(q *ent.TokenOutputQuery) {
-								q.WithOutputCreatedTokenTransaction()
-								q.WithTokenPartialRevocationSecretShares()
-								q.WithRevocationKeyshare()
-								q.ForUpdate()
-							}).
-							WithCreatedOutput(func(q *ent.TokenOutputQuery) {
-								q.ForUpdate()
-							}).
-							Order(ent.Asc(tokentransaction.FieldID)).
-							Limit(batchLimit).
-							ForUpdate(sql.WithLockAction(sql.SkipLocked)).
-							All(ctx)
-						if err != nil {
-							errs = append(errs, fmt.Errorf("[cron] failed to query revealed token transactions: %w", err))
-							break
-						}
-						if len(tokenTransactions) == 0 {
-							break
-						}
-						logger.Sugar().Infof("[cron] Finalizing batch of %d revealed token transactions", len(tokenTransactions))
-
-						for _, tokenTransaction := range tokenTransactions {
-							finalizeCtx, _ := logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
-							if err := signTokenHandler.TryFinalizeRevealedTokenTransaction(finalizeCtx, tokenTransaction); err != nil {
-								errs = append(errs, fmt.Errorf("[cron] failed to finalize revealed token transaction %s: %w", tokenTransaction.ID, err))
-							}
-						}
-						cursor = tokenTransactions[len(tokenTransactions)-1].ID
-
-						if len(tokenTransactions) < batchLimit || time.Since(start) >= maxRuntime {
-							break
+					for _, tokenTransaction := range tokenTransactions {
+						finalizeCtx, _ := logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
+						if err := signTokenHandler.TryFinalizeRevealedTokenTransaction(finalizeCtx, tokenTransaction); err != nil {
+							errs = append(errs, fmt.Errorf("[cron] failed to finalize revealed token transaction %s: %w", tokenTransaction.ID, err))
 						}
 					}
-					return errors.Join(errs...)
-				},
+					cursor = tokenTransactions[len(tokenTransactions)-1].ID
+
+					if len(tokenTransactions) < batchLimit || time.Since(start) >= maxRuntime {
+						break
+					}
+				}
+				return errors.Join(errs...)
 			},
 		},
 		{
 			ExecutionInterval: 30 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "retry_signed_token_transaction_broadcasts",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					if knobsService == nil || !knobsService.RolloutRandom(knobs.KnobTokenTransactionV3Phase2RetryEnabled, 0) {
-						return nil
-					}
-					return tokens.RetryIncompleteSignatureBroadcasts(ctx, config)
-				},
+			Name:              "retry_signed_token_transaction_broadcasts",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				if knobsService == nil || !knobsService.RolloutRandom(knobs.KnobTokenTransactionV3Phase2RetryEnabled, 0) {
+					return nil
+				}
+				return tokens.RetryIncompleteSignatureBroadcasts(ctx, config)
 			},
 		},
 		{
 			ExecutionInterval: 20 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "send_gossip",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					gossipHandler := handler.NewSendGossipHandler(config)
-					tx, err := ent.GetDbFromContext(ctx)
+			Name:              "send_gossip",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx)
+				gossipHandler := handler.NewSendGossipHandler(config)
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+
+				gossipLimit := knobsService.GetValue(knobs.KnobGossipLimit, 50)
+				boundaryUUID := uuids.UUIDv7FromTime(time.Now().Add(-20 * time.Second))
+				query := tx.Gossip.Query().Where(
+					gossip.StatusEQ(st.GossipStatusPending),
+					gossip.IDLT(boundaryUUID),
+				).Limit(int(gossipLimit))
+				gossips, err := query.ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
+				if err != nil {
+					return err
+				}
+
+				for _, gossipMsg := range gossips {
+					_, err := gossipHandler.SendGossipMessage(ctx, gossipMsg)
 					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+						logger.Error("Failed to send gossip", zap.Error(err))
 					}
+				}
 
-					gossipLimit := knobsService.GetValue(knobs.KnobGossipLimit, 50)
-					boundaryUUID := uuids.UUIDv7FromTime(time.Now().Add(-20 * time.Second))
-					query := tx.Gossip.Query().Where(
-						gossip.StatusEQ(st.GossipStatusPending),
-						gossip.IDLT(boundaryUUID),
-					).Limit(int(gossipLimit))
-					gossips, err := query.ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
-					if err != nil {
-						return err
-					}
+				// Record oldest pending gossip age + pending count after processing
+				oldestPending, err := tx.Gossip.Query().
+					Where(gossip.StatusEQ(st.GossipStatusPending)).
+					Order(gossip.ByCreateTime(sql.OrderAsc())).
+					First(ctx)
+				if err == nil {
+					ageMs := time.Since(oldestPending.CreateTime).Milliseconds()
+					oldestPendingGossipAgeGauge.Record(ctx, ageMs)
+				} else if ent.IsNotFound(err) {
+					oldestPendingGossipAgeGauge.Record(ctx, 0)
+				} else {
+					logger.Warn("Failed to query oldest pending gossip message", zap.Error(err))
+				}
 
-					for _, gossipMsg := range gossips {
-						_, err := gossipHandler.SendGossipMessage(ctx, gossipMsg)
-						if err != nil {
-							logger.Error("Failed to send gossip", zap.Error(err))
-						}
-					}
+				pendingCount, err := tx.Gossip.Query().
+					Where(gossip.StatusEQ(st.GossipStatusPending)).
+					Count(ctx)
+				if err != nil {
+					logger.Warn("Failed to count pending gossip messages", zap.Error(err))
+				} else {
+					pendingGossipCountGauge.Record(ctx, int64(pendingCount))
+				}
 
-					// Record oldest pending gossip age + pending count after processing
-					oldestPending, err := tx.Gossip.Query().
-						Where(gossip.StatusEQ(st.GossipStatusPending)).
-						Order(gossip.ByCreateTime(sql.OrderAsc())).
-						First(ctx)
-					if err == nil {
-						ageMs := time.Since(oldestPending.CreateTime).Milliseconds()
-						oldestPendingGossipAgeGauge.Record(ctx, ageMs)
-					} else if ent.IsNotFound(err) {
-						oldestPendingGossipAgeGauge.Record(ctx, 0)
-					} else {
-						logger.Warn("Failed to query oldest pending gossip message", zap.Error(err))
-					}
-
-					pendingCount, err := tx.Gossip.Query().
-						Where(gossip.StatusEQ(st.GossipStatusPending)).
-						Count(ctx)
-					if err != nil {
-						logger.Warn("Failed to count pending gossip messages", zap.Error(err))
-					} else {
-						pendingGossipCountGauge.Record(ctx, int64(pendingCount))
-					}
-
-					return nil
-				},
+				return nil
 			},
 		},
 		{
 			ExecutionInterval: 30 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "reconcile_stuck_flow_executions",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					return ReconcileStuckParticipantFlows(ctx, config, knobsService)
-				},
+			Name:              "reconcile_stuck_flow_executions",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				return ReconcileStuckParticipantFlows(ctx, config, knobsService)
 			},
 		},
 		{
 			ExecutionInterval: 1 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "sweep_stale_coordinator_flow_executions",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					return SweepStaleCoordinatorFlows(ctx, config, knobsService)
-				},
+			Name:              "sweep_stale_coordinator_flow_executions",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				return SweepStaleCoordinatorFlows(ctx, config, knobsService)
 			},
 		},
 		{
@@ -624,524 +598,500 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			// longer than the TTL is a bug we want to investigate, not silently
 			// drop.
 			ExecutionInterval: 7 * 24 * time.Hour,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "purge_terminal_flow_executions",
-				Timeout:      &purgeTerminalFlowExecutionsTimeout,
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					return PurgeTerminalFlowExecutions(ctx, purgeTerminalFlowExecutionsTTL, purgeTerminalFlowExecutionsBatchSize)
-				},
+			Name:              "purge_terminal_flow_executions",
+			Timeout:           &purgeTerminalFlowExecutionsTimeout,
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				return PurgeTerminalFlowExecutions(ctx, purgeTerminalFlowExecutionsTTL, purgeTerminalFlowExecutionsBatchSize)
 			},
 		},
 		{
 			ExecutionInterval: 1 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "complete_utxo_swap",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
+			Name:              "complete_utxo_swap",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx)
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
 
-					query := tx.UtxoSwap.Query().
-						Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
-						Where(utxoswap.CoordinatorIdentityPublicKeyEQ(config.IdentityPublicKey())).
-						// Only try to auto complete utxo swaps older than 300 seconds
-						// allowing the core flow to complete the utxo swap first.
-						Where(utxoswap.CreateTimeLT(time.Now().Add(-5 * time.Minute))).
-						// Do not complete instant utxo swaps, these will be completed by another task.
-						Where(utxoswap.RequestTypeNEQ(st.UtxoSwapRequestTypeInstant)).
-						Order(utxoswap.ByCreateTime(sql.OrderDesc())).
-						Limit(100)
+				query := tx.UtxoSwap.Query().
+					Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
+					Where(utxoswap.CoordinatorIdentityPublicKeyEQ(config.IdentityPublicKey())).
+					// Only try to auto complete utxo swaps older than 300 seconds
+					// allowing the core flow to complete the utxo swap first.
+					Where(utxoswap.CreateTimeLT(time.Now().Add(-5 * time.Minute))).
+					// Do not complete instant utxo swaps, these will be completed by another task.
+					Where(utxoswap.RequestTypeNEQ(st.UtxoSwapRequestTypeInstant)).
+					Order(utxoswap.ByCreateTime(sql.OrderDesc())).
+					Limit(100)
 
-					// Consensus (2PC) refund and fixed-amount swap rows structurally never
-					// match this query: participant rows carry the coordinator's key
-					// (DispatchPrepare rejects a prepare naming the receiver as
-					// coordinator), and the coordinator's own row is created and
-					// completed within the same request transaction, so it is only
-					// ever visible COMPLETED or CANCELLED — never CREATED under this
-					// SO's key. Any CREATED refund or fixed-amount row matched here is
-					// therefore a legacy stray (coordinator died between create-fanout
-					// and complete), and sweeping it keeps the legacy self-heal path
-					// alive: refund retries only re-sign against
-					// a COMPLETED swap, and fixed swaps have no re-sign path at all,
-					// so an unswept stray would block the UTXO's active-swap slot
-					// indefinitely.
-					utxoSwaps, err := query.All(ctx)
-					if err != nil {
-						return err
-					}
+				// Consensus (2PC) refund and fixed-amount swap rows structurally never
+				// match this query: participant rows carry the coordinator's key
+				// (DispatchPrepare rejects a prepare naming the receiver as
+				// coordinator), and the coordinator's own row is created and
+				// completed within the same request transaction, so it is only
+				// ever visible COMPLETED or CANCELLED — never CREATED under this
+				// SO's key. Any CREATED refund or fixed-amount row matched here is
+				// therefore a legacy stray (coordinator died between create-fanout
+				// and complete), and sweeping it keeps the legacy self-heal path
+				// alive: refund retries only re-sign against
+				// a COMPLETED swap, and fixed swaps have no re-sign path at all,
+				// so an unswept stray would block the UTXO's active-swap slot
+				// indefinitely.
+				utxoSwaps, err := query.All(ctx)
+				if err != nil {
+					return err
+				}
 
-					for _, utxoSwap := range utxoSwaps {
-						// Resolve the transfer via the edge with a requested_transfer_id
-						// fallback. A swap orphaned before completion never had its transfer
-						// edge persisted, but requested_transfer_id is always set at creation.
-						// Relying on the edge alone here would skip such a swap forever,
-						// leaving it CREATED while its transfer is already SENDER_KEY_TWEAKED
-						// (receiver-claimable). See SP-3261.
-						var dbTransfer *ent.Transfer
-						if utxoSwap.RequestType != st.UtxoSwapRequestTypeRefund {
-							transfer, needUpdate, err := handler.GetTransferFromUtxoSwap(ctx, utxoSwap)
-							if err != nil {
-								logger.With(zap.Error(err)).Sugar().Debugf("No transfer found for a non-refund utxo swap %s", utxoSwap.ID)
-								continue
-							}
-							dbTransfer = transfer
-							if needUpdate {
-								if _, err := utxoSwap.Update().SetTransfer(dbTransfer).Save(ctx); err != nil {
-									logger.With(zap.Error(err)).Sugar().Warnf("Failed to repair transfer linkage for utxo swap %s", utxoSwap.ID)
-									continue
-								}
-							}
-						}
-
-						// If the utxo swap is a refund or the transfer is sent, mark the utxo swap as completed.
-						// Generally, if utxo swap has a transfer, then it means the transfer is sent,
-						// we just double check that it was not accidentally cancelled.
-						// Checking if the transfer is Completed is not enough because the
-						// transfer can be not yet claimed by the user, but utxo swap is
-						// completed as far as the SE is concerned.
-						if utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund || transferHelper.IsTransferSent(dbTransfer) {
-							logger.Sugar().Debugf("Marking utxo swap %s as completed", utxoSwap.ID)
-
-							utxo, err := utxoSwap.QueryUtxo().Only(ctx)
-							if err != nil {
-								if ent.IsNotFound(err) {
-									logger.Sugar().Debugf("No utxo found for utxo swap %s, skipping", utxoSwap.ID)
-									continue
-								}
-								return fmt.Errorf("unable to get utxo: %w", err)
-							}
-							protoNetwork, err := utxo.Network.MarshalProto()
-							if err != nil {
-								return fmt.Errorf("unable to get proto network: %w", err)
-							}
-							protoUtxo := &pbspark.UTXO{
-								Txid:    utxo.Txid,
-								Vout:    utxo.Vout,
-								Network: protoNetwork,
-							}
-
-							// Non-instant swaps: the cron does not know the original threshold.
-							// nil falls back to receiver-side default (network config / 3).
-							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo, nil)
-							if err != nil {
-								logger.Warn("Failed to get complete swap for utxo request, cron task to retry", zap.Error(err))
-							} else {
-								h := handler.NewInternalDepositHandler(config)
-								if err := h.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
-									logger.Warn("Failed to mark a utxo swap as completed in all operators, cron task to retry", zap.Error(err))
-								}
-							}
-						}
-					}
-					return nil
-				},
-			},
-		},
-		{
-			ExecutionInterval: 1 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "complete_instant_utxo_swap",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-
-					query := tx.UtxoSwap.Query().
-						Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
-						Where(utxoswap.CoordinatorIdentityPublicKeyEQ(config.IdentityPublicKey())).
-						Where(utxoswap.CreateTimeLT(time.Now().Add(-2 * time.Minute))).
-						Where(utxoswap.RequestTypeEQ(st.UtxoSwapRequestTypeInstant)).
-						Where(utxoswap.HasUtxo()).
-						WithUtxo().
-						WithTransfer().
-						Order(utxoswap.ByCreateTime(sql.OrderAsc())).
-						Limit(100)
-
-					utxoSwaps, err := query.All(ctx)
-					if err != nil {
-						return err
-					}
-
-					h := handler.NewInternalDepositHandler(config)
-					for _, utxoSwap := range utxoSwaps {
-						dbTransfer := utxoSwap.Edges.Transfer
-						if dbTransfer == nil {
-							logger.Sugar().Debugf("No transfer found for instant utxo swap %s", utxoSwap.ID)
+				for _, utxoSwap := range utxoSwaps {
+					// Resolve the transfer via the edge with a requested_transfer_id
+					// fallback. A swap orphaned before completion never had its transfer
+					// edge persisted, but requested_transfer_id is always set at creation.
+					// Relying on the edge alone here would skip such a swap forever,
+					// leaving it CREATED while its transfer is already SENDER_KEY_TWEAKED
+					// (receiver-claimable). See SP-3261.
+					var dbTransfer *ent.Transfer
+					if utxoSwap.RequestType != st.UtxoSwapRequestTypeRefund {
+						transfer, needUpdate, err := handler.GetTransferFromUtxoSwap(ctx, utxoSwap)
+						if err != nil {
+							logger.With(zap.Error(err)).Sugar().Debugf("No transfer found for a non-refund utxo swap %s", utxoSwap.ID)
 							continue
 						}
-
-						if transferHelper.IsTransferSent(dbTransfer) {
-							logger.Sugar().Infof("Completing orphaned instant utxo swap %s", utxoSwap.ID)
-
-							utxo := utxoSwap.Edges.Utxo
-							protoNetwork, err := utxo.Network.MarshalProto()
-							if err != nil {
-								return fmt.Errorf("unable to get proto network: %w", err)
-							}
-							protoUtxo := &pbspark.UTXO{
-								Txid:    utxo.Txid,
-								Vout:    utxo.Vout,
-								Network: protoNetwork,
-							}
-
-							// Cron is filtered to RequestType==Instant, so the original
-							// threshold is always 1.
-							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo, new(uint32(1)))
-							if err != nil {
-								logger.Warn("Failed to create complete swap request for instant utxo swap", zap.Error(err))
-							} else {
-								if err := h.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
-									logger.Warn("Failed to complete instant utxo swap in all operators, will retry", zap.Error(err))
-								}
+						dbTransfer = transfer
+						if needUpdate {
+							if _, err := utxoSwap.Update().SetTransfer(dbTransfer).Save(ctx); err != nil {
+								logger.With(zap.Error(err)).Sugar().Warnf("Failed to repair transfer linkage for utxo swap %s", utxoSwap.ID)
+								continue
 							}
 						}
 					}
-					return nil
-				},
+
+					// If the utxo swap is a refund or the transfer is sent, mark the utxo swap as completed.
+					// Generally, if utxo swap has a transfer, then it means the transfer is sent,
+					// we just double check that it was not accidentally cancelled.
+					// Checking if the transfer is Completed is not enough because the
+					// transfer can be not yet claimed by the user, but utxo swap is
+					// completed as far as the SE is concerned.
+					if utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund || transferHelper.IsTransferSent(dbTransfer) {
+						logger.Sugar().Debugf("Marking utxo swap %s as completed", utxoSwap.ID)
+
+						utxo, err := utxoSwap.QueryUtxo().Only(ctx)
+						if err != nil {
+							if ent.IsNotFound(err) {
+								logger.Sugar().Debugf("No utxo found for utxo swap %s, skipping", utxoSwap.ID)
+								continue
+							}
+							return fmt.Errorf("unable to get utxo: %w", err)
+						}
+						protoNetwork, err := utxo.Network.MarshalProto()
+						if err != nil {
+							return fmt.Errorf("unable to get proto network: %w", err)
+						}
+						protoUtxo := &pbspark.UTXO{
+							Txid:    utxo.Txid,
+							Vout:    utxo.Vout,
+							Network: protoNetwork,
+						}
+
+						// Non-instant swaps: the cron does not know the original threshold.
+						// nil falls back to receiver-side default (network config / 3).
+						completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo, nil)
+						if err != nil {
+							logger.Warn("Failed to get complete swap for utxo request, cron task to retry", zap.Error(err))
+						} else {
+							h := handler.NewInternalDepositHandler(config)
+							if err := h.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
+								logger.Warn("Failed to mark a utxo swap as completed in all operators, cron task to retry", zap.Error(err))
+							}
+						}
+					}
+				}
+				return nil
+			},
+		},
+		{
+			ExecutionInterval: 1 * time.Minute,
+			Name:              "complete_instant_utxo_swap",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx)
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+
+				query := tx.UtxoSwap.Query().
+					Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
+					Where(utxoswap.CoordinatorIdentityPublicKeyEQ(config.IdentityPublicKey())).
+					Where(utxoswap.CreateTimeLT(time.Now().Add(-2 * time.Minute))).
+					Where(utxoswap.RequestTypeEQ(st.UtxoSwapRequestTypeInstant)).
+					Where(utxoswap.HasUtxo()).
+					WithUtxo().
+					WithTransfer().
+					Order(utxoswap.ByCreateTime(sql.OrderAsc())).
+					Limit(100)
+
+				utxoSwaps, err := query.All(ctx)
+				if err != nil {
+					return err
+				}
+
+				h := handler.NewInternalDepositHandler(config)
+				for _, utxoSwap := range utxoSwaps {
+					dbTransfer := utxoSwap.Edges.Transfer
+					if dbTransfer == nil {
+						logger.Sugar().Debugf("No transfer found for instant utxo swap %s", utxoSwap.ID)
+						continue
+					}
+
+					if transferHelper.IsTransferSent(dbTransfer) {
+						logger.Sugar().Infof("Completing orphaned instant utxo swap %s", utxoSwap.ID)
+
+						utxo := utxoSwap.Edges.Utxo
+						protoNetwork, err := utxo.Network.MarshalProto()
+						if err != nil {
+							return fmt.Errorf("unable to get proto network: %w", err)
+						}
+						protoUtxo := &pbspark.UTXO{
+							Txid:    utxo.Txid,
+							Vout:    utxo.Vout,
+							Network: protoNetwork,
+						}
+
+						// Cron is filtered to RequestType==Instant, so the original
+						// threshold is always 1.
+						completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo, new(uint32(1)))
+						if err != nil {
+							logger.Warn("Failed to create complete swap request for instant utxo swap", zap.Error(err))
+						} else {
+							if err := h.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
+								logger.Warn("Failed to complete instant utxo swap in all operators, will retry", zap.Error(err))
+							}
+						}
+					}
+				}
+				return nil
 			},
 		},
 		{
 			ExecutionInterval: 30 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "purge_gossip_messages",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					db, err := ent.GetDbFromContext(ctx)
+			Name:              "purge_gossip_messages",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				db, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+				// First query for IDs to delete (with limit), then delete those IDs.
+				// Use ForUpdate with SkipLocked to prevent race conditions when multiple
+				// operators run this task concurrently - each operator will lock and delete
+				// a different set of rows.
+				idsToDelete, err := db.Gossip.Query().
+					Where(gossip.StatusEQ(st.GossipStatusDelivered)).
+					Limit(60000).
+					ForUpdate(sql.WithLockAction(sql.SkipLocked)).
+					IDs(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to query gossip messages to purge: %w", err)
+				}
+				if len(idsToDelete) > 0 {
+					_, err = db.Gossip.Delete().
+						Where(gossip.IDIn(idsToDelete...)).
+						Exec(ctx)
 					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+						return fmt.Errorf("failed to purge gossip messages: %w", err)
 					}
-					// First query for IDs to delete (with limit), then delete those IDs.
-					// Use ForUpdate with SkipLocked to prevent race conditions when multiple
-					// operators run this task concurrently - each operator will lock and delete
-					// a different set of rows.
-					idsToDelete, err := db.Gossip.Query().
-						Where(gossip.StatusEQ(st.GossipStatusDelivered)).
-						Limit(60000).
-						ForUpdate(sql.WithLockAction(sql.SkipLocked)).
-						IDs(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to query gossip messages to purge: %w", err)
-					}
-					if len(idsToDelete) > 0 {
-						_, err = db.Gossip.Delete().
-							Where(gossip.IDIn(idsToDelete...)).
-							Exec(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to purge gossip messages: %w", err)
-						}
-					}
-					return nil
-				},
+				}
+				return nil
 			},
 		},
 		{
-			ExecutionInterval: 20 * time.Second,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:                "purge_signing_nonces",
-				RunInTestEnv:        true,
-				RequiresRawDBClient: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					if signingNoncesPartitioned.Load() {
-						return nil
-					}
+			ExecutionInterval:   20 * time.Second,
+			Name:                "purge_signing_nonces",
+			RunInTestEnv:        true,
+			RequiresRawDBClient: true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				if signingNoncesPartitioned.Load() {
+					return nil
+				}
 
-					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Partition detection must run on the raw client, outside task transaction wrappers.
+				rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Partition detection must run on the raw client, outside task transaction wrappers.
+				if err != nil {
+					return fmt.Errorf("failed to get raw db client from context: %w", err)
+				}
+
+				// Skip if table is partitioned (use purge_signing_nonces_partitions instead)
+				isPartitioned, err := ent.IsSigningNoncesPartitioned(ctx, rawDB)
+				if err != nil {
+					return fmt.Errorf("failed to check if signing_nonces is partitioned: %w", err)
+				}
+				if isPartitioned {
+					signingNoncesPartitioned.Store(true)
+				}
+				if signingNoncesPartitioned.Load() {
+					// Table is partitioned, skip this task (purge_signing_nonces_partitions will handle cleanup)
+					return nil
+				}
+
+				db, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+				cutOffUUID := uuids.UUIDv7FromTime(time.Now().Add(-24 * time.Hour))
+				// First query for IDs to delete (with limit), then delete those IDs.
+				// Use ForUpdate with SkipLocked to prevent race conditions when multiple
+				// operators run this task concurrently - each operator will lock and delete
+				// a different set of rows.
+				idsToDelete, err := db.SigningNonce.Query().
+					Where(signingnonce.IDLT(cutOffUUID)).
+					Limit(60000).
+					ForUpdate(sql.WithLockAction(sql.SkipLocked)).
+					IDs(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to query signing nonces to purge: %w", err)
+				}
+				if len(idsToDelete) > 0 {
+					_, err = db.SigningNonce.Delete().
+						Where(signingnonce.IDIn(idsToDelete...)).
+						Exec(ctx)
 					if err != nil {
-						return fmt.Errorf("failed to get raw db client from context: %w", err)
+						return fmt.Errorf("failed to purge signing nonces: %w", err)
 					}
+				}
+				return nil
+			},
+		},
+		{
+			ExecutionInterval:   1 * time.Hour,
+			Name:                "purge_signing_nonces_partitions",
+			Timeout:             &purgeSigningNoncePartitionsTimeout,
+			RunInTestEnv:        true,
+			RequiresRawDBClient: true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Partition maintenance uses raw Postgres operations that must not run in a transaction.
+				if err != nil {
+					return fmt.Errorf("failed to get raw db client from context: %w", err)
+				}
 
-					// Skip if table is partitioned (use purge_signing_nonces_partitions instead)
+				if !signingNoncesPartitioned.Load() {
+					// Skip if table is NOT partitioned (use purge_signing_nonces instead)
 					isPartitioned, err := ent.IsSigningNoncesPartitioned(ctx, rawDB)
 					if err != nil {
 						return fmt.Errorf("failed to check if signing_nonces is partitioned: %w", err)
 					}
-					if isPartitioned {
-						signingNoncesPartitioned.Store(true)
-					}
-					if signingNoncesPartitioned.Load() {
-						// Table is partitioned, skip this task (purge_signing_nonces_partitions will handle cleanup)
+					if !isPartitioned {
+						// Table is not partitioned yet, skip this task (purge_signing_nonces will handle cleanup)
 						return nil
 					}
+					signingNoncesPartitioned.Store(true)
+				}
 
-					db, err := ent.GetDbFromContext(ctx)
+				t := time.Now()
+				cutoffTime := t.Add(-24 * time.Hour)
+				maxRequestedTime := t.Add(48 * time.Hour)
+				return ent.PurgeAndCreateSigningNoncePartitions(ctx, rawDB, cutoffTime, maxRequestedTime)
+			},
+		},
+		{
+			ExecutionInterval: 5 * time.Minute,
+			Name:              "purge_dangling_signing_keyshare_secrets",
+			RunInTestEnv:      true,
+			Task:              runPurgeDanglingSigningKeyshareSecrets,
+		},
+		{
+			ExecutionInterval: 5 * time.Minute,
+			Name:              "reconcile_signing_keyshare_secret_pointers",
+			RunInTestEnv:      true,
+			Task:              runReconcileSigningKeyshareSecretPointers,
+		},
+		{
+			ExecutionInterval: 5 * time.Minute,
+			Name:              "purge_idempotency_keys",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				cutoffTime := time.Now().Add(-24 * time.Hour)
+				const batchSize = 10000
+
+				for {
+					db, err := ent.GetTxFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
-					cutOffUUID := uuids.UUIDv7FromTime(time.Now().Add(-24 * time.Hour))
-					// First query for IDs to delete (with limit), then delete those IDs.
-					// Use ForUpdate with SkipLocked to prevent race conditions when multiple
-					// operators run this task concurrently - each operator will lock and delete
-					// a different set of rows.
-					idsToDelete, err := db.SigningNonce.Query().
-						Where(signingnonce.IDLT(cutOffUUID)).
-						Limit(60000).
+
+					idsToDelete, err := db.IdempotencyKey.Query().
+						Where(idempotencykey.CreateTimeLT(cutoffTime)).
+						Limit(batchSize).
 						ForUpdate(sql.WithLockAction(sql.SkipLocked)).
 						IDs(ctx)
 					if err != nil {
-						return fmt.Errorf("failed to query signing nonces to purge: %w", err)
+						return fmt.Errorf("failed to query idempotency keys to purge: %w", err)
 					}
-					if len(idsToDelete) > 0 {
-						_, err = db.SigningNonce.Delete().
-							Where(signingnonce.IDIn(idsToDelete...)).
-							Exec(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to purge signing nonces: %w", err)
-						}
+
+					if len(idsToDelete) == 0 {
+						break
 					}
-					return nil
-				},
-			},
-		},
-		{
-			ExecutionInterval: 1 * time.Hour,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:                "purge_signing_nonces_partitions",
-				Timeout:             &purgeSigningNoncePartitionsTimeout,
-				RunInTestEnv:        true,
-				RequiresRawDBClient: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					rawDB, err := GetRawClientFromContext(ctx) //nolint:forbidigo // Partition maintenance uses raw Postgres operations that must not run in a transaction.
+
+					_, err = db.IdempotencyKey.Delete().
+						Where(idempotencykey.IDIn(idsToDelete...)).
+						Exec(ctx)
 					if err != nil {
-						return fmt.Errorf("failed to get raw db client from context: %w", err)
+						return fmt.Errorf("failed to purge idempotency keys: %w", err)
 					}
 
-					if !signingNoncesPartitioned.Load() {
-						// Skip if table is NOT partitioned (use purge_signing_nonces instead)
-						isPartitioned, err := ent.IsSigningNoncesPartitioned(ctx, rawDB)
-						if err != nil {
-							return fmt.Errorf("failed to check if signing_nonces is partitioned: %w", err)
-						}
-						if !isPartitioned {
-							// Table is not partitioned yet, skip this task (purge_signing_nonces will handle cleanup)
-							return nil
-						}
-						signingNoncesPartitioned.Store(true)
+					if err := db.Commit(); err != nil {
+						return fmt.Errorf("failed to commit batch: %w", err)
 					}
 
-					t := time.Now()
-					cutoffTime := t.Add(-24 * time.Hour)
-					maxRequestedTime := t.Add(48 * time.Hour)
-					return ent.PurgeAndCreateSigningNoncePartitions(ctx, rawDB, cutoffTime, maxRequestedTime)
-				},
-			},
-		},
-		{
-			ExecutionInterval: 5 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "purge_dangling_signing_keyshare_secrets",
-				RunInTestEnv: true,
-				Task:         runPurgeDanglingSigningKeyshareSecrets,
-			},
-		},
-		{
-			ExecutionInterval: 5 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "reconcile_signing_keyshare_secret_pointers",
-				RunInTestEnv: true,
-				Task:         runReconcileSigningKeyshareSecretPointers,
-			},
-		},
-		{
-			ExecutionInterval: 5 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "purge_idempotency_keys",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					cutoffTime := time.Now().Add(-24 * time.Hour)
-					const batchSize = 10000
-
-					for {
-						db, err := ent.GetTxFromContext(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to get or create current tx for request: %w", err)
-						}
-
-						idsToDelete, err := db.IdempotencyKey.Query().
-							Where(idempotencykey.CreateTimeLT(cutoffTime)).
-							Limit(batchSize).
-							ForUpdate(sql.WithLockAction(sql.SkipLocked)).
-							IDs(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to query idempotency keys to purge: %w", err)
-						}
-
-						if len(idsToDelete) == 0 {
-							break
-						}
-
-						_, err = db.IdempotencyKey.Delete().
-							Where(idempotencykey.IDIn(idsToDelete...)).
-							Exec(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to purge idempotency keys: %w", err)
-						}
-
-						if err := db.Commit(); err != nil {
-							return fmt.Errorf("failed to commit batch: %w", err)
-						}
-
-						// the last query got less than batchSize rows, so we are done
-						if len(idsToDelete) < batchSize {
-							break
-						}
+					// the last query got less than batchSize rows, so we are done
+					if len(idsToDelete) < batchSize {
+						break
 					}
+				}
 
-					return nil
-				},
+				return nil
 			},
 		},
 		{
 			ExecutionInterval: 1 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "monitor_pending_send_transfers",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_pending_send_transfers"))
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-					now := time.Now()
-					pendingSendTransfers, err := tx.PendingSendTransfer.Query().Where(
-						pendingsendtransfer.StatusEQ(st.PendingSendTransferStatusPending),
-						pendingsendtransfer.UpdateTimeLT(now.Add(-4*time.Minute)),
-					).Limit(100).ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
-					if err != nil {
-						return err
-					}
-					if len(pendingSendTransfers) == 0 {
-						return nil
+			Name:              "monitor_pending_send_transfers",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx).With(zap.String("task.name", "monitor_pending_send_transfers"))
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+				now := time.Now()
+				pendingSendTransfers, err := tx.PendingSendTransfer.Query().Where(
+					pendingsendtransfer.StatusEQ(st.PendingSendTransferStatusPending),
+					pendingsendtransfer.UpdateTimeLT(now.Add(-4*time.Minute)),
+				).Limit(100).ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
+				if err != nil {
+					return err
+				}
+				if len(pendingSendTransfers) == 0 {
+					return nil
+				}
+
+				logger.Sugar().Warnf("found %d stuck pending send transfers (limit=%d, may_have_more=%v)",
+					len(pendingSendTransfers), 100, len(pendingSendTransfers) == 100)
+				cancelledCount := 0
+				finishedCount := 0
+				errorCount := 0
+				for _, pendingSendTransfer := range pendingSendTransfers {
+					transferLogger := logger.With(
+						zap.Stringer("transfer_id", pendingSendTransfer.TransferID),
+						zap.Stringer("pending_send_transfer_id", pendingSendTransfer.ID),
+					)
+					stuckDuration := now.Sub(pendingSendTransfer.UpdateTime)
+					transferLogger.Sugar().Warnf("stuck for %s (since %s)",
+						stuckDuration.Round(time.Second), pendingSendTransfer.UpdateTime.Format(time.RFC3339))
+					transferEnt, err := tx.Transfer.Query().Where(transfer.IDEQ(pendingSendTransfer.TransferID)).Only(ctx)
+					if err != nil && !ent.IsNotFound(err) {
+						transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to get transfer")
+						errorCount++
+						continue
 					}
 
-					logger.Sugar().Warnf("found %d stuck pending send transfers (limit=%d, may_have_more=%v)",
-						len(pendingSendTransfers), 100, len(pendingSendTransfers) == 100)
-					cancelledCount := 0
-					finishedCount := 0
-					errorCount := 0
-					for _, pendingSendTransfer := range pendingSendTransfers {
-						transferLogger := logger.With(
-							zap.Stringer("transfer_id", pendingSendTransfer.TransferID),
-							zap.Stringer("pending_send_transfer_id", pendingSendTransfer.ID),
-						)
-						stuckDuration := now.Sub(pendingSendTransfer.UpdateTime)
-						transferLogger.Sugar().Warnf("stuck for %s (since %s)",
-							stuckDuration.Round(time.Second), pendingSendTransfer.UpdateTime.Format(time.RFC3339))
-						transferEnt, err := tx.Transfer.Query().Where(transfer.IDEQ(pendingSendTransfer.TransferID)).Only(ctx)
-						if err != nil && !ent.IsNotFound(err) {
-							transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to get transfer")
-							errorCount++
-							continue
-						}
-
-						transferNotFound := ent.IsNotFound(err)
-						shouldCancel := transferNotFound || transferEnt.Status == st.TransferStatusReturned
-						if shouldCancel {
-							if transferNotFound {
-								transferLogger.Sugar().Warnf("cancelling (transfer entity not found)")
-							} else {
-								transferLogger.Sugar().Warnf("cancelling (transfer status: %s)", transferEnt.Status)
-							}
-							transferHandler := handler.NewTransferHandler(config)
-							err := transferHandler.CreateCancelTransferGossipMessage(ctx, pendingSendTransfer.TransferID)
-							if err != nil {
-								transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer")
-								errorCount++
-							} else {
-								_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
-								if err != nil {
-									transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to update pending send transfer")
-									errorCount++
-								} else {
-									cancelledCount++
-								}
-							}
+					transferNotFound := ent.IsNotFound(err)
+					shouldCancel := transferNotFound || transferEnt.Status == st.TransferStatusReturned
+					if shouldCancel {
+						if transferNotFound {
+							transferLogger.Sugar().Warnf("cancelling (transfer entity not found)")
 						} else {
-							transferLogger.Sugar().Warnf("marking as finished without cancel (transfer status: %s)", transferEnt.Status)
+							transferLogger.Sugar().Warnf("cancelling (transfer status: %s)", transferEnt.Status)
+						}
+						transferHandler := handler.NewTransferHandler(config)
+						err := transferHandler.CreateCancelTransferGossipMessage(ctx, pendingSendTransfer.TransferID)
+						if err != nil {
+							transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer")
+							errorCount++
+						} else {
 							_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 							if err != nil {
 								transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to update pending send transfer")
 								errorCount++
 							} else {
-								finishedCount++
+								cancelledCount++
 							}
 						}
+					} else {
+						transferLogger.Sugar().Warnf("marking as finished without cancel (transfer status: %s)", transferEnt.Status)
+						_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+						if err != nil {
+							transferLogger.With(zap.Error(err)).Sugar().Errorf("failed to update pending send transfer")
+							errorCount++
+						} else {
+							finishedCount++
+						}
 					}
+				}
 
-					logger.Sugar().Warnf("processed %d stuck transfers (cancelled: %d, finished: %d, errors: %d)",
-						len(pendingSendTransfers), cancelledCount, finishedCount, errorCount)
-					return nil
-				},
+				logger.Sugar().Warnf("processed %d stuck transfers (cancelled: %d, finished: %d, errors: %d)",
+					len(pendingSendTransfers), cancelledCount, finishedCount, errorCount)
+				return nil
 			},
 		},
 		{
 			ExecutionInterval: 10 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "publish_occupancy_metrics",
-				Timeout:      &publishOccupancyMetricsTimeout,
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					return publishOccupancyMetrics(ctx, config)
-				},
+			Name:              "publish_occupancy_metrics",
+			Timeout:           &publishOccupancyMetricsTimeout,
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				return publishOccupancyMetrics(ctx, config)
 			},
 		},
 		{
 			ExecutionInterval: 30 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "purge_event_messages",
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					cutoffTime := time.Now().Add(-1 * time.Hour)
-					const batchSize = 10000
+			Name:              "purge_event_messages",
+			RunInTestEnv:      true,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				cutoffTime := time.Now().Add(-1 * time.Hour)
+				const batchSize = 10000
 
-					for {
-						db, err := ent.GetTxFromContext(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to get or create current tx for request: %w", err)
-						}
-
-						// Query for IDs to delete (with limit)
-						idsToDelete, err := db.EventMessage.Query().
-							Where(eventmessage.CreateTimeLT(cutoffTime)).
-							Limit(batchSize).
-							IDs(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to query event messages to purge: %w", err)
-						}
-
-						// If no more rows to delete, we're done
-						if len(idsToDelete) == 0 {
-							break
-						}
-
-						// Delete the batch
-						_, err = db.EventMessage.Delete().
-							Where(eventmessage.IDIn(idsToDelete...)).
-							Exec(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to purge event messages: %w", err)
-						}
-
-						// Commit the batch by returning nil, which triggers middleware commit
-						// Then continue to next batch
-						if err := db.Commit(); err != nil {
-							return fmt.Errorf("failed to commit batch: %w", err)
-						}
-
-						// If we got fewer than the batch size, we're done
-						if len(idsToDelete) < batchSize {
-							break
-						}
+				for {
+					db, err := ent.GetTxFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
 
-					return nil
-				},
+					// Query for IDs to delete (with limit)
+					idsToDelete, err := db.EventMessage.Query().
+						Where(eventmessage.CreateTimeLT(cutoffTime)).
+						Limit(batchSize).
+						IDs(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to query event messages to purge: %w", err)
+					}
+
+					// If no more rows to delete, we're done
+					if len(idsToDelete) == 0 {
+						break
+					}
+
+					// Delete the batch
+					_, err = db.EventMessage.Delete().
+						Where(eventmessage.IDIn(idsToDelete...)).
+						Exec(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to purge event messages: %w", err)
+					}
+
+					// Commit the batch by returning nil, which triggers middleware commit
+					// Then continue to next batch
+					if err := db.Commit(); err != nil {
+						return fmt.Errorf("failed to commit batch: %w", err)
+					}
+
+					// If we got fewer than the batch size, we're done
+					if len(idsToDelete) < batchSize {
+						break
+					}
+				}
+
+				return nil
 			},
 		},
 	}
@@ -1152,167 +1102,163 @@ func AllStartupTasks() []StartupTaskSpec {
 
 	return []StartupTaskSpec{
 		{
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "backfill_create_mint_finalized_status",
-				RunInTestEnv: false,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					if knobsService == nil || !knobsService.RolloutRandom(knobs.KnobBackfillCreateMintFinalizedStatusEnabled, 0) {
-						return nil
-					}
-					logger := logging.GetLoggerFromContext(ctx)
-
-					const batchSize = 1000
-					totalUpdated := 0
-					var cursor uuid.UUID
-
-					for {
-						db, err := ent.GetDbFromContext(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to get database: %w", err)
-						}
-
-						query := db.TokenTransaction.Query().
-							Where(
-								tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
-								tokentransaction.Or(
-									tokentransaction.HasMint(),
-									tokentransaction.HasCreate(),
-								),
-								tokentransaction.VersionEQ(3),
-							).
-							WithCreatedOutput().
-							Order(ent.Asc(tokentransaction.FieldID)).
-							Limit(batchSize)
-
-						if cursor != uuid.Nil {
-							query = query.Where(tokentransaction.IDGT(cursor))
-						}
-
-						transactions, err := query.All(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to query transactions: %w", err)
-						}
-
-						if len(transactions) == 0 {
-							break
-						}
-
-						cursor = transactions[len(transactions)-1].ID
-
-						var toUpdate []uuid.UUID
-						for _, tx := range transactions {
-							allOutputsValid := true
-							for _, output := range tx.Edges.CreatedOutput {
-								if output.Status != st.TokenOutputStatusCreatedFinalized &&
-									output.Status != st.TokenOutputStatusSpentStarted &&
-									output.Status != st.TokenOutputStatusSpentSigned &&
-									output.Status != st.TokenOutputStatusSpentFinalized {
-									allOutputsValid = false
-									break
-								}
-							}
-
-							if allOutputsValid {
-								toUpdate = append(toUpdate, tx.ID)
-							}
-						}
-
-						if len(toUpdate) > 0 {
-							updated, err := db.TokenTransaction.Update().
-								Where(
-									tokentransaction.IDIn(toUpdate...),
-									tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
-								).
-								SetStatus(st.TokenTransactionStatusFinalized).
-								Save(ctx)
-							if err != nil {
-								return fmt.Errorf("failed to update transactions: %w", err)
-							}
-							totalUpdated += updated
-							logger.Sugar().Infof("Updated %d v3 mint/create transactions to FINALIZED (total: %d)", updated, totalUpdated)
-						}
-
-						if err := ent.DbCommit(ctx); err != nil {
-							return fmt.Errorf("failed to commit batch: %w", err)
-						}
-
-						if len(transactions) < batchSize {
-							break
-						}
-					}
-
-					if totalUpdated > 0 {
-						logger.Sugar().Infof("Backfill complete: %d total v3 mint/create transactions updated to FINALIZED", totalUpdated)
-					}
+			Name:         "backfill_create_mint_finalized_status",
+			RunInTestEnv: false,
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				if knobsService == nil || !knobsService.RolloutRandom(knobs.KnobBackfillCreateMintFinalizedStatusEnabled, 0) {
 					return nil
-				},
+				}
+				logger := logging.GetLoggerFromContext(ctx)
+
+				const batchSize = 1000
+				totalUpdated := 0
+				var cursor uuid.UUID
+
+				for {
+					db, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get database: %w", err)
+					}
+
+					query := db.TokenTransaction.Query().
+						Where(
+							tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
+							tokentransaction.Or(
+								tokentransaction.HasMint(),
+								tokentransaction.HasCreate(),
+							),
+							tokentransaction.VersionEQ(3),
+						).
+						WithCreatedOutput().
+						Order(ent.Asc(tokentransaction.FieldID)).
+						Limit(batchSize)
+
+					if cursor != uuid.Nil {
+						query = query.Where(tokentransaction.IDGT(cursor))
+					}
+
+					transactions, err := query.All(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to query transactions: %w", err)
+					}
+
+					if len(transactions) == 0 {
+						break
+					}
+
+					cursor = transactions[len(transactions)-1].ID
+
+					var toUpdate []uuid.UUID
+					for _, tx := range transactions {
+						allOutputsValid := true
+						for _, output := range tx.Edges.CreatedOutput {
+							if output.Status != st.TokenOutputStatusCreatedFinalized &&
+								output.Status != st.TokenOutputStatusSpentStarted &&
+								output.Status != st.TokenOutputStatusSpentSigned &&
+								output.Status != st.TokenOutputStatusSpentFinalized {
+								allOutputsValid = false
+								break
+							}
+						}
+
+						if allOutputsValid {
+							toUpdate = append(toUpdate, tx.ID)
+						}
+					}
+
+					if len(toUpdate) > 0 {
+						updated, err := db.TokenTransaction.Update().
+							Where(
+								tokentransaction.IDIn(toUpdate...),
+								tokentransaction.StatusEQ(st.TokenTransactionStatusSigned),
+							).
+							SetStatus(st.TokenTransactionStatusFinalized).
+							Save(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to update transactions: %w", err)
+						}
+						totalUpdated += updated
+						logger.Sugar().Infof("Updated %d v3 mint/create transactions to FINALIZED (total: %d)", updated, totalUpdated)
+					}
+
+					if err := ent.DbCommit(ctx); err != nil {
+						return fmt.Errorf("failed to commit batch: %w", err)
+					}
+
+					if len(transactions) < batchSize {
+						break
+					}
+				}
+
+				if totalUpdated > 0 {
+					logger.Sugar().Infof("Backfill complete: %d total v3 mint/create transactions updated to FINALIZED", totalUpdated)
+				}
+				return nil
 			},
 		},
 		{
 			RetryInterval: &entityDkgRetryInterval,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "maybe_reserve_entity_dkg",
-				RunInTestEnv: true,
-				Timeout:      new(5 * time.Minute),
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-					if config.Index != 0 {
-						logger.Info("Not the first operator, skipping entity DKG reservation task")
-						return nil
-					}
-
-					// Try to find existing entity DKG key
-					entityDkgKey, err := tx.EntityDkgKey.Query().
-						WithSigningKeyshare().
-						Only(ctx)
-
-					var keyshare *ent.SigningKeyshare
-					if err != nil {
-						if !ent.IsNotFound(err) {
-							return fmt.Errorf("failed to query for entity DKG key: %w", err)
-						}
-						// No existing entity DKG key found, create a new one
-						_, err = ent.CreateEntityDkgKeyWithUnusedSigningKeyshare(ctx, config)
-						if err != nil {
-							return fmt.Errorf("failed to create entity DKG key with unused signing keyshare: %w", err)
-						}
-						tx, err = ent.GetDbFromContext(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to get database connection: %w", err)
-						}
-						entityDkgKey, err = tx.EntityDkgKey.Query().WithSigningKeyshare().Only(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to re-load entity DKG key with signing keyshare: %w", err)
-						}
-					}
-					keyshare, err = entityDkgKey.Edges.SigningKeyshareOrErr()
-					if err != nil {
-						return fmt.Errorf("failed to get signing keyshare from entity DKG key: %w", err)
-					}
-					logger.Sugar().Infof("Found available signing keyshare %s, proceeding with reservation on other SOs", keyshare.ID)
-					selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-					_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-						conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
-						if err != nil {
-							return nil, err
-						}
-						defer conn.Close()
-
-						client := pbinternal.NewSparkInternalServiceClient(conn)
-						_, err = client.ReserveEntityDkgKey(ctx, &pbinternal.ReserveEntityDkgKeyRequest{KeyshareId: keyshare.ID.String()})
-						return nil, err
-					})
-					if err != nil {
-						return fmt.Errorf("failed to reserve entity DKG key with operators. This is likely due to not all SOs being ready yet. Will retry in %s: %w", entityDkgRetryInterval, err)
-					}
-
-					logger.Sugar().Infof("Successfully verified reserved entity DKG key %s in all operators", keyshare.ID)
+			Name:          "maybe_reserve_entity_dkg",
+			RunInTestEnv:  true,
+			Timeout:       new(5 * time.Minute),
+			Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+				logger := logging.GetLoggerFromContext(ctx)
+				tx, err := ent.GetDbFromContext(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get or create current tx for request: %w", err)
+				}
+				if config.Index != 0 {
+					logger.Info("Not the first operator, skipping entity DKG reservation task")
 					return nil
-				},
+				}
+
+				// Try to find existing entity DKG key
+				entityDkgKey, err := tx.EntityDkgKey.Query().
+					WithSigningKeyshare().
+					Only(ctx)
+
+				var keyshare *ent.SigningKeyshare
+				if err != nil {
+					if !ent.IsNotFound(err) {
+						return fmt.Errorf("failed to query for entity DKG key: %w", err)
+					}
+					// No existing entity DKG key found, create a new one
+					_, err = ent.CreateEntityDkgKeyWithUnusedSigningKeyshare(ctx, config)
+					if err != nil {
+						return fmt.Errorf("failed to create entity DKG key with unused signing keyshare: %w", err)
+					}
+					tx, err = ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get database connection: %w", err)
+					}
+					entityDkgKey, err = tx.EntityDkgKey.Query().WithSigningKeyshare().Only(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to re-load entity DKG key with signing keyshare: %w", err)
+					}
+				}
+				keyshare, err = entityDkgKey.Edges.SigningKeyshareOrErr()
+				if err != nil {
+					return fmt.Errorf("failed to get signing keyshare from entity DKG key: %w", err)
+				}
+				logger.Sugar().Infof("Found available signing keyshare %s, proceeding with reservation on other SOs", keyshare.ID)
+				selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+				_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
+					conn, err := operator.NewOperatorInternalGRPCConnection(ctx)
+					if err != nil {
+						return nil, err
+					}
+					defer conn.Close()
+
+					client := pbinternal.NewSparkInternalServiceClient(conn)
+					_, err = client.ReserveEntityDkgKey(ctx, &pbinternal.ReserveEntityDkgKeyRequest{KeyshareId: keyshare.ID.String()})
+					return nil, err
+				})
+				if err != nil {
+					return fmt.Errorf("failed to reserve entity DKG key with operators. This is likely due to not all SOs being ready yet. Will retry in %s: %w", entityDkgRetryInterval, err)
+				}
+
+				logger.Sugar().Infof("Successfully verified reserved entity DKG key %s in all operators", keyshare.ID)
+				return nil
 			},
 		},
 	}

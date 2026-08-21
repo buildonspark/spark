@@ -85,8 +85,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 
 		// Check request size
 		if err := validateRequestSize(req, info.FullMethod); err != nil {
-			var valErr *ValidationError
-			if errors.As(err, &valErr) {
+			if valErr, ok := errors.AsType[*ValidationError](err); ok {
 				logger.With(zap.Error(err)).Sugar().Warnf("Request size validation failed (size: %d)", valErr.Value)
 			}
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -94,8 +93,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 
 		// Check array lengths
 		if err := validateArrayLengths(req, info.FullMethod); err != nil {
-			var valErr *ValidationError
-			if errors.As(err, &valErr) {
+			if valErr, ok := errors.AsType[*ValidationError](err); ok {
 				logger.With(zap.Error(err)).Sugar().Warnf("Array length validation failed (length: %d)", valErr.Value)
 			}
 			return nil, status.Error(codes.InvalidArgument, err.Error())

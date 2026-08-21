@@ -379,13 +379,11 @@ func (h *BaseTransferHandler) validateKeyTweakShares(leafTweaksMap map[string]*p
 		shareInt := new(big.Int).SetBytes(leafTweak.GetSecretShareTweak().GetSecretShare())
 		err := secretsharing.ValidateShare(
 			&secretsharing.VerifiableSecretShare{
-				SecretShare: secretsharing.SecretShare{
-					FieldModulus: secp256k1.S256().N,
-					Threshold:    int(h.config.Threshold),
-					Index:        big.NewInt(int64(h.config.Index + 1)),
-					Share:        shareInt,
-				},
-				Proofs: leafTweak.GetSecretShareTweak().GetProofs(),
+				FieldModulus: secp256k1.S256().N,
+				Threshold:    int(h.config.Threshold),
+				Index:        big.NewInt(int64(h.config.Index + 1)),
+				Share:        shareInt,
+				Proofs:       leafTweak.GetSecretShareTweak().GetProofs(),
 			},
 		)
 		if err != nil {

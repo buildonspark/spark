@@ -14,6 +14,11 @@ import (
     "fmt"
     "testing"
 
+    {{/* Imported explicitly: Go 1.27 added a stdlib "uuid" package, and the goimports pass ent runs
+         over the generated file resolves a bare uuid.UUID reference to that instead of
+         github.com/google/uuid. That same pass drops the import when no schema has a UUID field. */}}
+    "github.com/google/uuid"
+
     "{{ $.Config.Package }}"
 )
 

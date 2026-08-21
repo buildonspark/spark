@@ -680,13 +680,11 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 
 		keyshareID := uuid.New()
 		job := &helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{
-				JobID:             jobID,
-				SigningKeyshareID: keyshareID,
-				Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
-				VerifyingKey:      &pubKey,
-				UserCommitment:    &commitment,
-			},
+			JobID:             jobID,
+			SigningKeyshareID: keyshareID,
+			Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
+			VerifyingKey:      &pubKey,
+			UserCommitment:    &commitment,
 			Round1Packages: map[string]frost.SigningCommitment{
 				"operator1": commitment,
 				"operator2": commitment,
@@ -733,13 +731,11 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 			}
 
 			job := &helper.SigningJobWithPregeneratedNonce{
-				SigningJob: helper.SigningJob{
-					JobID:             jobID,
-					SigningKeyshareID: uuid.New(),
-					Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
-					VerifyingKey:      &pubKey,
-					UserCommitment:    &commitment,
-				},
+				JobID:             jobID,
+				SigningKeyshareID: uuid.New(),
+				Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
+				VerifyingKey:      &pubKey,
+				UserCommitment:    &commitment,
 				Round1Packages: map[string]frost.SigningCommitment{
 					"operator1": commitment,
 				},
@@ -757,13 +753,11 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 			}
 
 			job := &helper.SigningJobWithPregeneratedNonce{
-				SigningJob: helper.SigningJob{
-					JobID:             jobID,
-					SigningKeyshareID: uuid.New(),
-					Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
-					VerifyingKey:      &pubKey,
-					UserCommitment:    &commitment,
-				},
+				JobID:             jobID,
+				SigningKeyshareID: uuid.New(),
+				Message:           sighash.MustParseHex("0303030303030303030303030303030303030303030303030303030303030303"),
+				VerifyingKey:      &pubKey,
+				UserCommitment:    &commitment,
 				Round1Packages: map[string]frost.SigningCommitment{
 					"operator1": commitment,
 				},
@@ -790,26 +784,22 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 			}
 
 			validJob := &helper.SigningJobWithPregeneratedNonce{
-				SigningJob: helper.SigningJob{
-					JobID:             uuid.New(),
-					SigningKeyshareID: uuid.New(),
-					Message:           sighash.MustParseHex("0404040404040404040404040404040404040404040404040404040404040404"),
-					VerifyingKey:      &pubKey,
-					UserCommitment:    &commitment,
-				},
+				JobID:             uuid.New(),
+				SigningKeyshareID: uuid.New(),
+				Message:           sighash.MustParseHex("0404040404040404040404040404040404040404040404040404040404040404"),
+				VerifyingKey:      &pubKey,
+				UserCommitment:    &commitment,
 				Round1Packages: map[string]frost.SigningCommitment{
 					"operator1": commitment,
 				},
 			}
 			emptyCommitmentsJob := &helper.SigningJobWithPregeneratedNonce{
-				SigningJob: helper.SigningJob{
-					JobID:             uuid.New(),
-					SigningKeyshareID: uuid.New(),
-					Message:           sighash.MustParseHex("0505050505050505050505050505050505050505050505050505050505050505"),
-					VerifyingKey:      &pubKey,
-					UserCommitment:    &commitment,
-				},
-				Round1Packages: map[string]frost.SigningCommitment{},
+				JobID:             uuid.New(),
+				SigningKeyshareID: uuid.New(),
+				Message:           sighash.MustParseHex("0505050505050505050505050505050505050505050505050505050505050505"),
+				VerifyingKey:      &pubKey,
+				UserCommitment:    &commitment,
+				Round1Packages:    map[string]frost.SigningCommitment{},
 			}
 
 			_, err := helper.SignFrostWithPregeneratedNonceInternal(

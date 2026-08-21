@@ -1476,14 +1476,12 @@ func SignRefundsWithPregeneratedNonce(
 		signingJobs = append(
 			signingJobs,
 			&helper.SigningJobWithPregeneratedNonce{
-				SigningJob: helper.SigningJob{
-					JobID:            cpfpJobID,
-					Message:          refundTxSigHash,
-					VerifyingKey:     &leaf.VerifyingPubkey,
-					UserCommitment:   &userNonceCommitment,
-					AdaptorPublicKey: &cpfpAdaptorPubKey,
-				},
-				Round1Packages: round1Packages,
+				JobID:            cpfpJobID,
+				Message:          refundTxSigHash,
+				VerifyingKey:     &leaf.VerifyingPubkey,
+				UserCommitment:   &userNonceCommitment,
+				AdaptorPublicKey: &cpfpAdaptorPubKey,
+				Round1Packages:   round1Packages,
 			},
 		)
 		leafJobMap[cpfpJobID] = leaf
@@ -1554,14 +1552,12 @@ func SignRefundsWithPregeneratedNonce(
 			round1Packages[key] = obj
 		}
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{
-				JobID:            directJobID,
-				Message:          directRefundTxSigHash,
-				VerifyingKey:     &leaf.VerifyingPubkey,
-				UserCommitment:   &userNonceCommitment,
-				AdaptorPublicKey: &directAdaptorPubKey,
-			},
-			Round1Packages: round1Packages,
+			JobID:            directJobID,
+			Message:          directRefundTxSigHash,
+			VerifyingKey:     &leaf.VerifyingPubkey,
+			UserCommitment:   &userNonceCommitment,
+			AdaptorPublicKey: &directAdaptorPubKey,
+			Round1Packages:   round1Packages,
 		})
 		leafJobMap[directJobID] = leaf
 	}
@@ -1630,14 +1626,12 @@ func SignRefundsWithPregeneratedNonce(
 			round1Packages[key] = obj
 		}
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{
-				JobID:            directFromCpfpJobID,
-				Message:          directFromCpfpRefundTxSigHash,
-				VerifyingKey:     &leaf.VerifyingPubkey,
-				UserCommitment:   &userNonceCommitment,
-				AdaptorPublicKey: &directFromCpfpAdaptorPubKey,
-			},
-			Round1Packages: round1Packages,
+			JobID:            directFromCpfpJobID,
+			Message:          directFromCpfpRefundTxSigHash,
+			VerifyingKey:     &leaf.VerifyingPubkey,
+			UserCommitment:   &userNonceCommitment,
+			AdaptorPublicKey: &directFromCpfpAdaptorPubKey,
+			Round1Packages:   round1Packages,
 		})
 		leafJobMap[directFromCpfpJobID] = leaf
 	}
@@ -3167,13 +3161,11 @@ func (h *TransferHandler) validateClaimLeafTweak(leaf *ent.TreeNode, req *pb.Cla
 	}
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
-			SecretShare: secretsharing.SecretShare{
-				FieldModulus: secp256k1.S256().N,
-				Threshold:    int(h.config.Threshold),
-				Index:        big.NewInt(int64(h.config.Index + 1)),
-				Share:        new(big.Int).SetBytes(req.GetSecretShareTweak().GetSecretShare()),
-			},
-			Proofs: req.GetSecretShareTweak().GetProofs(),
+			FieldModulus: secp256k1.S256().N,
+			Threshold:    int(h.config.Threshold),
+			Index:        big.NewInt(int64(h.config.Index + 1)),
+			Share:        new(big.Int).SetBytes(req.GetSecretShareTweak().GetSecretShare()),
+			Proofs:       req.GetSecretShareTweak().GetProofs(),
 		},
 	)
 	if err != nil {
@@ -3894,14 +3886,12 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 
 		cpfpJobID := uuid.New()
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{
-				JobID:             cpfpJobID,
-				SigningKeyshareID: signingKeyshare.ID,
-				Message:           refundTxSigHash,
-				VerifyingKey:      &leaf.VerifyingPubkey,
-				UserCommitment:    &userNonceCommitment,
-			},
-			Round1Packages: round1Packages,
+			JobID:             cpfpJobID,
+			SigningKeyshareID: signingKeyshare.ID,
+			Message:           refundTxSigHash,
+			VerifyingKey:      &leaf.VerifyingPubkey,
+			UserCommitment:    &userNonceCommitment,
+			Round1Packages:    round1Packages,
 		})
 		leafJobMap[cpfpJobID] = leaf
 		jobIsDirectRefund[cpfpJobID] = false
@@ -3945,14 +3935,12 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 
 		directJobID := uuid.New()
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{
-				JobID:             directJobID,
-				SigningKeyshareID: signingKeyshare.ID,
-				Message:           directRefundTxSigHash,
-				VerifyingKey:      &leaf.VerifyingPubkey,
-				UserCommitment:    &userNonceCommitment,
-			},
-			Round1Packages: round1Packages,
+			JobID:             directJobID,
+			SigningKeyshareID: signingKeyshare.ID,
+			Message:           directRefundTxSigHash,
+			VerifyingKey:      &leaf.VerifyingPubkey,
+			UserCommitment:    &userNonceCommitment,
+			Round1Packages:    round1Packages,
 		})
 		leafJobMap[directJobID] = leaf
 		jobIsDirectRefund[directJobID] = true
@@ -3995,14 +3983,12 @@ func (h *TransferHandler) prepareClaimRefundSigningJobs(
 
 		directFromCpfpJobID := uuid.New()
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
-			SigningJob: helper.SigningJob{
-				JobID:             directFromCpfpJobID,
-				SigningKeyshareID: signingKeyshare.ID,
-				Message:           directFromCpfpSigHash,
-				VerifyingKey:      &leaf.VerifyingPubkey,
-				UserCommitment:    &userNonceCommitment,
-			},
-			Round1Packages: round1Packages,
+			JobID:             directFromCpfpJobID,
+			SigningKeyshareID: signingKeyshare.ID,
+			Message:           directFromCpfpSigHash,
+			VerifyingKey:      &leaf.VerifyingPubkey,
+			UserCommitment:    &userNonceCommitment,
+			Round1Packages:    round1Packages,
 		})
 		leafJobMap[directFromCpfpJobID] = leaf
 		jobIsDirectFromCpfpRefund[directFromCpfpJobID] = true

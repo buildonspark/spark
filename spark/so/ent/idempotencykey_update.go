@@ -4,7 +4,7 @@ package ent
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
@@ -38,14 +38,14 @@ func (iku *IdempotencyKeyUpdate) SetUpdateTime(t time.Time) *IdempotencyKeyUpdat
 }
 
 // SetResponse sets the "response" field.
-func (iku *IdempotencyKeyUpdate) SetResponse(jm json.RawMessage) *IdempotencyKeyUpdate {
-	iku.mutation.SetResponse(jm)
+func (iku *IdempotencyKeyUpdate) SetResponse(j jsontext.Value) *IdempotencyKeyUpdate {
+	iku.mutation.SetResponse(j)
 	return iku
 }
 
-// AppendResponse appends jm to the "response" field.
-func (iku *IdempotencyKeyUpdate) AppendResponse(jm json.RawMessage) *IdempotencyKeyUpdate {
-	iku.mutation.AppendResponse(jm)
+// AppendResponse appends j to the "response" field.
+func (iku *IdempotencyKeyUpdate) AppendResponse(j jsontext.Value) *IdempotencyKeyUpdate {
+	iku.mutation.AppendResponse(j)
 	return iku
 }
 
@@ -154,14 +154,14 @@ func (ikuo *IdempotencyKeyUpdateOne) SetUpdateTime(t time.Time) *IdempotencyKeyU
 }
 
 // SetResponse sets the "response" field.
-func (ikuo *IdempotencyKeyUpdateOne) SetResponse(jm json.RawMessage) *IdempotencyKeyUpdateOne {
-	ikuo.mutation.SetResponse(jm)
+func (ikuo *IdempotencyKeyUpdateOne) SetResponse(j jsontext.Value) *IdempotencyKeyUpdateOne {
+	ikuo.mutation.SetResponse(j)
 	return ikuo
 }
 
-// AppendResponse appends jm to the "response" field.
-func (ikuo *IdempotencyKeyUpdateOne) AppendResponse(jm json.RawMessage) *IdempotencyKeyUpdateOne {
-	ikuo.mutation.AppendResponse(jm)
+// AppendResponse appends j to the "response" field.
+func (ikuo *IdempotencyKeyUpdateOne) AppendResponse(j jsontext.Value) *IdempotencyKeyUpdateOne {
+	ikuo.mutation.AppendResponse(j)
 	return ikuo
 }
 

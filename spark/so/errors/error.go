@@ -103,13 +103,11 @@ func toGRPCError(err error) error {
 		return nil
 	}
 
-	var convertable Error
-	if errors.As(err, &convertable) {
+	if convertable, ok := errors.AsType[Error](err); ok {
 		return convertable.ToGRPCError()
 	}
 
-	var grpcErr *grpcError
-	if errors.As(err, &grpcErr) {
+	if grpcErr, ok := errors.AsType[*grpcError](err); ok {
 		return &grpcError{
 			Code:       grpcErr.Code,
 			Cause:      err,
@@ -158,8 +156,7 @@ func IsTransientDBContention(err error) bool {
 	if err == nil {
 		return false
 	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		return slices.Contains(transientPostgresCodes, pgErr.Code)
 	}
 	msg := err.Error()
@@ -260,8 +257,7 @@ func HasReason(err error) bool {
 }
 
 func CodeAndReasonFrom(err error) (codes.Code, string) {
-	var ge *grpcError
-	if errors.As(err, &ge) {
+	if ge, ok := errors.AsType[*grpcError](err); ok {
 		return ge.Code, ge.Reason
 	}
 	// The code and reason could be set either via the grpcError (our definition) or via the gRPC (standardized) status details.
@@ -282,8 +278,7 @@ func CodeAndReasonFrom(err error) (codes.Code, string) {
 // metadataFrom extracts the ErrorInfo metadata from a grpcError or from a
 // google.rpc.ErrorInfo detail on a gRPC status. Returns nil if none is set.
 func metadataFrom(err error) map[string]string {
-	var ge *grpcError
-	if errors.As(err, &ge) {
+	if ge, ok := errors.AsType[*grpcError](err); ok {
 		return ge.Metadata
 	}
 	if st, ok := status.FromError(err); ok {
@@ -299,8 +294,7 @@ func metadataFrom(err error) map[string]string {
 // retryAfterFrom extracts the retry-after hint from a grpcError or from a
 // google.rpc.RetryInfo detail on a gRPC status. Returns 0 if no hint is set.
 func retryAfterFrom(err error) time.Duration {
-	var ge *grpcError
-	if errors.As(err, &ge) {
+	if ge, ok := errors.AsType[*grpcError](err); ok {
 		return ge.RetryAfter
 	}
 	if st, ok := status.FromError(err); ok {
