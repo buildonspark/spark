@@ -62,6 +62,12 @@ const (
 	SparkService_InitiateSwapPrimaryTransfer_FullMethodName         = "/spark.SparkService/initiate_swap_primary_transfer"
 	SparkService_UpdateWalletSetting_FullMethodName                 = "/spark.SparkService/update_wallet_setting"
 	SparkService_QueryWalletSetting_FullMethodName                  = "/spark.SparkService/query_wallet_setting"
+	SparkService_CreateDelegationGrant_FullMethodName               = "/spark.SparkService/create_delegation_grant"
+	SparkService_RevokeDelegationGrant_FullMethodName               = "/spark.SparkService/revoke_delegation_grant"
+	SparkService_QueryDelegationGrants_FullMethodName               = "/spark.SparkService/query_delegation_grants"
+	SparkService_InstallLeafDecompositions_FullMethodName           = "/spark.SparkService/install_leaf_decompositions"
+	SparkService_AddDelegationSpender_FullMethodName                = "/spark.SparkService/add_delegation_spender"
+	SparkService_RevokeDelegationSpender_FullMethodName             = "/spark.SparkService/revoke_delegation_spender"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -141,6 +147,18 @@ type SparkServiceClient interface {
 	InitiateSwapPrimaryTransfer(ctx context.Context, in *InitiateSwapPrimaryTransferRequest, opts ...grpc.CallOption) (*InitiateSwapPrimaryTransferResponse, error)
 	UpdateWalletSetting(ctx context.Context, in *UpdateWalletSettingRequest, opts ...grpc.CallOption) (*UpdateWalletSettingResponse, error)
 	QueryWalletSetting(ctx context.Context, in *QueryWalletSettingRequest, opts ...grpc.CallOption) (*QueryWalletSettingResponse, error)
+	// Spark Pull: delegated spending via parallel key decomposition. An owner
+	// installs a second key decomposition (delegate share + SE2 keyshare)
+	// alongside the primary one, bounded by an owner-signed grant the SO
+	// federation enforces at signing time.
+	CreateDelegationGrant(ctx context.Context, in *CreateDelegationGrantRequest, opts ...grpc.CallOption) (*CreateDelegationGrantResponse, error)
+	RevokeDelegationGrant(ctx context.Context, in *RevokeDelegationGrantRequest, opts ...grpc.CallOption) (*RevokeDelegationGrantResponse, error)
+	QueryDelegationGrants(ctx context.Context, in *QueryDelegationGrantsRequest, opts ...grpc.CallOption) (*QueryDelegationGrantsResponse, error)
+	InstallLeafDecompositions(ctx context.Context, in *InstallLeafDecompositionsRequest, opts ...grpc.CallOption) (*InstallLeafDecompositionsResponse, error)
+	// Owner-signed addition / removal of an authorized spender on an existing
+	// grant's delegate path. No new key material — a metering record only.
+	AddDelegationSpender(ctx context.Context, in *AddDelegationSpenderRequest, opts ...grpc.CallOption) (*AddDelegationSpenderResponse, error)
+	RevokeDelegationSpender(ctx context.Context, in *RevokeDelegationSpenderRequest, opts ...grpc.CallOption) (*RevokeDelegationSpenderResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -580,6 +598,66 @@ func (c *sparkServiceClient) QueryWalletSetting(ctx context.Context, in *QueryWa
 	return out, nil
 }
 
+func (c *sparkServiceClient) CreateDelegationGrant(ctx context.Context, in *CreateDelegationGrantRequest, opts ...grpc.CallOption) (*CreateDelegationGrantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateDelegationGrantResponse)
+	err := c.cc.Invoke(ctx, SparkService_CreateDelegationGrant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) RevokeDelegationGrant(ctx context.Context, in *RevokeDelegationGrantRequest, opts ...grpc.CallOption) (*RevokeDelegationGrantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeDelegationGrantResponse)
+	err := c.cc.Invoke(ctx, SparkService_RevokeDelegationGrant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) QueryDelegationGrants(ctx context.Context, in *QueryDelegationGrantsRequest, opts ...grpc.CallOption) (*QueryDelegationGrantsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryDelegationGrantsResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryDelegationGrants_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) InstallLeafDecompositions(ctx context.Context, in *InstallLeafDecompositionsRequest, opts ...grpc.CallOption) (*InstallLeafDecompositionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InstallLeafDecompositionsResponse)
+	err := c.cc.Invoke(ctx, SparkService_InstallLeafDecompositions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) AddDelegationSpender(ctx context.Context, in *AddDelegationSpenderRequest, opts ...grpc.CallOption) (*AddDelegationSpenderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddDelegationSpenderResponse)
+	err := c.cc.Invoke(ctx, SparkService_AddDelegationSpender_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) RevokeDelegationSpender(ctx context.Context, in *RevokeDelegationSpenderRequest, opts ...grpc.CallOption) (*RevokeDelegationSpenderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeDelegationSpenderResponse)
+	err := c.cc.Invoke(ctx, SparkService_RevokeDelegationSpender_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -657,6 +735,18 @@ type SparkServiceServer interface {
 	InitiateSwapPrimaryTransfer(context.Context, *InitiateSwapPrimaryTransferRequest) (*InitiateSwapPrimaryTransferResponse, error)
 	UpdateWalletSetting(context.Context, *UpdateWalletSettingRequest) (*UpdateWalletSettingResponse, error)
 	QueryWalletSetting(context.Context, *QueryWalletSettingRequest) (*QueryWalletSettingResponse, error)
+	// Spark Pull: delegated spending via parallel key decomposition. An owner
+	// installs a second key decomposition (delegate share + SE2 keyshare)
+	// alongside the primary one, bounded by an owner-signed grant the SO
+	// federation enforces at signing time.
+	CreateDelegationGrant(context.Context, *CreateDelegationGrantRequest) (*CreateDelegationGrantResponse, error)
+	RevokeDelegationGrant(context.Context, *RevokeDelegationGrantRequest) (*RevokeDelegationGrantResponse, error)
+	QueryDelegationGrants(context.Context, *QueryDelegationGrantsRequest) (*QueryDelegationGrantsResponse, error)
+	InstallLeafDecompositions(context.Context, *InstallLeafDecompositionsRequest) (*InstallLeafDecompositionsResponse, error)
+	// Owner-signed addition / removal of an authorized spender on an existing
+	// grant's delegate path. No new key material — a metering record only.
+	AddDelegationSpender(context.Context, *AddDelegationSpenderRequest) (*AddDelegationSpenderResponse, error)
+	RevokeDelegationSpender(context.Context, *RevokeDelegationSpenderRequest) (*RevokeDelegationSpenderResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -792,6 +882,24 @@ func (UnimplementedSparkServiceServer) UpdateWalletSetting(context.Context, *Upd
 }
 func (UnimplementedSparkServiceServer) QueryWalletSetting(context.Context, *QueryWalletSettingRequest) (*QueryWalletSettingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryWalletSetting not implemented")
+}
+func (UnimplementedSparkServiceServer) CreateDelegationGrant(context.Context, *CreateDelegationGrantRequest) (*CreateDelegationGrantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateDelegationGrant not implemented")
+}
+func (UnimplementedSparkServiceServer) RevokeDelegationGrant(context.Context, *RevokeDelegationGrantRequest) (*RevokeDelegationGrantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeDelegationGrant not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryDelegationGrants(context.Context, *QueryDelegationGrantsRequest) (*QueryDelegationGrantsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method QueryDelegationGrants not implemented")
+}
+func (UnimplementedSparkServiceServer) InstallLeafDecompositions(context.Context, *InstallLeafDecompositionsRequest) (*InstallLeafDecompositionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InstallLeafDecompositions not implemented")
+}
+func (UnimplementedSparkServiceServer) AddDelegationSpender(context.Context, *AddDelegationSpenderRequest) (*AddDelegationSpenderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddDelegationSpender not implemented")
+}
+func (UnimplementedSparkServiceServer) RevokeDelegationSpender(context.Context, *RevokeDelegationSpenderRequest) (*RevokeDelegationSpenderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeDelegationSpender not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -1563,6 +1671,114 @@ func _SparkService_QueryWalletSetting_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_CreateDelegationGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDelegationGrantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).CreateDelegationGrant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_CreateDelegationGrant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).CreateDelegationGrant(ctx, req.(*CreateDelegationGrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_RevokeDelegationGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeDelegationGrantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).RevokeDelegationGrant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_RevokeDelegationGrant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).RevokeDelegationGrant(ctx, req.(*RevokeDelegationGrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_QueryDelegationGrants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryDelegationGrantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryDelegationGrants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryDelegationGrants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryDelegationGrants(ctx, req.(*QueryDelegationGrantsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_InstallLeafDecompositions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InstallLeafDecompositionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).InstallLeafDecompositions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_InstallLeafDecompositions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).InstallLeafDecompositions(ctx, req.(*InstallLeafDecompositionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_AddDelegationSpender_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddDelegationSpenderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).AddDelegationSpender(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_AddDelegationSpender_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).AddDelegationSpender(ctx, req.(*AddDelegationSpenderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_RevokeDelegationSpender_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeDelegationSpenderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).RevokeDelegationSpender(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_RevokeDelegationSpender_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).RevokeDelegationSpender(ctx, req.(*RevokeDelegationSpenderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1733,6 +1949,30 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_wallet_setting",
 			Handler:    _SparkService_QueryWalletSetting_Handler,
+		},
+		{
+			MethodName: "create_delegation_grant",
+			Handler:    _SparkService_CreateDelegationGrant_Handler,
+		},
+		{
+			MethodName: "revoke_delegation_grant",
+			Handler:    _SparkService_RevokeDelegationGrant_Handler,
+		},
+		{
+			MethodName: "query_delegation_grants",
+			Handler:    _SparkService_QueryDelegationGrants_Handler,
+		},
+		{
+			MethodName: "install_leaf_decompositions",
+			Handler:    _SparkService_InstallLeafDecompositions_Handler,
+		},
+		{
+			MethodName: "add_delegation_spender",
+			Handler:    _SparkService_AddDelegationSpender_Handler,
+		},
+		{
+			MethodName: "revoke_delegation_spender",
+			Handler:    _SparkService_RevokeDelegationSpender_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

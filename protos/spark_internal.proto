@@ -1379,6 +1379,26 @@ message TokenTransactionRollbackRequest {
     bytes final_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
 }
 
+// DelegationGrantPrepareRequest is the 2PC prepare payload for consensus
+// create/revoke of a delegation grant (Spark Pull). Each SO independently
+// re-verifies the owner signature over the grant statement and persists the
+// grant (or tombstones it on revoke) in its own database. Rides
+// google.protobuf.Any in ConsensusPrepareRequest.operation like the other
+// consensus flows.
+message DelegationGrantPrepareRequest {
+    spark.CreateDelegationGrantRequest original_request = 1;
+}
+
+// InstallDecompositionsPrepareRequest is the 2PC prepare payload for consensus
+// installation of delegate-path decompositions across a grant's leaves. Each SO
+// re-verifies the owner signature over the install statement, decrypts its slice
+// of the key tweak package, adjusts its share to install the SE2 (delegate-path)
+// keyshare, and persists the leaf_decomposition rows — without deleting the
+// primary decomposition.
+message InstallDecompositionsPrepareRequest {
+    spark.InstallLeafDecompositionsRequest original_request = 1;
+}
+
 message ConsensusPrepareRequest {
     // Corresponds to gossip.ConsensusOperationType. Defined as int32 to avoid
     // a circular proto import (gossip.proto already imports spark_internal.proto).

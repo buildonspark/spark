@@ -19,6 +19,8 @@ import (
 	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrant"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrantspender"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
@@ -29,6 +31,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/leafdecomposition"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/partner"
@@ -78,6 +81,8 @@ const (
 	// Node types.
 	TypeBlockHeight                       = "BlockHeight"
 	TypeCooperativeExit                   = "CooperativeExit"
+	TypeDelegationGrant                   = "DelegationGrant"
+	TypeDelegationGrantSpender            = "DelegationGrantSpender"
 	TypeDepositAddress                    = "DepositAddress"
 	TypeEntityDkgKey                      = "EntityDkgKey"
 	TypeEventMessage                      = "EventMessage"
@@ -88,6 +93,7 @@ const (
 	TypeL1TokenJusticeTransaction         = "L1TokenJusticeTransaction"
 	TypeL1TokenOutputWithdrawal           = "L1TokenOutputWithdrawal"
 	TypeL1WithdrawalTransaction           = "L1WithdrawalTransaction"
+	TypeLeafDecomposition                 = "LeafDecomposition"
 	TypeMultisigConfig                    = "MultisigConfig"
 	TypeMultisigMember                    = "MultisigMember"
 	TypePartner                           = "Partner"
@@ -1561,6 +1567,2490 @@ func (m *CooperativeExitMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown CooperativeExit edge %s", name)
+}
+
+// DelegationGrantMutation represents an operation that mutates the DelegationGrant nodes in the graph.
+type DelegationGrantMutation struct {
+	config
+	op                            Op
+	typ                           string
+	id                            *uuid.UUID
+	create_time                   *time.Time
+	update_time                   *time.Time
+	owner_identity_pubkey         *keys.Public
+	status                        *schematype.DelegationStatus
+	network                       *btcnetwork.Network
+	expiry_time                   *time.Time
+	scope_transfer                *bool
+	scope_renew                   *bool
+	scope_claim                   *bool
+	fee_flat_sats                 *uint64
+	addfee_flat_sats              *int64
+	fee_collector_identity_pubkey *keys.Public
+	version                       *uint64
+	addversion                    *int64
+	owner_signature               *[]byte
+	clearedFields                 map[string]struct{}
+	spenders                      map[uuid.UUID]struct{}
+	removedspenders               map[uuid.UUID]struct{}
+	clearedspenders               bool
+	leaf_decompositions           map[uuid.UUID]struct{}
+	removedleaf_decompositions    map[uuid.UUID]struct{}
+	clearedleaf_decompositions    bool
+	done                          bool
+	oldValue                      func(context.Context) (*DelegationGrant, error)
+	predicates                    []predicate.DelegationGrant
+}
+
+var _ ent.Mutation = (*DelegationGrantMutation)(nil)
+
+// delegationgrantOption allows management of the mutation configuration using functional options.
+type delegationgrantOption func(*DelegationGrantMutation)
+
+// newDelegationGrantMutation creates new mutation for the DelegationGrant entity.
+func newDelegationGrantMutation(c config, op Op, opts ...delegationgrantOption) *DelegationGrantMutation {
+	m := &DelegationGrantMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDelegationGrant,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDelegationGrantID sets the ID field of the mutation.
+func withDelegationGrantID(id uuid.UUID) delegationgrantOption {
+	return func(m *DelegationGrantMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DelegationGrant
+		)
+		m.oldValue = func(ctx context.Context) (*DelegationGrant, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DelegationGrant.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDelegationGrant sets the old DelegationGrant of the mutation.
+func withDelegationGrant(node *DelegationGrant) delegationgrantOption {
+	return func(m *DelegationGrantMutation) {
+		m.oldValue = func(context.Context) (*DelegationGrant, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DelegationGrantMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DelegationGrantMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DelegationGrant entities.
+func (m *DelegationGrantMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DelegationGrantMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DelegationGrantMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DelegationGrant.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *DelegationGrantMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *DelegationGrantMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *DelegationGrantMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *DelegationGrantMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *DelegationGrantMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *DelegationGrantMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
+func (m *DelegationGrantMutation) SetOwnerIdentityPubkey(k keys.Public) {
+	m.owner_identity_pubkey = &k
+}
+
+// OwnerIdentityPubkey returns the value of the "owner_identity_pubkey" field in the mutation.
+func (m *DelegationGrantMutation) OwnerIdentityPubkey() (r keys.Public, exists bool) {
+	v := m.owner_identity_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerIdentityPubkey returns the old "owner_identity_pubkey" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldOwnerIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerIdentityPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerIdentityPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerIdentityPubkey: %w", err)
+	}
+	return oldValue.OwnerIdentityPubkey, nil
+}
+
+// ResetOwnerIdentityPubkey resets all changes to the "owner_identity_pubkey" field.
+func (m *DelegationGrantMutation) ResetOwnerIdentityPubkey() {
+	m.owner_identity_pubkey = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *DelegationGrantMutation) SetStatus(ss schematype.DelegationStatus) {
+	m.status = &ss
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *DelegationGrantMutation) Status() (r schematype.DelegationStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldStatus(ctx context.Context) (v schematype.DelegationStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *DelegationGrantMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetNetwork sets the "network" field.
+func (m *DelegationGrantMutation) SetNetwork(b btcnetwork.Network) {
+	m.network = &b
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *DelegationGrantMutation) Network() (r btcnetwork.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldNetwork(ctx context.Context) (v btcnetwork.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *DelegationGrantMutation) ResetNetwork() {
+	m.network = nil
+}
+
+// SetExpiryTime sets the "expiry_time" field.
+func (m *DelegationGrantMutation) SetExpiryTime(t time.Time) {
+	m.expiry_time = &t
+}
+
+// ExpiryTime returns the value of the "expiry_time" field in the mutation.
+func (m *DelegationGrantMutation) ExpiryTime() (r time.Time, exists bool) {
+	v := m.expiry_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiryTime returns the old "expiry_time" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldExpiryTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiryTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiryTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiryTime: %w", err)
+	}
+	return oldValue.ExpiryTime, nil
+}
+
+// ResetExpiryTime resets all changes to the "expiry_time" field.
+func (m *DelegationGrantMutation) ResetExpiryTime() {
+	m.expiry_time = nil
+}
+
+// SetScopeTransfer sets the "scope_transfer" field.
+func (m *DelegationGrantMutation) SetScopeTransfer(b bool) {
+	m.scope_transfer = &b
+}
+
+// ScopeTransfer returns the value of the "scope_transfer" field in the mutation.
+func (m *DelegationGrantMutation) ScopeTransfer() (r bool, exists bool) {
+	v := m.scope_transfer
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopeTransfer returns the old "scope_transfer" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldScopeTransfer(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopeTransfer is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopeTransfer requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopeTransfer: %w", err)
+	}
+	return oldValue.ScopeTransfer, nil
+}
+
+// ResetScopeTransfer resets all changes to the "scope_transfer" field.
+func (m *DelegationGrantMutation) ResetScopeTransfer() {
+	m.scope_transfer = nil
+}
+
+// SetScopeRenew sets the "scope_renew" field.
+func (m *DelegationGrantMutation) SetScopeRenew(b bool) {
+	m.scope_renew = &b
+}
+
+// ScopeRenew returns the value of the "scope_renew" field in the mutation.
+func (m *DelegationGrantMutation) ScopeRenew() (r bool, exists bool) {
+	v := m.scope_renew
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopeRenew returns the old "scope_renew" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldScopeRenew(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopeRenew is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopeRenew requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopeRenew: %w", err)
+	}
+	return oldValue.ScopeRenew, nil
+}
+
+// ResetScopeRenew resets all changes to the "scope_renew" field.
+func (m *DelegationGrantMutation) ResetScopeRenew() {
+	m.scope_renew = nil
+}
+
+// SetScopeClaim sets the "scope_claim" field.
+func (m *DelegationGrantMutation) SetScopeClaim(b bool) {
+	m.scope_claim = &b
+}
+
+// ScopeClaim returns the value of the "scope_claim" field in the mutation.
+func (m *DelegationGrantMutation) ScopeClaim() (r bool, exists bool) {
+	v := m.scope_claim
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopeClaim returns the old "scope_claim" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldScopeClaim(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopeClaim is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopeClaim requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopeClaim: %w", err)
+	}
+	return oldValue.ScopeClaim, nil
+}
+
+// ResetScopeClaim resets all changes to the "scope_claim" field.
+func (m *DelegationGrantMutation) ResetScopeClaim() {
+	m.scope_claim = nil
+}
+
+// SetFeeFlatSats sets the "fee_flat_sats" field.
+func (m *DelegationGrantMutation) SetFeeFlatSats(u uint64) {
+	m.fee_flat_sats = &u
+	m.addfee_flat_sats = nil
+}
+
+// FeeFlatSats returns the value of the "fee_flat_sats" field in the mutation.
+func (m *DelegationGrantMutation) FeeFlatSats() (r uint64, exists bool) {
+	v := m.fee_flat_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeeFlatSats returns the old "fee_flat_sats" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldFeeFlatSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeeFlatSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeeFlatSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeeFlatSats: %w", err)
+	}
+	return oldValue.FeeFlatSats, nil
+}
+
+// AddFeeFlatSats adds u to the "fee_flat_sats" field.
+func (m *DelegationGrantMutation) AddFeeFlatSats(u int64) {
+	if m.addfee_flat_sats != nil {
+		*m.addfee_flat_sats += u
+	} else {
+		m.addfee_flat_sats = &u
+	}
+}
+
+// AddedFeeFlatSats returns the value that was added to the "fee_flat_sats" field in this mutation.
+func (m *DelegationGrantMutation) AddedFeeFlatSats() (r int64, exists bool) {
+	v := m.addfee_flat_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFeeFlatSats resets all changes to the "fee_flat_sats" field.
+func (m *DelegationGrantMutation) ResetFeeFlatSats() {
+	m.fee_flat_sats = nil
+	m.addfee_flat_sats = nil
+}
+
+// SetFeeCollectorIdentityPubkey sets the "fee_collector_identity_pubkey" field.
+func (m *DelegationGrantMutation) SetFeeCollectorIdentityPubkey(k keys.Public) {
+	m.fee_collector_identity_pubkey = &k
+}
+
+// FeeCollectorIdentityPubkey returns the value of the "fee_collector_identity_pubkey" field in the mutation.
+func (m *DelegationGrantMutation) FeeCollectorIdentityPubkey() (r keys.Public, exists bool) {
+	v := m.fee_collector_identity_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeeCollectorIdentityPubkey returns the old "fee_collector_identity_pubkey" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldFeeCollectorIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeeCollectorIdentityPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeeCollectorIdentityPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeeCollectorIdentityPubkey: %w", err)
+	}
+	return oldValue.FeeCollectorIdentityPubkey, nil
+}
+
+// ClearFeeCollectorIdentityPubkey clears the value of the "fee_collector_identity_pubkey" field.
+func (m *DelegationGrantMutation) ClearFeeCollectorIdentityPubkey() {
+	m.fee_collector_identity_pubkey = nil
+	m.clearedFields[delegationgrant.FieldFeeCollectorIdentityPubkey] = struct{}{}
+}
+
+// FeeCollectorIdentityPubkeyCleared returns if the "fee_collector_identity_pubkey" field was cleared in this mutation.
+func (m *DelegationGrantMutation) FeeCollectorIdentityPubkeyCleared() bool {
+	_, ok := m.clearedFields[delegationgrant.FieldFeeCollectorIdentityPubkey]
+	return ok
+}
+
+// ResetFeeCollectorIdentityPubkey resets all changes to the "fee_collector_identity_pubkey" field.
+func (m *DelegationGrantMutation) ResetFeeCollectorIdentityPubkey() {
+	m.fee_collector_identity_pubkey = nil
+	delete(m.clearedFields, delegationgrant.FieldFeeCollectorIdentityPubkey)
+}
+
+// SetVersion sets the "version" field.
+func (m *DelegationGrantMutation) SetVersion(u uint64) {
+	m.version = &u
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *DelegationGrantMutation) Version() (r uint64, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldVersion(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds u to the "version" field.
+func (m *DelegationGrantMutation) AddVersion(u int64) {
+	if m.addversion != nil {
+		*m.addversion += u
+	} else {
+		m.addversion = &u
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *DelegationGrantMutation) AddedVersion() (r int64, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *DelegationGrantMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetOwnerSignature sets the "owner_signature" field.
+func (m *DelegationGrantMutation) SetOwnerSignature(b []byte) {
+	m.owner_signature = &b
+}
+
+// OwnerSignature returns the value of the "owner_signature" field in the mutation.
+func (m *DelegationGrantMutation) OwnerSignature() (r []byte, exists bool) {
+	v := m.owner_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerSignature returns the old "owner_signature" field's value of the DelegationGrant entity.
+// If the DelegationGrant object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantMutation) OldOwnerSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerSignature: %w", err)
+	}
+	return oldValue.OwnerSignature, nil
+}
+
+// ResetOwnerSignature resets all changes to the "owner_signature" field.
+func (m *DelegationGrantMutation) ResetOwnerSignature() {
+	m.owner_signature = nil
+}
+
+// AddSpenderIDs adds the "spenders" edge to the DelegationGrantSpender entity by ids.
+func (m *DelegationGrantMutation) AddSpenderIDs(ids ...uuid.UUID) {
+	if m.spenders == nil {
+		m.spenders = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.spenders[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSpenders clears the "spenders" edge to the DelegationGrantSpender entity.
+func (m *DelegationGrantMutation) ClearSpenders() {
+	m.clearedspenders = true
+}
+
+// SpendersCleared reports if the "spenders" edge to the DelegationGrantSpender entity was cleared.
+func (m *DelegationGrantMutation) SpendersCleared() bool {
+	return m.clearedspenders
+}
+
+// RemoveSpenderIDs removes the "spenders" edge to the DelegationGrantSpender entity by IDs.
+func (m *DelegationGrantMutation) RemoveSpenderIDs(ids ...uuid.UUID) {
+	if m.removedspenders == nil {
+		m.removedspenders = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.spenders, ids[i])
+		m.removedspenders[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSpenders returns the removed IDs of the "spenders" edge to the DelegationGrantSpender entity.
+func (m *DelegationGrantMutation) RemovedSpendersIDs() (ids []uuid.UUID) {
+	for id := range m.removedspenders {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SpendersIDs returns the "spenders" edge IDs in the mutation.
+func (m *DelegationGrantMutation) SpendersIDs() (ids []uuid.UUID) {
+	for id := range m.spenders {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSpenders resets all changes to the "spenders" edge.
+func (m *DelegationGrantMutation) ResetSpenders() {
+	m.spenders = nil
+	m.clearedspenders = false
+	m.removedspenders = nil
+}
+
+// AddLeafDecompositionIDs adds the "leaf_decompositions" edge to the LeafDecomposition entity by ids.
+func (m *DelegationGrantMutation) AddLeafDecompositionIDs(ids ...uuid.UUID) {
+	if m.leaf_decompositions == nil {
+		m.leaf_decompositions = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.leaf_decompositions[ids[i]] = struct{}{}
+	}
+}
+
+// ClearLeafDecompositions clears the "leaf_decompositions" edge to the LeafDecomposition entity.
+func (m *DelegationGrantMutation) ClearLeafDecompositions() {
+	m.clearedleaf_decompositions = true
+}
+
+// LeafDecompositionsCleared reports if the "leaf_decompositions" edge to the LeafDecomposition entity was cleared.
+func (m *DelegationGrantMutation) LeafDecompositionsCleared() bool {
+	return m.clearedleaf_decompositions
+}
+
+// RemoveLeafDecompositionIDs removes the "leaf_decompositions" edge to the LeafDecomposition entity by IDs.
+func (m *DelegationGrantMutation) RemoveLeafDecompositionIDs(ids ...uuid.UUID) {
+	if m.removedleaf_decompositions == nil {
+		m.removedleaf_decompositions = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.leaf_decompositions, ids[i])
+		m.removedleaf_decompositions[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedLeafDecompositions returns the removed IDs of the "leaf_decompositions" edge to the LeafDecomposition entity.
+func (m *DelegationGrantMutation) RemovedLeafDecompositionsIDs() (ids []uuid.UUID) {
+	for id := range m.removedleaf_decompositions {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// LeafDecompositionsIDs returns the "leaf_decompositions" edge IDs in the mutation.
+func (m *DelegationGrantMutation) LeafDecompositionsIDs() (ids []uuid.UUID) {
+	for id := range m.leaf_decompositions {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetLeafDecompositions resets all changes to the "leaf_decompositions" edge.
+func (m *DelegationGrantMutation) ResetLeafDecompositions() {
+	m.leaf_decompositions = nil
+	m.clearedleaf_decompositions = false
+	m.removedleaf_decompositions = nil
+}
+
+// Where appends a list predicates to the DelegationGrantMutation builder.
+func (m *DelegationGrantMutation) Where(ps ...predicate.DelegationGrant) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DelegationGrantMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DelegationGrantMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DelegationGrant, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DelegationGrantMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DelegationGrantMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DelegationGrant).
+func (m *DelegationGrantMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DelegationGrantMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.create_time != nil {
+		fields = append(fields, delegationgrant.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, delegationgrant.FieldUpdateTime)
+	}
+	if m.owner_identity_pubkey != nil {
+		fields = append(fields, delegationgrant.FieldOwnerIdentityPubkey)
+	}
+	if m.status != nil {
+		fields = append(fields, delegationgrant.FieldStatus)
+	}
+	if m.network != nil {
+		fields = append(fields, delegationgrant.FieldNetwork)
+	}
+	if m.expiry_time != nil {
+		fields = append(fields, delegationgrant.FieldExpiryTime)
+	}
+	if m.scope_transfer != nil {
+		fields = append(fields, delegationgrant.FieldScopeTransfer)
+	}
+	if m.scope_renew != nil {
+		fields = append(fields, delegationgrant.FieldScopeRenew)
+	}
+	if m.scope_claim != nil {
+		fields = append(fields, delegationgrant.FieldScopeClaim)
+	}
+	if m.fee_flat_sats != nil {
+		fields = append(fields, delegationgrant.FieldFeeFlatSats)
+	}
+	if m.fee_collector_identity_pubkey != nil {
+		fields = append(fields, delegationgrant.FieldFeeCollectorIdentityPubkey)
+	}
+	if m.version != nil {
+		fields = append(fields, delegationgrant.FieldVersion)
+	}
+	if m.owner_signature != nil {
+		fields = append(fields, delegationgrant.FieldOwnerSignature)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DelegationGrantMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case delegationgrant.FieldCreateTime:
+		return m.CreateTime()
+	case delegationgrant.FieldUpdateTime:
+		return m.UpdateTime()
+	case delegationgrant.FieldOwnerIdentityPubkey:
+		return m.OwnerIdentityPubkey()
+	case delegationgrant.FieldStatus:
+		return m.Status()
+	case delegationgrant.FieldNetwork:
+		return m.Network()
+	case delegationgrant.FieldExpiryTime:
+		return m.ExpiryTime()
+	case delegationgrant.FieldScopeTransfer:
+		return m.ScopeTransfer()
+	case delegationgrant.FieldScopeRenew:
+		return m.ScopeRenew()
+	case delegationgrant.FieldScopeClaim:
+		return m.ScopeClaim()
+	case delegationgrant.FieldFeeFlatSats:
+		return m.FeeFlatSats()
+	case delegationgrant.FieldFeeCollectorIdentityPubkey:
+		return m.FeeCollectorIdentityPubkey()
+	case delegationgrant.FieldVersion:
+		return m.Version()
+	case delegationgrant.FieldOwnerSignature:
+		return m.OwnerSignature()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DelegationGrantMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case delegationgrant.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case delegationgrant.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case delegationgrant.FieldOwnerIdentityPubkey:
+		return m.OldOwnerIdentityPubkey(ctx)
+	case delegationgrant.FieldStatus:
+		return m.OldStatus(ctx)
+	case delegationgrant.FieldNetwork:
+		return m.OldNetwork(ctx)
+	case delegationgrant.FieldExpiryTime:
+		return m.OldExpiryTime(ctx)
+	case delegationgrant.FieldScopeTransfer:
+		return m.OldScopeTransfer(ctx)
+	case delegationgrant.FieldScopeRenew:
+		return m.OldScopeRenew(ctx)
+	case delegationgrant.FieldScopeClaim:
+		return m.OldScopeClaim(ctx)
+	case delegationgrant.FieldFeeFlatSats:
+		return m.OldFeeFlatSats(ctx)
+	case delegationgrant.FieldFeeCollectorIdentityPubkey:
+		return m.OldFeeCollectorIdentityPubkey(ctx)
+	case delegationgrant.FieldVersion:
+		return m.OldVersion(ctx)
+	case delegationgrant.FieldOwnerSignature:
+		return m.OldOwnerSignature(ctx)
+	}
+	return nil, fmt.Errorf("unknown DelegationGrant field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DelegationGrantMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case delegationgrant.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case delegationgrant.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case delegationgrant.FieldOwnerIdentityPubkey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerIdentityPubkey(v)
+		return nil
+	case delegationgrant.FieldStatus:
+		v, ok := value.(schematype.DelegationStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case delegationgrant.FieldNetwork:
+		v, ok := value.(btcnetwork.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
+		return nil
+	case delegationgrant.FieldExpiryTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiryTime(v)
+		return nil
+	case delegationgrant.FieldScopeTransfer:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopeTransfer(v)
+		return nil
+	case delegationgrant.FieldScopeRenew:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopeRenew(v)
+		return nil
+	case delegationgrant.FieldScopeClaim:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopeClaim(v)
+		return nil
+	case delegationgrant.FieldFeeFlatSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeeFlatSats(v)
+		return nil
+	case delegationgrant.FieldFeeCollectorIdentityPubkey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeeCollectorIdentityPubkey(v)
+		return nil
+	case delegationgrant.FieldVersion:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case delegationgrant.FieldOwnerSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerSignature(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrant field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DelegationGrantMutation) AddedFields() []string {
+	var fields []string
+	if m.addfee_flat_sats != nil {
+		fields = append(fields, delegationgrant.FieldFeeFlatSats)
+	}
+	if m.addversion != nil {
+		fields = append(fields, delegationgrant.FieldVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DelegationGrantMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case delegationgrant.FieldFeeFlatSats:
+		return m.AddedFeeFlatSats()
+	case delegationgrant.FieldVersion:
+		return m.AddedVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DelegationGrantMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case delegationgrant.FieldFeeFlatSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFeeFlatSats(v)
+		return nil
+	case delegationgrant.FieldVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrant numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DelegationGrantMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(delegationgrant.FieldFeeCollectorIdentityPubkey) {
+		fields = append(fields, delegationgrant.FieldFeeCollectorIdentityPubkey)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DelegationGrantMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DelegationGrantMutation) ClearField(name string) error {
+	switch name {
+	case delegationgrant.FieldFeeCollectorIdentityPubkey:
+		m.ClearFeeCollectorIdentityPubkey()
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrant nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DelegationGrantMutation) ResetField(name string) error {
+	switch name {
+	case delegationgrant.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case delegationgrant.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case delegationgrant.FieldOwnerIdentityPubkey:
+		m.ResetOwnerIdentityPubkey()
+		return nil
+	case delegationgrant.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case delegationgrant.FieldNetwork:
+		m.ResetNetwork()
+		return nil
+	case delegationgrant.FieldExpiryTime:
+		m.ResetExpiryTime()
+		return nil
+	case delegationgrant.FieldScopeTransfer:
+		m.ResetScopeTransfer()
+		return nil
+	case delegationgrant.FieldScopeRenew:
+		m.ResetScopeRenew()
+		return nil
+	case delegationgrant.FieldScopeClaim:
+		m.ResetScopeClaim()
+		return nil
+	case delegationgrant.FieldFeeFlatSats:
+		m.ResetFeeFlatSats()
+		return nil
+	case delegationgrant.FieldFeeCollectorIdentityPubkey:
+		m.ResetFeeCollectorIdentityPubkey()
+		return nil
+	case delegationgrant.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case delegationgrant.FieldOwnerSignature:
+		m.ResetOwnerSignature()
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrant field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DelegationGrantMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.spenders != nil {
+		edges = append(edges, delegationgrant.EdgeSpenders)
+	}
+	if m.leaf_decompositions != nil {
+		edges = append(edges, delegationgrant.EdgeLeafDecompositions)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DelegationGrantMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case delegationgrant.EdgeSpenders:
+		ids := make([]ent.Value, 0, len(m.spenders))
+		for id := range m.spenders {
+			ids = append(ids, id)
+		}
+		return ids
+	case delegationgrant.EdgeLeafDecompositions:
+		ids := make([]ent.Value, 0, len(m.leaf_decompositions))
+		for id := range m.leaf_decompositions {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DelegationGrantMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.removedspenders != nil {
+		edges = append(edges, delegationgrant.EdgeSpenders)
+	}
+	if m.removedleaf_decompositions != nil {
+		edges = append(edges, delegationgrant.EdgeLeafDecompositions)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DelegationGrantMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case delegationgrant.EdgeSpenders:
+		ids := make([]ent.Value, 0, len(m.removedspenders))
+		for id := range m.removedspenders {
+			ids = append(ids, id)
+		}
+		return ids
+	case delegationgrant.EdgeLeafDecompositions:
+		ids := make([]ent.Value, 0, len(m.removedleaf_decompositions))
+		for id := range m.removedleaf_decompositions {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DelegationGrantMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedspenders {
+		edges = append(edges, delegationgrant.EdgeSpenders)
+	}
+	if m.clearedleaf_decompositions {
+		edges = append(edges, delegationgrant.EdgeLeafDecompositions)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DelegationGrantMutation) EdgeCleared(name string) bool {
+	switch name {
+	case delegationgrant.EdgeSpenders:
+		return m.clearedspenders
+	case delegationgrant.EdgeLeafDecompositions:
+		return m.clearedleaf_decompositions
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DelegationGrantMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown DelegationGrant unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DelegationGrantMutation) ResetEdge(name string) error {
+	switch name {
+	case delegationgrant.EdgeSpenders:
+		m.ResetSpenders()
+		return nil
+	case delegationgrant.EdgeLeafDecompositions:
+		m.ResetLeafDecompositions()
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrant edge %s", name)
+}
+
+// DelegationGrantSpenderMutation represents an operation that mutates the DelegationGrantSpender nodes in the graph.
+type DelegationGrantSpenderMutation struct {
+	config
+	op                        Op
+	typ                       string
+	id                        *uuid.UUID
+	create_time               *time.Time
+	update_time               *time.Time
+	spender_identity_pubkey   *keys.Public
+	status                    *schematype.DelegationStatus
+	per_tx_cap_sats           *uint64
+	addper_tx_cap_sats        *int64
+	rolling_limit_sats        *uint64
+	addrolling_limit_sats     *int64
+	rolling_window_seconds    *uint64
+	addrolling_window_seconds *int64
+	per_tx_unlimited          *bool
+	rolling_unlimited         *bool
+	spent_sats                *uint64
+	addspent_sats             *int64
+	window_start              *time.Time
+	version                   *uint64
+	addversion                *int64
+	owner_signature           *[]byte
+	clearedFields             map[string]struct{}
+	delegation_grant          *uuid.UUID
+	cleareddelegation_grant   bool
+	done                      bool
+	oldValue                  func(context.Context) (*DelegationGrantSpender, error)
+	predicates                []predicate.DelegationGrantSpender
+}
+
+var _ ent.Mutation = (*DelegationGrantSpenderMutation)(nil)
+
+// delegationgrantspenderOption allows management of the mutation configuration using functional options.
+type delegationgrantspenderOption func(*DelegationGrantSpenderMutation)
+
+// newDelegationGrantSpenderMutation creates new mutation for the DelegationGrantSpender entity.
+func newDelegationGrantSpenderMutation(c config, op Op, opts ...delegationgrantspenderOption) *DelegationGrantSpenderMutation {
+	m := &DelegationGrantSpenderMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDelegationGrantSpender,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDelegationGrantSpenderID sets the ID field of the mutation.
+func withDelegationGrantSpenderID(id uuid.UUID) delegationgrantspenderOption {
+	return func(m *DelegationGrantSpenderMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DelegationGrantSpender
+		)
+		m.oldValue = func(ctx context.Context) (*DelegationGrantSpender, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DelegationGrantSpender.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDelegationGrantSpender sets the old DelegationGrantSpender of the mutation.
+func withDelegationGrantSpender(node *DelegationGrantSpender) delegationgrantspenderOption {
+	return func(m *DelegationGrantSpenderMutation) {
+		m.oldValue = func(context.Context) (*DelegationGrantSpender, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DelegationGrantSpenderMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DelegationGrantSpenderMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DelegationGrantSpender entities.
+func (m *DelegationGrantSpenderMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DelegationGrantSpenderMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DelegationGrantSpenderMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DelegationGrantSpender.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *DelegationGrantSpenderMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *DelegationGrantSpenderMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *DelegationGrantSpenderMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *DelegationGrantSpenderMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *DelegationGrantSpenderMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *DelegationGrantSpenderMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetSpenderIdentityPubkey sets the "spender_identity_pubkey" field.
+func (m *DelegationGrantSpenderMutation) SetSpenderIdentityPubkey(k keys.Public) {
+	m.spender_identity_pubkey = &k
+}
+
+// SpenderIdentityPubkey returns the value of the "spender_identity_pubkey" field in the mutation.
+func (m *DelegationGrantSpenderMutation) SpenderIdentityPubkey() (r keys.Public, exists bool) {
+	v := m.spender_identity_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSpenderIdentityPubkey returns the old "spender_identity_pubkey" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldSpenderIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSpenderIdentityPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSpenderIdentityPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSpenderIdentityPubkey: %w", err)
+	}
+	return oldValue.SpenderIdentityPubkey, nil
+}
+
+// ResetSpenderIdentityPubkey resets all changes to the "spender_identity_pubkey" field.
+func (m *DelegationGrantSpenderMutation) ResetSpenderIdentityPubkey() {
+	m.spender_identity_pubkey = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *DelegationGrantSpenderMutation) SetStatus(ss schematype.DelegationStatus) {
+	m.status = &ss
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *DelegationGrantSpenderMutation) Status() (r schematype.DelegationStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldStatus(ctx context.Context) (v schematype.DelegationStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *DelegationGrantSpenderMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetPerTxCapSats sets the "per_tx_cap_sats" field.
+func (m *DelegationGrantSpenderMutation) SetPerTxCapSats(u uint64) {
+	m.per_tx_cap_sats = &u
+	m.addper_tx_cap_sats = nil
+}
+
+// PerTxCapSats returns the value of the "per_tx_cap_sats" field in the mutation.
+func (m *DelegationGrantSpenderMutation) PerTxCapSats() (r uint64, exists bool) {
+	v := m.per_tx_cap_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPerTxCapSats returns the old "per_tx_cap_sats" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldPerTxCapSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPerTxCapSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPerTxCapSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPerTxCapSats: %w", err)
+	}
+	return oldValue.PerTxCapSats, nil
+}
+
+// AddPerTxCapSats adds u to the "per_tx_cap_sats" field.
+func (m *DelegationGrantSpenderMutation) AddPerTxCapSats(u int64) {
+	if m.addper_tx_cap_sats != nil {
+		*m.addper_tx_cap_sats += u
+	} else {
+		m.addper_tx_cap_sats = &u
+	}
+}
+
+// AddedPerTxCapSats returns the value that was added to the "per_tx_cap_sats" field in this mutation.
+func (m *DelegationGrantSpenderMutation) AddedPerTxCapSats() (r int64, exists bool) {
+	v := m.addper_tx_cap_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPerTxCapSats resets all changes to the "per_tx_cap_sats" field.
+func (m *DelegationGrantSpenderMutation) ResetPerTxCapSats() {
+	m.per_tx_cap_sats = nil
+	m.addper_tx_cap_sats = nil
+}
+
+// SetRollingLimitSats sets the "rolling_limit_sats" field.
+func (m *DelegationGrantSpenderMutation) SetRollingLimitSats(u uint64) {
+	m.rolling_limit_sats = &u
+	m.addrolling_limit_sats = nil
+}
+
+// RollingLimitSats returns the value of the "rolling_limit_sats" field in the mutation.
+func (m *DelegationGrantSpenderMutation) RollingLimitSats() (r uint64, exists bool) {
+	v := m.rolling_limit_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRollingLimitSats returns the old "rolling_limit_sats" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldRollingLimitSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRollingLimitSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRollingLimitSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRollingLimitSats: %w", err)
+	}
+	return oldValue.RollingLimitSats, nil
+}
+
+// AddRollingLimitSats adds u to the "rolling_limit_sats" field.
+func (m *DelegationGrantSpenderMutation) AddRollingLimitSats(u int64) {
+	if m.addrolling_limit_sats != nil {
+		*m.addrolling_limit_sats += u
+	} else {
+		m.addrolling_limit_sats = &u
+	}
+}
+
+// AddedRollingLimitSats returns the value that was added to the "rolling_limit_sats" field in this mutation.
+func (m *DelegationGrantSpenderMutation) AddedRollingLimitSats() (r int64, exists bool) {
+	v := m.addrolling_limit_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRollingLimitSats resets all changes to the "rolling_limit_sats" field.
+func (m *DelegationGrantSpenderMutation) ResetRollingLimitSats() {
+	m.rolling_limit_sats = nil
+	m.addrolling_limit_sats = nil
+}
+
+// SetRollingWindowSeconds sets the "rolling_window_seconds" field.
+func (m *DelegationGrantSpenderMutation) SetRollingWindowSeconds(u uint64) {
+	m.rolling_window_seconds = &u
+	m.addrolling_window_seconds = nil
+}
+
+// RollingWindowSeconds returns the value of the "rolling_window_seconds" field in the mutation.
+func (m *DelegationGrantSpenderMutation) RollingWindowSeconds() (r uint64, exists bool) {
+	v := m.rolling_window_seconds
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRollingWindowSeconds returns the old "rolling_window_seconds" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldRollingWindowSeconds(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRollingWindowSeconds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRollingWindowSeconds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRollingWindowSeconds: %w", err)
+	}
+	return oldValue.RollingWindowSeconds, nil
+}
+
+// AddRollingWindowSeconds adds u to the "rolling_window_seconds" field.
+func (m *DelegationGrantSpenderMutation) AddRollingWindowSeconds(u int64) {
+	if m.addrolling_window_seconds != nil {
+		*m.addrolling_window_seconds += u
+	} else {
+		m.addrolling_window_seconds = &u
+	}
+}
+
+// AddedRollingWindowSeconds returns the value that was added to the "rolling_window_seconds" field in this mutation.
+func (m *DelegationGrantSpenderMutation) AddedRollingWindowSeconds() (r int64, exists bool) {
+	v := m.addrolling_window_seconds
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRollingWindowSeconds resets all changes to the "rolling_window_seconds" field.
+func (m *DelegationGrantSpenderMutation) ResetRollingWindowSeconds() {
+	m.rolling_window_seconds = nil
+	m.addrolling_window_seconds = nil
+}
+
+// SetPerTxUnlimited sets the "per_tx_unlimited" field.
+func (m *DelegationGrantSpenderMutation) SetPerTxUnlimited(b bool) {
+	m.per_tx_unlimited = &b
+}
+
+// PerTxUnlimited returns the value of the "per_tx_unlimited" field in the mutation.
+func (m *DelegationGrantSpenderMutation) PerTxUnlimited() (r bool, exists bool) {
+	v := m.per_tx_unlimited
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPerTxUnlimited returns the old "per_tx_unlimited" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldPerTxUnlimited(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPerTxUnlimited is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPerTxUnlimited requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPerTxUnlimited: %w", err)
+	}
+	return oldValue.PerTxUnlimited, nil
+}
+
+// ResetPerTxUnlimited resets all changes to the "per_tx_unlimited" field.
+func (m *DelegationGrantSpenderMutation) ResetPerTxUnlimited() {
+	m.per_tx_unlimited = nil
+}
+
+// SetRollingUnlimited sets the "rolling_unlimited" field.
+func (m *DelegationGrantSpenderMutation) SetRollingUnlimited(b bool) {
+	m.rolling_unlimited = &b
+}
+
+// RollingUnlimited returns the value of the "rolling_unlimited" field in the mutation.
+func (m *DelegationGrantSpenderMutation) RollingUnlimited() (r bool, exists bool) {
+	v := m.rolling_unlimited
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRollingUnlimited returns the old "rolling_unlimited" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldRollingUnlimited(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRollingUnlimited is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRollingUnlimited requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRollingUnlimited: %w", err)
+	}
+	return oldValue.RollingUnlimited, nil
+}
+
+// ResetRollingUnlimited resets all changes to the "rolling_unlimited" field.
+func (m *DelegationGrantSpenderMutation) ResetRollingUnlimited() {
+	m.rolling_unlimited = nil
+}
+
+// SetSpentSats sets the "spent_sats" field.
+func (m *DelegationGrantSpenderMutation) SetSpentSats(u uint64) {
+	m.spent_sats = &u
+	m.addspent_sats = nil
+}
+
+// SpentSats returns the value of the "spent_sats" field in the mutation.
+func (m *DelegationGrantSpenderMutation) SpentSats() (r uint64, exists bool) {
+	v := m.spent_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSpentSats returns the old "spent_sats" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldSpentSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSpentSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSpentSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSpentSats: %w", err)
+	}
+	return oldValue.SpentSats, nil
+}
+
+// AddSpentSats adds u to the "spent_sats" field.
+func (m *DelegationGrantSpenderMutation) AddSpentSats(u int64) {
+	if m.addspent_sats != nil {
+		*m.addspent_sats += u
+	} else {
+		m.addspent_sats = &u
+	}
+}
+
+// AddedSpentSats returns the value that was added to the "spent_sats" field in this mutation.
+func (m *DelegationGrantSpenderMutation) AddedSpentSats() (r int64, exists bool) {
+	v := m.addspent_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSpentSats resets all changes to the "spent_sats" field.
+func (m *DelegationGrantSpenderMutation) ResetSpentSats() {
+	m.spent_sats = nil
+	m.addspent_sats = nil
+}
+
+// SetWindowStart sets the "window_start" field.
+func (m *DelegationGrantSpenderMutation) SetWindowStart(t time.Time) {
+	m.window_start = &t
+}
+
+// WindowStart returns the value of the "window_start" field in the mutation.
+func (m *DelegationGrantSpenderMutation) WindowStart() (r time.Time, exists bool) {
+	v := m.window_start
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWindowStart returns the old "window_start" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldWindowStart(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWindowStart is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWindowStart requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWindowStart: %w", err)
+	}
+	return oldValue.WindowStart, nil
+}
+
+// ClearWindowStart clears the value of the "window_start" field.
+func (m *DelegationGrantSpenderMutation) ClearWindowStart() {
+	m.window_start = nil
+	m.clearedFields[delegationgrantspender.FieldWindowStart] = struct{}{}
+}
+
+// WindowStartCleared returns if the "window_start" field was cleared in this mutation.
+func (m *DelegationGrantSpenderMutation) WindowStartCleared() bool {
+	_, ok := m.clearedFields[delegationgrantspender.FieldWindowStart]
+	return ok
+}
+
+// ResetWindowStart resets all changes to the "window_start" field.
+func (m *DelegationGrantSpenderMutation) ResetWindowStart() {
+	m.window_start = nil
+	delete(m.clearedFields, delegationgrantspender.FieldWindowStart)
+}
+
+// SetVersion sets the "version" field.
+func (m *DelegationGrantSpenderMutation) SetVersion(u uint64) {
+	m.version = &u
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *DelegationGrantSpenderMutation) Version() (r uint64, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldVersion(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds u to the "version" field.
+func (m *DelegationGrantSpenderMutation) AddVersion(u int64) {
+	if m.addversion != nil {
+		*m.addversion += u
+	} else {
+		m.addversion = &u
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *DelegationGrantSpenderMutation) AddedVersion() (r int64, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *DelegationGrantSpenderMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetOwnerSignature sets the "owner_signature" field.
+func (m *DelegationGrantSpenderMutation) SetOwnerSignature(b []byte) {
+	m.owner_signature = &b
+}
+
+// OwnerSignature returns the value of the "owner_signature" field in the mutation.
+func (m *DelegationGrantSpenderMutation) OwnerSignature() (r []byte, exists bool) {
+	v := m.owner_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerSignature returns the old "owner_signature" field's value of the DelegationGrantSpender entity.
+// If the DelegationGrantSpender object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DelegationGrantSpenderMutation) OldOwnerSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerSignature: %w", err)
+	}
+	return oldValue.OwnerSignature, nil
+}
+
+// ResetOwnerSignature resets all changes to the "owner_signature" field.
+func (m *DelegationGrantSpenderMutation) ResetOwnerSignature() {
+	m.owner_signature = nil
+}
+
+// SetDelegationGrantID sets the "delegation_grant" edge to the DelegationGrant entity by id.
+func (m *DelegationGrantSpenderMutation) SetDelegationGrantID(id uuid.UUID) {
+	m.delegation_grant = &id
+}
+
+// ClearDelegationGrant clears the "delegation_grant" edge to the DelegationGrant entity.
+func (m *DelegationGrantSpenderMutation) ClearDelegationGrant() {
+	m.cleareddelegation_grant = true
+}
+
+// DelegationGrantCleared reports if the "delegation_grant" edge to the DelegationGrant entity was cleared.
+func (m *DelegationGrantSpenderMutation) DelegationGrantCleared() bool {
+	return m.cleareddelegation_grant
+}
+
+// DelegationGrantID returns the "delegation_grant" edge ID in the mutation.
+func (m *DelegationGrantSpenderMutation) DelegationGrantID() (id uuid.UUID, exists bool) {
+	if m.delegation_grant != nil {
+		return *m.delegation_grant, true
+	}
+	return
+}
+
+// DelegationGrantIDs returns the "delegation_grant" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// DelegationGrantID instead. It exists only for internal usage by the builders.
+func (m *DelegationGrantSpenderMutation) DelegationGrantIDs() (ids []uuid.UUID) {
+	if id := m.delegation_grant; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetDelegationGrant resets all changes to the "delegation_grant" edge.
+func (m *DelegationGrantSpenderMutation) ResetDelegationGrant() {
+	m.delegation_grant = nil
+	m.cleareddelegation_grant = false
+}
+
+// Where appends a list predicates to the DelegationGrantSpenderMutation builder.
+func (m *DelegationGrantSpenderMutation) Where(ps ...predicate.DelegationGrantSpender) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DelegationGrantSpenderMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DelegationGrantSpenderMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DelegationGrantSpender, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DelegationGrantSpenderMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DelegationGrantSpenderMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DelegationGrantSpender).
+func (m *DelegationGrantSpenderMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DelegationGrantSpenderMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.create_time != nil {
+		fields = append(fields, delegationgrantspender.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, delegationgrantspender.FieldUpdateTime)
+	}
+	if m.spender_identity_pubkey != nil {
+		fields = append(fields, delegationgrantspender.FieldSpenderIdentityPubkey)
+	}
+	if m.status != nil {
+		fields = append(fields, delegationgrantspender.FieldStatus)
+	}
+	if m.per_tx_cap_sats != nil {
+		fields = append(fields, delegationgrantspender.FieldPerTxCapSats)
+	}
+	if m.rolling_limit_sats != nil {
+		fields = append(fields, delegationgrantspender.FieldRollingLimitSats)
+	}
+	if m.rolling_window_seconds != nil {
+		fields = append(fields, delegationgrantspender.FieldRollingWindowSeconds)
+	}
+	if m.per_tx_unlimited != nil {
+		fields = append(fields, delegationgrantspender.FieldPerTxUnlimited)
+	}
+	if m.rolling_unlimited != nil {
+		fields = append(fields, delegationgrantspender.FieldRollingUnlimited)
+	}
+	if m.spent_sats != nil {
+		fields = append(fields, delegationgrantspender.FieldSpentSats)
+	}
+	if m.window_start != nil {
+		fields = append(fields, delegationgrantspender.FieldWindowStart)
+	}
+	if m.version != nil {
+		fields = append(fields, delegationgrantspender.FieldVersion)
+	}
+	if m.owner_signature != nil {
+		fields = append(fields, delegationgrantspender.FieldOwnerSignature)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DelegationGrantSpenderMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case delegationgrantspender.FieldCreateTime:
+		return m.CreateTime()
+	case delegationgrantspender.FieldUpdateTime:
+		return m.UpdateTime()
+	case delegationgrantspender.FieldSpenderIdentityPubkey:
+		return m.SpenderIdentityPubkey()
+	case delegationgrantspender.FieldStatus:
+		return m.Status()
+	case delegationgrantspender.FieldPerTxCapSats:
+		return m.PerTxCapSats()
+	case delegationgrantspender.FieldRollingLimitSats:
+		return m.RollingLimitSats()
+	case delegationgrantspender.FieldRollingWindowSeconds:
+		return m.RollingWindowSeconds()
+	case delegationgrantspender.FieldPerTxUnlimited:
+		return m.PerTxUnlimited()
+	case delegationgrantspender.FieldRollingUnlimited:
+		return m.RollingUnlimited()
+	case delegationgrantspender.FieldSpentSats:
+		return m.SpentSats()
+	case delegationgrantspender.FieldWindowStart:
+		return m.WindowStart()
+	case delegationgrantspender.FieldVersion:
+		return m.Version()
+	case delegationgrantspender.FieldOwnerSignature:
+		return m.OwnerSignature()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DelegationGrantSpenderMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case delegationgrantspender.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case delegationgrantspender.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case delegationgrantspender.FieldSpenderIdentityPubkey:
+		return m.OldSpenderIdentityPubkey(ctx)
+	case delegationgrantspender.FieldStatus:
+		return m.OldStatus(ctx)
+	case delegationgrantspender.FieldPerTxCapSats:
+		return m.OldPerTxCapSats(ctx)
+	case delegationgrantspender.FieldRollingLimitSats:
+		return m.OldRollingLimitSats(ctx)
+	case delegationgrantspender.FieldRollingWindowSeconds:
+		return m.OldRollingWindowSeconds(ctx)
+	case delegationgrantspender.FieldPerTxUnlimited:
+		return m.OldPerTxUnlimited(ctx)
+	case delegationgrantspender.FieldRollingUnlimited:
+		return m.OldRollingUnlimited(ctx)
+	case delegationgrantspender.FieldSpentSats:
+		return m.OldSpentSats(ctx)
+	case delegationgrantspender.FieldWindowStart:
+		return m.OldWindowStart(ctx)
+	case delegationgrantspender.FieldVersion:
+		return m.OldVersion(ctx)
+	case delegationgrantspender.FieldOwnerSignature:
+		return m.OldOwnerSignature(ctx)
+	}
+	return nil, fmt.Errorf("unknown DelegationGrantSpender field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DelegationGrantSpenderMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case delegationgrantspender.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case delegationgrantspender.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case delegationgrantspender.FieldSpenderIdentityPubkey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSpenderIdentityPubkey(v)
+		return nil
+	case delegationgrantspender.FieldStatus:
+		v, ok := value.(schematype.DelegationStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case delegationgrantspender.FieldPerTxCapSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPerTxCapSats(v)
+		return nil
+	case delegationgrantspender.FieldRollingLimitSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRollingLimitSats(v)
+		return nil
+	case delegationgrantspender.FieldRollingWindowSeconds:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRollingWindowSeconds(v)
+		return nil
+	case delegationgrantspender.FieldPerTxUnlimited:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPerTxUnlimited(v)
+		return nil
+	case delegationgrantspender.FieldRollingUnlimited:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRollingUnlimited(v)
+		return nil
+	case delegationgrantspender.FieldSpentSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSpentSats(v)
+		return nil
+	case delegationgrantspender.FieldWindowStart:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWindowStart(v)
+		return nil
+	case delegationgrantspender.FieldVersion:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case delegationgrantspender.FieldOwnerSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerSignature(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrantSpender field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DelegationGrantSpenderMutation) AddedFields() []string {
+	var fields []string
+	if m.addper_tx_cap_sats != nil {
+		fields = append(fields, delegationgrantspender.FieldPerTxCapSats)
+	}
+	if m.addrolling_limit_sats != nil {
+		fields = append(fields, delegationgrantspender.FieldRollingLimitSats)
+	}
+	if m.addrolling_window_seconds != nil {
+		fields = append(fields, delegationgrantspender.FieldRollingWindowSeconds)
+	}
+	if m.addspent_sats != nil {
+		fields = append(fields, delegationgrantspender.FieldSpentSats)
+	}
+	if m.addversion != nil {
+		fields = append(fields, delegationgrantspender.FieldVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DelegationGrantSpenderMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case delegationgrantspender.FieldPerTxCapSats:
+		return m.AddedPerTxCapSats()
+	case delegationgrantspender.FieldRollingLimitSats:
+		return m.AddedRollingLimitSats()
+	case delegationgrantspender.FieldRollingWindowSeconds:
+		return m.AddedRollingWindowSeconds()
+	case delegationgrantspender.FieldSpentSats:
+		return m.AddedSpentSats()
+	case delegationgrantspender.FieldVersion:
+		return m.AddedVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DelegationGrantSpenderMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case delegationgrantspender.FieldPerTxCapSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPerTxCapSats(v)
+		return nil
+	case delegationgrantspender.FieldRollingLimitSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRollingLimitSats(v)
+		return nil
+	case delegationgrantspender.FieldRollingWindowSeconds:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRollingWindowSeconds(v)
+		return nil
+	case delegationgrantspender.FieldSpentSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSpentSats(v)
+		return nil
+	case delegationgrantspender.FieldVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrantSpender numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DelegationGrantSpenderMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(delegationgrantspender.FieldWindowStart) {
+		fields = append(fields, delegationgrantspender.FieldWindowStart)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DelegationGrantSpenderMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DelegationGrantSpenderMutation) ClearField(name string) error {
+	switch name {
+	case delegationgrantspender.FieldWindowStart:
+		m.ClearWindowStart()
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrantSpender nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DelegationGrantSpenderMutation) ResetField(name string) error {
+	switch name {
+	case delegationgrantspender.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case delegationgrantspender.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case delegationgrantspender.FieldSpenderIdentityPubkey:
+		m.ResetSpenderIdentityPubkey()
+		return nil
+	case delegationgrantspender.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case delegationgrantspender.FieldPerTxCapSats:
+		m.ResetPerTxCapSats()
+		return nil
+	case delegationgrantspender.FieldRollingLimitSats:
+		m.ResetRollingLimitSats()
+		return nil
+	case delegationgrantspender.FieldRollingWindowSeconds:
+		m.ResetRollingWindowSeconds()
+		return nil
+	case delegationgrantspender.FieldPerTxUnlimited:
+		m.ResetPerTxUnlimited()
+		return nil
+	case delegationgrantspender.FieldRollingUnlimited:
+		m.ResetRollingUnlimited()
+		return nil
+	case delegationgrantspender.FieldSpentSats:
+		m.ResetSpentSats()
+		return nil
+	case delegationgrantspender.FieldWindowStart:
+		m.ResetWindowStart()
+		return nil
+	case delegationgrantspender.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case delegationgrantspender.FieldOwnerSignature:
+		m.ResetOwnerSignature()
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrantSpender field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DelegationGrantSpenderMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.delegation_grant != nil {
+		edges = append(edges, delegationgrantspender.EdgeDelegationGrant)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DelegationGrantSpenderMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case delegationgrantspender.EdgeDelegationGrant:
+		if id := m.delegation_grant; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DelegationGrantSpenderMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DelegationGrantSpenderMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DelegationGrantSpenderMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.cleareddelegation_grant {
+		edges = append(edges, delegationgrantspender.EdgeDelegationGrant)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DelegationGrantSpenderMutation) EdgeCleared(name string) bool {
+	switch name {
+	case delegationgrantspender.EdgeDelegationGrant:
+		return m.cleareddelegation_grant
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DelegationGrantSpenderMutation) ClearEdge(name string) error {
+	switch name {
+	case delegationgrantspender.EdgeDelegationGrant:
+		m.ClearDelegationGrant()
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrantSpender unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DelegationGrantSpenderMutation) ResetEdge(name string) error {
+	switch name {
+	case delegationgrantspender.EdgeDelegationGrant:
+		m.ResetDelegationGrant()
+		return nil
+	}
+	return fmt.Errorf("unknown DelegationGrantSpender edge %s", name)
 }
 
 // DepositAddressMutation represents an operation that mutates the DepositAddress nodes in the graph.
@@ -9501,6 +11991,685 @@ func (m *L1WithdrawalTransactionMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown L1WithdrawalTransaction edge %s", name)
+}
+
+// LeafDecompositionMutation represents an operation that mutates the LeafDecomposition nodes in the graph.
+type LeafDecompositionMutation struct {
+	config
+	op                      Op
+	typ                     string
+	id                      *uuid.UUID
+	create_time             *time.Time
+	update_time             *time.Time
+	delegate_signing_pubkey *keys.Public
+	status                  *schematype.LeafDecompositionStatus
+	clearedFields           map[string]struct{}
+	tree_node               *uuid.UUID
+	clearedtree_node        bool
+	signing_keyshare        *uuid.UUID
+	clearedsigning_keyshare bool
+	delegation_grant        *uuid.UUID
+	cleareddelegation_grant bool
+	done                    bool
+	oldValue                func(context.Context) (*LeafDecomposition, error)
+	predicates              []predicate.LeafDecomposition
+}
+
+var _ ent.Mutation = (*LeafDecompositionMutation)(nil)
+
+// leafdecompositionOption allows management of the mutation configuration using functional options.
+type leafdecompositionOption func(*LeafDecompositionMutation)
+
+// newLeafDecompositionMutation creates new mutation for the LeafDecomposition entity.
+func newLeafDecompositionMutation(c config, op Op, opts ...leafdecompositionOption) *LeafDecompositionMutation {
+	m := &LeafDecompositionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeLeafDecomposition,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withLeafDecompositionID sets the ID field of the mutation.
+func withLeafDecompositionID(id uuid.UUID) leafdecompositionOption {
+	return func(m *LeafDecompositionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *LeafDecomposition
+		)
+		m.oldValue = func(ctx context.Context) (*LeafDecomposition, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().LeafDecomposition.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withLeafDecomposition sets the old LeafDecomposition of the mutation.
+func withLeafDecomposition(node *LeafDecomposition) leafdecompositionOption {
+	return func(m *LeafDecompositionMutation) {
+		m.oldValue = func(context.Context) (*LeafDecomposition, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m LeafDecompositionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m LeafDecompositionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of LeafDecomposition entities.
+func (m *LeafDecompositionMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *LeafDecompositionMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *LeafDecompositionMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().LeafDecomposition.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *LeafDecompositionMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *LeafDecompositionMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the LeafDecomposition entity.
+// If the LeafDecomposition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafDecompositionMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *LeafDecompositionMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *LeafDecompositionMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *LeafDecompositionMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the LeafDecomposition entity.
+// If the LeafDecomposition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafDecompositionMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *LeafDecompositionMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetDelegateSigningPubkey sets the "delegate_signing_pubkey" field.
+func (m *LeafDecompositionMutation) SetDelegateSigningPubkey(k keys.Public) {
+	m.delegate_signing_pubkey = &k
+}
+
+// DelegateSigningPubkey returns the value of the "delegate_signing_pubkey" field in the mutation.
+func (m *LeafDecompositionMutation) DelegateSigningPubkey() (r keys.Public, exists bool) {
+	v := m.delegate_signing_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDelegateSigningPubkey returns the old "delegate_signing_pubkey" field's value of the LeafDecomposition entity.
+// If the LeafDecomposition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafDecompositionMutation) OldDelegateSigningPubkey(ctx context.Context) (v keys.Public, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDelegateSigningPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDelegateSigningPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDelegateSigningPubkey: %w", err)
+	}
+	return oldValue.DelegateSigningPubkey, nil
+}
+
+// ResetDelegateSigningPubkey resets all changes to the "delegate_signing_pubkey" field.
+func (m *LeafDecompositionMutation) ResetDelegateSigningPubkey() {
+	m.delegate_signing_pubkey = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *LeafDecompositionMutation) SetStatus(sds schematype.LeafDecompositionStatus) {
+	m.status = &sds
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *LeafDecompositionMutation) Status() (r schematype.LeafDecompositionStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the LeafDecomposition entity.
+// If the LeafDecomposition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafDecompositionMutation) OldStatus(ctx context.Context) (v schematype.LeafDecompositionStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *LeafDecompositionMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetTreeNodeID sets the "tree_node" edge to the TreeNode entity by id.
+func (m *LeafDecompositionMutation) SetTreeNodeID(id uuid.UUID) {
+	m.tree_node = &id
+}
+
+// ClearTreeNode clears the "tree_node" edge to the TreeNode entity.
+func (m *LeafDecompositionMutation) ClearTreeNode() {
+	m.clearedtree_node = true
+}
+
+// TreeNodeCleared reports if the "tree_node" edge to the TreeNode entity was cleared.
+func (m *LeafDecompositionMutation) TreeNodeCleared() bool {
+	return m.clearedtree_node
+}
+
+// TreeNodeID returns the "tree_node" edge ID in the mutation.
+func (m *LeafDecompositionMutation) TreeNodeID() (id uuid.UUID, exists bool) {
+	if m.tree_node != nil {
+		return *m.tree_node, true
+	}
+	return
+}
+
+// TreeNodeIDs returns the "tree_node" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TreeNodeID instead. It exists only for internal usage by the builders.
+func (m *LeafDecompositionMutation) TreeNodeIDs() (ids []uuid.UUID) {
+	if id := m.tree_node; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTreeNode resets all changes to the "tree_node" edge.
+func (m *LeafDecompositionMutation) ResetTreeNode() {
+	m.tree_node = nil
+	m.clearedtree_node = false
+}
+
+// SetSigningKeyshareID sets the "signing_keyshare" edge to the SigningKeyshare entity by id.
+func (m *LeafDecompositionMutation) SetSigningKeyshareID(id uuid.UUID) {
+	m.signing_keyshare = &id
+}
+
+// ClearSigningKeyshare clears the "signing_keyshare" edge to the SigningKeyshare entity.
+func (m *LeafDecompositionMutation) ClearSigningKeyshare() {
+	m.clearedsigning_keyshare = true
+}
+
+// SigningKeyshareCleared reports if the "signing_keyshare" edge to the SigningKeyshare entity was cleared.
+func (m *LeafDecompositionMutation) SigningKeyshareCleared() bool {
+	return m.clearedsigning_keyshare
+}
+
+// SigningKeyshareID returns the "signing_keyshare" edge ID in the mutation.
+func (m *LeafDecompositionMutation) SigningKeyshareID() (id uuid.UUID, exists bool) {
+	if m.signing_keyshare != nil {
+		return *m.signing_keyshare, true
+	}
+	return
+}
+
+// SigningKeyshareIDs returns the "signing_keyshare" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SigningKeyshareID instead. It exists only for internal usage by the builders.
+func (m *LeafDecompositionMutation) SigningKeyshareIDs() (ids []uuid.UUID) {
+	if id := m.signing_keyshare; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSigningKeyshare resets all changes to the "signing_keyshare" edge.
+func (m *LeafDecompositionMutation) ResetSigningKeyshare() {
+	m.signing_keyshare = nil
+	m.clearedsigning_keyshare = false
+}
+
+// SetDelegationGrantID sets the "delegation_grant" edge to the DelegationGrant entity by id.
+func (m *LeafDecompositionMutation) SetDelegationGrantID(id uuid.UUID) {
+	m.delegation_grant = &id
+}
+
+// ClearDelegationGrant clears the "delegation_grant" edge to the DelegationGrant entity.
+func (m *LeafDecompositionMutation) ClearDelegationGrant() {
+	m.cleareddelegation_grant = true
+}
+
+// DelegationGrantCleared reports if the "delegation_grant" edge to the DelegationGrant entity was cleared.
+func (m *LeafDecompositionMutation) DelegationGrantCleared() bool {
+	return m.cleareddelegation_grant
+}
+
+// DelegationGrantID returns the "delegation_grant" edge ID in the mutation.
+func (m *LeafDecompositionMutation) DelegationGrantID() (id uuid.UUID, exists bool) {
+	if m.delegation_grant != nil {
+		return *m.delegation_grant, true
+	}
+	return
+}
+
+// DelegationGrantIDs returns the "delegation_grant" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// DelegationGrantID instead. It exists only for internal usage by the builders.
+func (m *LeafDecompositionMutation) DelegationGrantIDs() (ids []uuid.UUID) {
+	if id := m.delegation_grant; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetDelegationGrant resets all changes to the "delegation_grant" edge.
+func (m *LeafDecompositionMutation) ResetDelegationGrant() {
+	m.delegation_grant = nil
+	m.cleareddelegation_grant = false
+}
+
+// Where appends a list predicates to the LeafDecompositionMutation builder.
+func (m *LeafDecompositionMutation) Where(ps ...predicate.LeafDecomposition) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the LeafDecompositionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *LeafDecompositionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.LeafDecomposition, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *LeafDecompositionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *LeafDecompositionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (LeafDecomposition).
+func (m *LeafDecompositionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *LeafDecompositionMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.create_time != nil {
+		fields = append(fields, leafdecomposition.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, leafdecomposition.FieldUpdateTime)
+	}
+	if m.delegate_signing_pubkey != nil {
+		fields = append(fields, leafdecomposition.FieldDelegateSigningPubkey)
+	}
+	if m.status != nil {
+		fields = append(fields, leafdecomposition.FieldStatus)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *LeafDecompositionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case leafdecomposition.FieldCreateTime:
+		return m.CreateTime()
+	case leafdecomposition.FieldUpdateTime:
+		return m.UpdateTime()
+	case leafdecomposition.FieldDelegateSigningPubkey:
+		return m.DelegateSigningPubkey()
+	case leafdecomposition.FieldStatus:
+		return m.Status()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *LeafDecompositionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case leafdecomposition.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case leafdecomposition.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case leafdecomposition.FieldDelegateSigningPubkey:
+		return m.OldDelegateSigningPubkey(ctx)
+	case leafdecomposition.FieldStatus:
+		return m.OldStatus(ctx)
+	}
+	return nil, fmt.Errorf("unknown LeafDecomposition field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *LeafDecompositionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case leafdecomposition.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case leafdecomposition.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case leafdecomposition.FieldDelegateSigningPubkey:
+		v, ok := value.(keys.Public)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDelegateSigningPubkey(v)
+		return nil
+	case leafdecomposition.FieldStatus:
+		v, ok := value.(schematype.LeafDecompositionStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	}
+	return fmt.Errorf("unknown LeafDecomposition field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *LeafDecompositionMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *LeafDecompositionMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *LeafDecompositionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown LeafDecomposition numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *LeafDecompositionMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *LeafDecompositionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *LeafDecompositionMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown LeafDecomposition nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *LeafDecompositionMutation) ResetField(name string) error {
+	switch name {
+	case leafdecomposition.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case leafdecomposition.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case leafdecomposition.FieldDelegateSigningPubkey:
+		m.ResetDelegateSigningPubkey()
+		return nil
+	case leafdecomposition.FieldStatus:
+		m.ResetStatus()
+		return nil
+	}
+	return fmt.Errorf("unknown LeafDecomposition field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *LeafDecompositionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.tree_node != nil {
+		edges = append(edges, leafdecomposition.EdgeTreeNode)
+	}
+	if m.signing_keyshare != nil {
+		edges = append(edges, leafdecomposition.EdgeSigningKeyshare)
+	}
+	if m.delegation_grant != nil {
+		edges = append(edges, leafdecomposition.EdgeDelegationGrant)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *LeafDecompositionMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case leafdecomposition.EdgeTreeNode:
+		if id := m.tree_node; id != nil {
+			return []ent.Value{*id}
+		}
+	case leafdecomposition.EdgeSigningKeyshare:
+		if id := m.signing_keyshare; id != nil {
+			return []ent.Value{*id}
+		}
+	case leafdecomposition.EdgeDelegationGrant:
+		if id := m.delegation_grant; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *LeafDecompositionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 3)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *LeafDecompositionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *LeafDecompositionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.clearedtree_node {
+		edges = append(edges, leafdecomposition.EdgeTreeNode)
+	}
+	if m.clearedsigning_keyshare {
+		edges = append(edges, leafdecomposition.EdgeSigningKeyshare)
+	}
+	if m.cleareddelegation_grant {
+		edges = append(edges, leafdecomposition.EdgeDelegationGrant)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *LeafDecompositionMutation) EdgeCleared(name string) bool {
+	switch name {
+	case leafdecomposition.EdgeTreeNode:
+		return m.clearedtree_node
+	case leafdecomposition.EdgeSigningKeyshare:
+		return m.clearedsigning_keyshare
+	case leafdecomposition.EdgeDelegationGrant:
+		return m.cleareddelegation_grant
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *LeafDecompositionMutation) ClearEdge(name string) error {
+	switch name {
+	case leafdecomposition.EdgeTreeNode:
+		m.ClearTreeNode()
+		return nil
+	case leafdecomposition.EdgeSigningKeyshare:
+		m.ClearSigningKeyshare()
+		return nil
+	case leafdecomposition.EdgeDelegationGrant:
+		m.ClearDelegationGrant()
+		return nil
+	}
+	return fmt.Errorf("unknown LeafDecomposition unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *LeafDecompositionMutation) ResetEdge(name string) error {
+	switch name {
+	case leafdecomposition.EdgeTreeNode:
+		m.ResetTreeNode()
+		return nil
+	case leafdecomposition.EdgeSigningKeyshare:
+		m.ResetSigningKeyshare()
+		return nil
+	case leafdecomposition.EdgeDelegationGrant:
+		m.ResetDelegationGrant()
+		return nil
+	}
+	return fmt.Errorf("unknown LeafDecomposition edge %s", name)
 }
 
 // MultisigConfigMutation represents an operation that mutates the MultisigConfig nodes in the graph.

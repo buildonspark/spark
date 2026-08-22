@@ -14,6 +14,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrant"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrantspender"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
@@ -24,6 +26,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/leafdecomposition"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/partner"
@@ -119,6 +122,8 @@ func checkColumn(table, column string) error {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			blockheight.Table:                       blockheight.ValidColumn,
 			cooperativeexit.Table:                   cooperativeexit.ValidColumn,
+			delegationgrant.Table:                   delegationgrant.ValidColumn,
+			delegationgrantspender.Table:            delegationgrantspender.ValidColumn,
 			depositaddress.Table:                    depositaddress.ValidColumn,
 			entitydkgkey.Table:                      entitydkgkey.ValidColumn,
 			eventmessage.Table:                      eventmessage.ValidColumn,
@@ -129,6 +134,7 @@ func checkColumn(table, column string) error {
 			l1tokenjusticetransaction.Table:         l1tokenjusticetransaction.ValidColumn,
 			l1tokenoutputwithdrawal.Table:           l1tokenoutputwithdrawal.ValidColumn,
 			l1withdrawaltransaction.Table:           l1withdrawaltransaction.ValidColumn,
+			leafdecomposition.Table:                 leafdecomposition.ValidColumn,
 			multisigconfig.Table:                    multisigconfig.ValidColumn,
 			multisigmember.Table:                    multisigmember.ValidColumn,
 			partner.Table:                           partner.ValidColumn,

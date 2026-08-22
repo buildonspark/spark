@@ -18,6 +18,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrant"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrantspender"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
@@ -28,6 +30,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/leafdecomposition"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/partner"
@@ -74,6 +77,10 @@ type Client struct {
 	BlockHeight *BlockHeightClient
 	// CooperativeExit is the client for interacting with the CooperativeExit builders.
 	CooperativeExit *CooperativeExitClient
+	// DelegationGrant is the client for interacting with the DelegationGrant builders.
+	DelegationGrant *DelegationGrantClient
+	// DelegationGrantSpender is the client for interacting with the DelegationGrantSpender builders.
+	DelegationGrantSpender *DelegationGrantSpenderClient
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
 	// EntityDkgKey is the client for interacting with the EntityDkgKey builders.
@@ -94,6 +101,8 @@ type Client struct {
 	L1TokenOutputWithdrawal *L1TokenOutputWithdrawalClient
 	// L1WithdrawalTransaction is the client for interacting with the L1WithdrawalTransaction builders.
 	L1WithdrawalTransaction *L1WithdrawalTransactionClient
+	// LeafDecomposition is the client for interacting with the LeafDecomposition builders.
+	LeafDecomposition *LeafDecompositionClient
 	// MultisigConfig is the client for interacting with the MultisigConfig builders.
 	MultisigConfig *MultisigConfigClient
 	// MultisigMember is the client for interacting with the MultisigMember builders.
@@ -173,6 +182,8 @@ func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.BlockHeight = NewBlockHeightClient(c.config)
 	c.CooperativeExit = NewCooperativeExitClient(c.config)
+	c.DelegationGrant = NewDelegationGrantClient(c.config)
+	c.DelegationGrantSpender = NewDelegationGrantSpenderClient(c.config)
 	c.DepositAddress = NewDepositAddressClient(c.config)
 	c.EntityDkgKey = NewEntityDkgKeyClient(c.config)
 	c.EventMessage = NewEventMessageClient(c.config)
@@ -183,6 +194,7 @@ func (c *Client) init() {
 	c.L1TokenJusticeTransaction = NewL1TokenJusticeTransactionClient(c.config)
 	c.L1TokenOutputWithdrawal = NewL1TokenOutputWithdrawalClient(c.config)
 	c.L1WithdrawalTransaction = NewL1WithdrawalTransactionClient(c.config)
+	c.LeafDecomposition = NewLeafDecompositionClient(c.config)
 	c.MultisigConfig = NewMultisigConfigClient(c.config)
 	c.MultisigMember = NewMultisigMemberClient(c.config)
 	c.Partner = NewPartnerClient(c.config)
@@ -310,6 +322,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		config:                            cfg,
 		BlockHeight:                       NewBlockHeightClient(cfg),
 		CooperativeExit:                   NewCooperativeExitClient(cfg),
+		DelegationGrant:                   NewDelegationGrantClient(cfg),
+		DelegationGrantSpender:            NewDelegationGrantSpenderClient(cfg),
 		DepositAddress:                    NewDepositAddressClient(cfg),
 		EntityDkgKey:                      NewEntityDkgKeyClient(cfg),
 		EventMessage:                      NewEventMessageClient(cfg),
@@ -320,6 +334,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		L1TokenJusticeTransaction:         NewL1TokenJusticeTransactionClient(cfg),
 		L1TokenOutputWithdrawal:           NewL1TokenOutputWithdrawalClient(cfg),
 		L1WithdrawalTransaction:           NewL1WithdrawalTransactionClient(cfg),
+		LeafDecomposition:                 NewLeafDecompositionClient(cfg),
 		MultisigConfig:                    NewMultisigConfigClient(cfg),
 		MultisigMember:                    NewMultisigMemberClient(cfg),
 		Partner:                           NewPartnerClient(cfg),
@@ -374,6 +389,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		config:                            cfg,
 		BlockHeight:                       NewBlockHeightClient(cfg),
 		CooperativeExit:                   NewCooperativeExitClient(cfg),
+		DelegationGrant:                   NewDelegationGrantClient(cfg),
+		DelegationGrantSpender:            NewDelegationGrantSpenderClient(cfg),
 		DepositAddress:                    NewDepositAddressClient(cfg),
 		EntityDkgKey:                      NewEntityDkgKeyClient(cfg),
 		EventMessage:                      NewEventMessageClient(cfg),
@@ -384,6 +401,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		L1TokenJusticeTransaction:         NewL1TokenJusticeTransactionClient(cfg),
 		L1TokenOutputWithdrawal:           NewL1TokenOutputWithdrawalClient(cfg),
 		L1WithdrawalTransaction:           NewL1WithdrawalTransactionClient(cfg),
+		LeafDecomposition:                 NewLeafDecompositionClient(cfg),
 		MultisigConfig:                    NewMultisigConfigClient(cfg),
 		MultisigMember:                    NewMultisigMemberClient(cfg),
 		Partner:                           NewPartnerClient(cfg),
@@ -446,18 +464,19 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
-		c.EventMessage, c.FlowExecution, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
-		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
-		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
-		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
-		c.PreimageShare, c.PreimageSharePartner, c.SigningCommitment,
-		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenAllowance,
-		c.TokenAllowanceSpend, c.TokenCreate, c.TokenFreeze, c.TokenMint,
-		c.TokenOutput, c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
-		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
-		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
+		c.BlockHeight, c.CooperativeExit, c.DelegationGrant, c.DelegationGrantSpender,
+		c.DepositAddress, c.EntityDkgKey, c.EventMessage, c.FlowExecution, c.Gossip,
+		c.IdempotencyKey, c.L1TokenCreate, c.L1TokenJusticeTransaction,
+		c.L1TokenOutputWithdrawal, c.L1WithdrawalTransaction, c.LeafDecomposition,
+		c.MultisigConfig, c.MultisigMember, c.Partner, c.PartnerKey, c.PaymentIntent,
+		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare,
+		c.PreimageSharePartner, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
+		c.SparkInvoice, c.TokenAllowance, c.TokenAllowanceSpend, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.TransferPartner, c.TransferReceiver, c.TransferSender,
+		c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
+		c.WalletSetting,
 	} {
 		n.Use(hooks...)
 	}
@@ -467,18 +486,19 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
-		c.EventMessage, c.FlowExecution, c.Gossip, c.IdempotencyKey, c.L1TokenCreate,
-		c.L1TokenJusticeTransaction, c.L1TokenOutputWithdrawal,
-		c.L1WithdrawalTransaction, c.MultisigConfig, c.MultisigMember, c.Partner,
-		c.PartnerKey, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
-		c.PreimageShare, c.PreimageSharePartner, c.SigningCommitment,
-		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenAllowance,
-		c.TokenAllowanceSpend, c.TokenCreate, c.TokenFreeze, c.TokenMint,
-		c.TokenOutput, c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.TransferPartner,
-		c.TransferReceiver, c.TransferSender, c.Tree, c.TreeNode,
-		c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
+		c.BlockHeight, c.CooperativeExit, c.DelegationGrant, c.DelegationGrantSpender,
+		c.DepositAddress, c.EntityDkgKey, c.EventMessage, c.FlowExecution, c.Gossip,
+		c.IdempotencyKey, c.L1TokenCreate, c.L1TokenJusticeTransaction,
+		c.L1TokenOutputWithdrawal, c.L1WithdrawalTransaction, c.LeafDecomposition,
+		c.MultisigConfig, c.MultisigMember, c.Partner, c.PartnerKey, c.PaymentIntent,
+		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare,
+		c.PreimageSharePartner, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
+		c.SparkInvoice, c.TokenAllowance, c.TokenAllowanceSpend, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.TransferPartner, c.TransferReceiver, c.TransferSender,
+		c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
+		c.WalletSetting,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -491,6 +511,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BlockHeight.mutate(ctx, m)
 	case *CooperativeExitMutation:
 		return c.CooperativeExit.mutate(ctx, m)
+	case *DelegationGrantMutation:
+		return c.DelegationGrant.mutate(ctx, m)
+	case *DelegationGrantSpenderMutation:
+		return c.DelegationGrantSpender.mutate(ctx, m)
 	case *DepositAddressMutation:
 		return c.DepositAddress.mutate(ctx, m)
 	case *EntityDkgKeyMutation:
@@ -511,6 +535,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.L1TokenOutputWithdrawal.mutate(ctx, m)
 	case *L1WithdrawalTransactionMutation:
 		return c.L1WithdrawalTransaction.mutate(ctx, m)
+	case *LeafDecompositionMutation:
+		return c.LeafDecomposition.mutate(ctx, m)
 	case *MultisigConfigMutation:
 		return c.MultisigConfig.mutate(ctx, m)
 	case *MultisigMemberMutation:
@@ -861,6 +887,320 @@ func (c *CooperativeExitClient) mutate(ctx context.Context, m *CooperativeExitMu
 		return (&CooperativeExitDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown CooperativeExit mutation op: %q", m.Op())
+	}
+}
+
+// DelegationGrantClient is a client for the DelegationGrant schema.
+type DelegationGrantClient struct {
+	config
+}
+
+// NewDelegationGrantClient returns a client for the DelegationGrant from the given config.
+func NewDelegationGrantClient(c config) *DelegationGrantClient {
+	return &DelegationGrantClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `delegationgrant.Hooks(f(g(h())))`.
+func (c *DelegationGrantClient) Use(hooks ...Hook) {
+	c.hooks.DelegationGrant = append(c.hooks.DelegationGrant, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `delegationgrant.Intercept(f(g(h())))`.
+func (c *DelegationGrantClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DelegationGrant = append(c.inters.DelegationGrant, interceptors...)
+}
+
+// Create returns a builder for creating a DelegationGrant entity.
+func (c *DelegationGrantClient) Create() *DelegationGrantCreate {
+	mutation := newDelegationGrantMutation(c.config, OpCreate)
+	return &DelegationGrantCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DelegationGrant entities.
+func (c *DelegationGrantClient) CreateBulk(builders ...*DelegationGrantCreate) *DelegationGrantCreateBulk {
+	return &DelegationGrantCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DelegationGrantClient) MapCreateBulk(slice any, setFunc func(*DelegationGrantCreate, int)) *DelegationGrantCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DelegationGrantCreateBulk{err: fmt.Errorf("calling to DelegationGrantClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DelegationGrantCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DelegationGrantCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DelegationGrant.
+func (c *DelegationGrantClient) Update() *DelegationGrantUpdate {
+	mutation := newDelegationGrantMutation(c.config, OpUpdate)
+	return &DelegationGrantUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DelegationGrantClient) UpdateOne(dg *DelegationGrant) *DelegationGrantUpdateOne {
+	mutation := newDelegationGrantMutation(c.config, OpUpdateOne, withDelegationGrant(dg))
+	return &DelegationGrantUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DelegationGrantClient) UpdateOneID(id uuid.UUID) *DelegationGrantUpdateOne {
+	mutation := newDelegationGrantMutation(c.config, OpUpdateOne, withDelegationGrantID(id))
+	return &DelegationGrantUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DelegationGrant.
+func (c *DelegationGrantClient) Delete() *DelegationGrantDelete {
+	mutation := newDelegationGrantMutation(c.config, OpDelete)
+	return &DelegationGrantDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DelegationGrantClient) DeleteOne(dg *DelegationGrant) *DelegationGrantDeleteOne {
+	return c.DeleteOneID(dg.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DelegationGrantClient) DeleteOneID(id uuid.UUID) *DelegationGrantDeleteOne {
+	builder := c.Delete().Where(delegationgrant.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DelegationGrantDeleteOne{builder}
+}
+
+// Query returns a query builder for DelegationGrant.
+func (c *DelegationGrantClient) Query() *DelegationGrantQuery {
+	return &DelegationGrantQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDelegationGrant},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DelegationGrant entity by its id.
+func (c *DelegationGrantClient) Get(ctx context.Context, id uuid.UUID) (*DelegationGrant, error) {
+	return c.Query().Where(delegationgrant.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DelegationGrantClient) GetX(ctx context.Context, id uuid.UUID) *DelegationGrant {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySpenders queries the spenders edge of a DelegationGrant.
+func (c *DelegationGrantClient) QuerySpenders(dg *DelegationGrant) *DelegationGrantSpenderQuery {
+	query := (&DelegationGrantSpenderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := dg.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(delegationgrant.Table, delegationgrant.FieldID, id),
+			sqlgraph.To(delegationgrantspender.Table, delegationgrantspender.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, delegationgrant.SpendersTable, delegationgrant.SpendersColumn),
+		)
+		fromV = sqlgraph.Neighbors(dg.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryLeafDecompositions queries the leaf_decompositions edge of a DelegationGrant.
+func (c *DelegationGrantClient) QueryLeafDecompositions(dg *DelegationGrant) *LeafDecompositionQuery {
+	query := (&LeafDecompositionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := dg.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(delegationgrant.Table, delegationgrant.FieldID, id),
+			sqlgraph.To(leafdecomposition.Table, leafdecomposition.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, delegationgrant.LeafDecompositionsTable, delegationgrant.LeafDecompositionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(dg.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *DelegationGrantClient) Hooks() []Hook {
+	return c.hooks.DelegationGrant
+}
+
+// Interceptors returns the client interceptors.
+func (c *DelegationGrantClient) Interceptors() []Interceptor {
+	return c.inters.DelegationGrant
+}
+
+func (c *DelegationGrantClient) mutate(ctx context.Context, m *DelegationGrantMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DelegationGrantCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DelegationGrantUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DelegationGrantUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DelegationGrantDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DelegationGrant mutation op: %q", m.Op())
+	}
+}
+
+// DelegationGrantSpenderClient is a client for the DelegationGrantSpender schema.
+type DelegationGrantSpenderClient struct {
+	config
+}
+
+// NewDelegationGrantSpenderClient returns a client for the DelegationGrantSpender from the given config.
+func NewDelegationGrantSpenderClient(c config) *DelegationGrantSpenderClient {
+	return &DelegationGrantSpenderClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `delegationgrantspender.Hooks(f(g(h())))`.
+func (c *DelegationGrantSpenderClient) Use(hooks ...Hook) {
+	c.hooks.DelegationGrantSpender = append(c.hooks.DelegationGrantSpender, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `delegationgrantspender.Intercept(f(g(h())))`.
+func (c *DelegationGrantSpenderClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DelegationGrantSpender = append(c.inters.DelegationGrantSpender, interceptors...)
+}
+
+// Create returns a builder for creating a DelegationGrantSpender entity.
+func (c *DelegationGrantSpenderClient) Create() *DelegationGrantSpenderCreate {
+	mutation := newDelegationGrantSpenderMutation(c.config, OpCreate)
+	return &DelegationGrantSpenderCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DelegationGrantSpender entities.
+func (c *DelegationGrantSpenderClient) CreateBulk(builders ...*DelegationGrantSpenderCreate) *DelegationGrantSpenderCreateBulk {
+	return &DelegationGrantSpenderCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DelegationGrantSpenderClient) MapCreateBulk(slice any, setFunc func(*DelegationGrantSpenderCreate, int)) *DelegationGrantSpenderCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DelegationGrantSpenderCreateBulk{err: fmt.Errorf("calling to DelegationGrantSpenderClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DelegationGrantSpenderCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DelegationGrantSpenderCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DelegationGrantSpender.
+func (c *DelegationGrantSpenderClient) Update() *DelegationGrantSpenderUpdate {
+	mutation := newDelegationGrantSpenderMutation(c.config, OpUpdate)
+	return &DelegationGrantSpenderUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DelegationGrantSpenderClient) UpdateOne(dgs *DelegationGrantSpender) *DelegationGrantSpenderUpdateOne {
+	mutation := newDelegationGrantSpenderMutation(c.config, OpUpdateOne, withDelegationGrantSpender(dgs))
+	return &DelegationGrantSpenderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DelegationGrantSpenderClient) UpdateOneID(id uuid.UUID) *DelegationGrantSpenderUpdateOne {
+	mutation := newDelegationGrantSpenderMutation(c.config, OpUpdateOne, withDelegationGrantSpenderID(id))
+	return &DelegationGrantSpenderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DelegationGrantSpender.
+func (c *DelegationGrantSpenderClient) Delete() *DelegationGrantSpenderDelete {
+	mutation := newDelegationGrantSpenderMutation(c.config, OpDelete)
+	return &DelegationGrantSpenderDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DelegationGrantSpenderClient) DeleteOne(dgs *DelegationGrantSpender) *DelegationGrantSpenderDeleteOne {
+	return c.DeleteOneID(dgs.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DelegationGrantSpenderClient) DeleteOneID(id uuid.UUID) *DelegationGrantSpenderDeleteOne {
+	builder := c.Delete().Where(delegationgrantspender.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DelegationGrantSpenderDeleteOne{builder}
+}
+
+// Query returns a query builder for DelegationGrantSpender.
+func (c *DelegationGrantSpenderClient) Query() *DelegationGrantSpenderQuery {
+	return &DelegationGrantSpenderQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDelegationGrantSpender},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DelegationGrantSpender entity by its id.
+func (c *DelegationGrantSpenderClient) Get(ctx context.Context, id uuid.UUID) (*DelegationGrantSpender, error) {
+	return c.Query().Where(delegationgrantspender.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DelegationGrantSpenderClient) GetX(ctx context.Context, id uuid.UUID) *DelegationGrantSpender {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryDelegationGrant queries the delegation_grant edge of a DelegationGrantSpender.
+func (c *DelegationGrantSpenderClient) QueryDelegationGrant(dgs *DelegationGrantSpender) *DelegationGrantQuery {
+	query := (&DelegationGrantClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := dgs.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(delegationgrantspender.Table, delegationgrantspender.FieldID, id),
+			sqlgraph.To(delegationgrant.Table, delegationgrant.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, delegationgrantspender.DelegationGrantTable, delegationgrantspender.DelegationGrantColumn),
+		)
+		fromV = sqlgraph.Neighbors(dgs.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *DelegationGrantSpenderClient) Hooks() []Hook {
+	return c.hooks.DelegationGrantSpender
+}
+
+// Interceptors returns the client interceptors.
+func (c *DelegationGrantSpenderClient) Interceptors() []Interceptor {
+	return c.inters.DelegationGrantSpender
+}
+
+func (c *DelegationGrantSpenderClient) mutate(ctx context.Context, m *DelegationGrantSpenderMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DelegationGrantSpenderCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DelegationGrantSpenderUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DelegationGrantSpenderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DelegationGrantSpenderDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DelegationGrantSpender mutation op: %q", m.Op())
 	}
 }
 
@@ -2385,6 +2725,187 @@ func (c *L1WithdrawalTransactionClient) mutate(ctx context.Context, m *L1Withdra
 		return (&L1WithdrawalTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown L1WithdrawalTransaction mutation op: %q", m.Op())
+	}
+}
+
+// LeafDecompositionClient is a client for the LeafDecomposition schema.
+type LeafDecompositionClient struct {
+	config
+}
+
+// NewLeafDecompositionClient returns a client for the LeafDecomposition from the given config.
+func NewLeafDecompositionClient(c config) *LeafDecompositionClient {
+	return &LeafDecompositionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `leafdecomposition.Hooks(f(g(h())))`.
+func (c *LeafDecompositionClient) Use(hooks ...Hook) {
+	c.hooks.LeafDecomposition = append(c.hooks.LeafDecomposition, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `leafdecomposition.Intercept(f(g(h())))`.
+func (c *LeafDecompositionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.LeafDecomposition = append(c.inters.LeafDecomposition, interceptors...)
+}
+
+// Create returns a builder for creating a LeafDecomposition entity.
+func (c *LeafDecompositionClient) Create() *LeafDecompositionCreate {
+	mutation := newLeafDecompositionMutation(c.config, OpCreate)
+	return &LeafDecompositionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of LeafDecomposition entities.
+func (c *LeafDecompositionClient) CreateBulk(builders ...*LeafDecompositionCreate) *LeafDecompositionCreateBulk {
+	return &LeafDecompositionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *LeafDecompositionClient) MapCreateBulk(slice any, setFunc func(*LeafDecompositionCreate, int)) *LeafDecompositionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &LeafDecompositionCreateBulk{err: fmt.Errorf("calling to LeafDecompositionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*LeafDecompositionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &LeafDecompositionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for LeafDecomposition.
+func (c *LeafDecompositionClient) Update() *LeafDecompositionUpdate {
+	mutation := newLeafDecompositionMutation(c.config, OpUpdate)
+	return &LeafDecompositionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *LeafDecompositionClient) UpdateOne(ld *LeafDecomposition) *LeafDecompositionUpdateOne {
+	mutation := newLeafDecompositionMutation(c.config, OpUpdateOne, withLeafDecomposition(ld))
+	return &LeafDecompositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *LeafDecompositionClient) UpdateOneID(id uuid.UUID) *LeafDecompositionUpdateOne {
+	mutation := newLeafDecompositionMutation(c.config, OpUpdateOne, withLeafDecompositionID(id))
+	return &LeafDecompositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for LeafDecomposition.
+func (c *LeafDecompositionClient) Delete() *LeafDecompositionDelete {
+	mutation := newLeafDecompositionMutation(c.config, OpDelete)
+	return &LeafDecompositionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *LeafDecompositionClient) DeleteOne(ld *LeafDecomposition) *LeafDecompositionDeleteOne {
+	return c.DeleteOneID(ld.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *LeafDecompositionClient) DeleteOneID(id uuid.UUID) *LeafDecompositionDeleteOne {
+	builder := c.Delete().Where(leafdecomposition.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &LeafDecompositionDeleteOne{builder}
+}
+
+// Query returns a query builder for LeafDecomposition.
+func (c *LeafDecompositionClient) Query() *LeafDecompositionQuery {
+	return &LeafDecompositionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeLeafDecomposition},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a LeafDecomposition entity by its id.
+func (c *LeafDecompositionClient) Get(ctx context.Context, id uuid.UUID) (*LeafDecomposition, error) {
+	return c.Query().Where(leafdecomposition.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *LeafDecompositionClient) GetX(ctx context.Context, id uuid.UUID) *LeafDecomposition {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTreeNode queries the tree_node edge of a LeafDecomposition.
+func (c *LeafDecompositionClient) QueryTreeNode(ld *LeafDecomposition) *TreeNodeQuery {
+	query := (&TreeNodeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ld.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(leafdecomposition.Table, leafdecomposition.FieldID, id),
+			sqlgraph.To(treenode.Table, treenode.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, leafdecomposition.TreeNodeTable, leafdecomposition.TreeNodeColumn),
+		)
+		fromV = sqlgraph.Neighbors(ld.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySigningKeyshare queries the signing_keyshare edge of a LeafDecomposition.
+func (c *LeafDecompositionClient) QuerySigningKeyshare(ld *LeafDecomposition) *SigningKeyshareQuery {
+	query := (&SigningKeyshareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ld.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(leafdecomposition.Table, leafdecomposition.FieldID, id),
+			sqlgraph.To(signingkeyshare.Table, signingkeyshare.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, leafdecomposition.SigningKeyshareTable, leafdecomposition.SigningKeyshareColumn),
+		)
+		fromV = sqlgraph.Neighbors(ld.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryDelegationGrant queries the delegation_grant edge of a LeafDecomposition.
+func (c *LeafDecompositionClient) QueryDelegationGrant(ld *LeafDecomposition) *DelegationGrantQuery {
+	query := (&DelegationGrantClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ld.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(leafdecomposition.Table, leafdecomposition.FieldID, id),
+			sqlgraph.To(delegationgrant.Table, delegationgrant.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, leafdecomposition.DelegationGrantTable, leafdecomposition.DelegationGrantColumn),
+		)
+		fromV = sqlgraph.Neighbors(ld.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *LeafDecompositionClient) Hooks() []Hook {
+	return c.hooks.LeafDecomposition
+}
+
+// Interceptors returns the client interceptors.
+func (c *LeafDecompositionClient) Interceptors() []Interceptor {
+	return c.inters.LeafDecomposition
+}
+
+func (c *LeafDecompositionClient) mutate(ctx context.Context, m *LeafDecompositionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&LeafDecompositionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&LeafDecompositionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&LeafDecompositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&LeafDecompositionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown LeafDecomposition mutation op: %q", m.Op())
 	}
 }
 
@@ -7974,9 +8495,10 @@ func (c *WalletSettingClient) mutate(ctx context.Context, m *WalletSettingMutati
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
-		FlowExecution, Gossip, IdempotencyKey, L1TokenCreate,
-		L1TokenJusticeTransaction, L1TokenOutputWithdrawal, L1WithdrawalTransaction,
+		BlockHeight, CooperativeExit, DelegationGrant, DelegationGrantSpender,
+		DepositAddress, EntityDkgKey, EventMessage, FlowExecution, Gossip,
+		IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
+		L1TokenOutputWithdrawal, L1WithdrawalTransaction, LeafDecomposition,
 		MultisigConfig, MultisigMember, Partner, PartnerKey, PaymentIntent,
 		PendingSendTransfer, PreimageRequest, PreimageShare, PreimageSharePartner,
 		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenAllowance,
@@ -7987,9 +8509,10 @@ type (
 		UtxoSwap, WalletSetting []ent.Hook
 	}
 	inters struct {
-		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
-		FlowExecution, Gossip, IdempotencyKey, L1TokenCreate,
-		L1TokenJusticeTransaction, L1TokenOutputWithdrawal, L1WithdrawalTransaction,
+		BlockHeight, CooperativeExit, DelegationGrant, DelegationGrantSpender,
+		DepositAddress, EntityDkgKey, EventMessage, FlowExecution, Gossip,
+		IdempotencyKey, L1TokenCreate, L1TokenJusticeTransaction,
+		L1TokenOutputWithdrawal, L1WithdrawalTransaction, LeafDecomposition,
 		MultisigConfig, MultisigMember, Partner, PartnerKey, PaymentIntent,
 		PendingSendTransfer, PreimageRequest, PreimageShare, PreimageSharePartner,
 		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenAllowance,

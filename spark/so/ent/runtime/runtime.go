@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrant"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrantspender"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
@@ -18,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/leafdecomposition"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/partner"
@@ -101,6 +104,64 @@ func init() {
 	cooperativeexitDescID := cooperativeexitMixinFields0[0].Descriptor()
 	// cooperativeexit.DefaultID holds the default value on creation for the id field.
 	cooperativeexit.DefaultID = cooperativeexitDescID.Default.(func() uuid.UUID)
+	delegationgrantMixin := schema.DelegationGrant{}.Mixin()
+	delegationgrantMixinFields0 := delegationgrantMixin[0].Fields()
+	_ = delegationgrantMixinFields0
+	delegationgrantFields := schema.DelegationGrant{}.Fields()
+	_ = delegationgrantFields
+	// delegationgrantDescCreateTime is the schema descriptor for create_time field.
+	delegationgrantDescCreateTime := delegationgrantMixinFields0[1].Descriptor()
+	// delegationgrant.DefaultCreateTime holds the default value on creation for the create_time field.
+	delegationgrant.DefaultCreateTime = delegationgrantDescCreateTime.Default.(func() time.Time)
+	// delegationgrantDescUpdateTime is the schema descriptor for update_time field.
+	delegationgrantDescUpdateTime := delegationgrantMixinFields0[2].Descriptor()
+	// delegationgrant.DefaultUpdateTime holds the default value on creation for the update_time field.
+	delegationgrant.DefaultUpdateTime = delegationgrantDescUpdateTime.Default.(func() time.Time)
+	// delegationgrant.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	delegationgrant.UpdateDefaultUpdateTime = delegationgrantDescUpdateTime.UpdateDefault.(func() time.Time)
+	// delegationgrantDescOwnerSignature is the schema descriptor for owner_signature field.
+	delegationgrantDescOwnerSignature := delegationgrantFields[10].Descriptor()
+	// delegationgrant.OwnerSignatureValidator is a validator for the "owner_signature" field. It is called by the builders before save.
+	delegationgrant.OwnerSignatureValidator = delegationgrantDescOwnerSignature.Validators[0].(func([]byte) error)
+	// delegationgrantDescID is the schema descriptor for id field.
+	delegationgrantDescID := delegationgrantMixinFields0[0].Descriptor()
+	// delegationgrant.DefaultID holds the default value on creation for the id field.
+	delegationgrant.DefaultID = delegationgrantDescID.Default.(func() uuid.UUID)
+	delegationgrantspenderMixin := schema.DelegationGrantSpender{}.Mixin()
+	delegationgrantspenderMixinFields0 := delegationgrantspenderMixin[0].Fields()
+	_ = delegationgrantspenderMixinFields0
+	delegationgrantspenderFields := schema.DelegationGrantSpender{}.Fields()
+	_ = delegationgrantspenderFields
+	// delegationgrantspenderDescCreateTime is the schema descriptor for create_time field.
+	delegationgrantspenderDescCreateTime := delegationgrantspenderMixinFields0[1].Descriptor()
+	// delegationgrantspender.DefaultCreateTime holds the default value on creation for the create_time field.
+	delegationgrantspender.DefaultCreateTime = delegationgrantspenderDescCreateTime.Default.(func() time.Time)
+	// delegationgrantspenderDescUpdateTime is the schema descriptor for update_time field.
+	delegationgrantspenderDescUpdateTime := delegationgrantspenderMixinFields0[2].Descriptor()
+	// delegationgrantspender.DefaultUpdateTime holds the default value on creation for the update_time field.
+	delegationgrantspender.DefaultUpdateTime = delegationgrantspenderDescUpdateTime.Default.(func() time.Time)
+	// delegationgrantspender.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	delegationgrantspender.UpdateDefaultUpdateTime = delegationgrantspenderDescUpdateTime.UpdateDefault.(func() time.Time)
+	// delegationgrantspenderDescPerTxUnlimited is the schema descriptor for per_tx_unlimited field.
+	delegationgrantspenderDescPerTxUnlimited := delegationgrantspenderFields[5].Descriptor()
+	// delegationgrantspender.DefaultPerTxUnlimited holds the default value on creation for the per_tx_unlimited field.
+	delegationgrantspender.DefaultPerTxUnlimited = delegationgrantspenderDescPerTxUnlimited.Default.(bool)
+	// delegationgrantspenderDescRollingUnlimited is the schema descriptor for rolling_unlimited field.
+	delegationgrantspenderDescRollingUnlimited := delegationgrantspenderFields[6].Descriptor()
+	// delegationgrantspender.DefaultRollingUnlimited holds the default value on creation for the rolling_unlimited field.
+	delegationgrantspender.DefaultRollingUnlimited = delegationgrantspenderDescRollingUnlimited.Default.(bool)
+	// delegationgrantspenderDescSpentSats is the schema descriptor for spent_sats field.
+	delegationgrantspenderDescSpentSats := delegationgrantspenderFields[7].Descriptor()
+	// delegationgrantspender.DefaultSpentSats holds the default value on creation for the spent_sats field.
+	delegationgrantspender.DefaultSpentSats = delegationgrantspenderDescSpentSats.Default.(uint64)
+	// delegationgrantspenderDescOwnerSignature is the schema descriptor for owner_signature field.
+	delegationgrantspenderDescOwnerSignature := delegationgrantspenderFields[10].Descriptor()
+	// delegationgrantspender.OwnerSignatureValidator is a validator for the "owner_signature" field. It is called by the builders before save.
+	delegationgrantspender.OwnerSignatureValidator = delegationgrantspenderDescOwnerSignature.Validators[0].(func([]byte) error)
+	// delegationgrantspenderDescID is the schema descriptor for id field.
+	delegationgrantspenderDescID := delegationgrantspenderMixinFields0[0].Descriptor()
+	// delegationgrantspender.DefaultID holds the default value on creation for the id field.
+	delegationgrantspender.DefaultID = delegationgrantspenderDescID.Default.(func() uuid.UUID)
 	depositaddressMixin := schema.DepositAddress{}.Mixin()
 	depositaddressMixinHooks1 := depositaddressMixin[1].Hooks()
 	depositaddress.Hooks[0] = depositaddressMixinHooks1[0]
@@ -353,6 +414,25 @@ func init() {
 	l1withdrawaltransactionDescID := l1withdrawaltransactionMixinFields0[0].Descriptor()
 	// l1withdrawaltransaction.DefaultID holds the default value on creation for the id field.
 	l1withdrawaltransaction.DefaultID = l1withdrawaltransactionDescID.Default.(func() uuid.UUID)
+	leafdecompositionMixin := schema.LeafDecomposition{}.Mixin()
+	leafdecompositionMixinFields0 := leafdecompositionMixin[0].Fields()
+	_ = leafdecompositionMixinFields0
+	leafdecompositionFields := schema.LeafDecomposition{}.Fields()
+	_ = leafdecompositionFields
+	// leafdecompositionDescCreateTime is the schema descriptor for create_time field.
+	leafdecompositionDescCreateTime := leafdecompositionMixinFields0[1].Descriptor()
+	// leafdecomposition.DefaultCreateTime holds the default value on creation for the create_time field.
+	leafdecomposition.DefaultCreateTime = leafdecompositionDescCreateTime.Default.(func() time.Time)
+	// leafdecompositionDescUpdateTime is the schema descriptor for update_time field.
+	leafdecompositionDescUpdateTime := leafdecompositionMixinFields0[2].Descriptor()
+	// leafdecomposition.DefaultUpdateTime holds the default value on creation for the update_time field.
+	leafdecomposition.DefaultUpdateTime = leafdecompositionDescUpdateTime.Default.(func() time.Time)
+	// leafdecomposition.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	leafdecomposition.UpdateDefaultUpdateTime = leafdecompositionDescUpdateTime.UpdateDefault.(func() time.Time)
+	// leafdecompositionDescID is the schema descriptor for id field.
+	leafdecompositionDescID := leafdecompositionMixinFields0[0].Descriptor()
+	// leafdecomposition.DefaultID holds the default value on creation for the id field.
+	leafdecomposition.DefaultID = leafdecompositionDescID.Default.(func() uuid.UUID)
 	multisigconfigMixin := schema.MultisigConfig{}.Mixin()
 	multisigconfigHooks := schema.MultisigConfig{}.Hooks()
 	multisigconfig.Hooks[0] = multisigconfigHooks[0]

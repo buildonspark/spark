@@ -215,3 +215,25 @@ func TestUnknownMethodFailsClosed(t *testing.T) {
 	assert.True(t, RequiresSessionToken("/never.Registered/Method"), "unknown methods must require authn")
 	assert.False(t, IsInternalOnly("/never.Registered/Method"))
 }
+
+// TestDelegationMethodsRequireSession pins the auth mode of the delegated-spending
+// RPCs. TestEveryRegisteredMethodHasAPolicy only proves an entry exists, so a
+// delegation method registered as AuthAnonymous would satisfy it while letting an
+// unauthenticated caller create, revoke or enumerate grants over an owner's funds.
+func TestDelegationMethodsRequireSession(t *testing.T) {
+	for _, method := range []string{
+		pbspark.SparkService_CreateDelegationGrant_FullMethodName,
+		pbspark.SparkService_RevokeDelegationGrant_FullMethodName,
+		pbspark.SparkService_QueryDelegationGrants_FullMethodName,
+		pbspark.SparkService_InstallLeafDecompositions_FullMethodName,
+		pbspark.SparkService_AddDelegationSpender_FullMethodName,
+		pbspark.SparkService_RevokeDelegationSpender_FullMethodName,
+	} {
+		t.Run(method, func(t *testing.T) {
+			policy, ok := LookUp(method)
+			require.True(t, ok, "no rpcpolicy entry")
+			assert.Equal(t, AuthSession, policy.AuthMode)
+			assert.False(t, policy.InternalOnly, "delegation RPCs are user-facing")
+		})
+	}
+}

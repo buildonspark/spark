@@ -10,6 +10,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrant"
+	"github.com/lightsparkdev/spark/so/ent/delegationgrantspender"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
 	"github.com/lightsparkdev/spark/so/ent/eventmessage"
@@ -20,6 +22,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/l1tokenjusticetransaction"
 	"github.com/lightsparkdev/spark/so/ent/l1tokenoutputwithdrawal"
 	"github.com/lightsparkdev/spark/so/ent/l1withdrawaltransaction"
+	"github.com/lightsparkdev/spark/so/ent/leafdecomposition"
 	"github.com/lightsparkdev/spark/so/ent/multisigconfig"
 	"github.com/lightsparkdev/spark/so/ent/multisigmember"
 	"github.com/lightsparkdev/spark/so/ent/partner"
@@ -164,6 +167,60 @@ func (f TraverseCooperativeExit) Traverse(ctx context.Context, q ent.Query) erro
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.CooperativeExitQuery", q)
+}
+
+// The DelegationGrantFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DelegationGrantFunc func(context.Context, *ent.DelegationGrantQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DelegationGrantFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DelegationGrantQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DelegationGrantQuery", q)
+}
+
+// The TraverseDelegationGrant type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDelegationGrant func(context.Context, *ent.DelegationGrantQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDelegationGrant) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDelegationGrant) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DelegationGrantQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DelegationGrantQuery", q)
+}
+
+// The DelegationGrantSpenderFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DelegationGrantSpenderFunc func(context.Context, *ent.DelegationGrantSpenderQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DelegationGrantSpenderFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DelegationGrantSpenderQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DelegationGrantSpenderQuery", q)
+}
+
+// The TraverseDelegationGrantSpender type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDelegationGrantSpender func(context.Context, *ent.DelegationGrantSpenderQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDelegationGrantSpender) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDelegationGrantSpender) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DelegationGrantSpenderQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DelegationGrantSpenderQuery", q)
 }
 
 // The DepositAddressFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -434,6 +491,33 @@ func (f TraverseL1WithdrawalTransaction) Traverse(ctx context.Context, q ent.Que
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.L1WithdrawalTransactionQuery", q)
+}
+
+// The LeafDecompositionFunc type is an adapter to allow the use of ordinary function as a Querier.
+type LeafDecompositionFunc func(context.Context, *ent.LeafDecompositionQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f LeafDecompositionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.LeafDecompositionQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.LeafDecompositionQuery", q)
+}
+
+// The TraverseLeafDecomposition type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseLeafDecomposition func(context.Context, *ent.LeafDecompositionQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseLeafDecomposition) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseLeafDecomposition) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.LeafDecompositionQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.LeafDecompositionQuery", q)
 }
 
 // The MultisigConfigFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1334,6 +1418,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.BlockHeightQuery, predicate.BlockHeight, blockheight.OrderOption]{typ: ent.TypeBlockHeight, tq: q}, nil
 	case *ent.CooperativeExitQuery:
 		return &query[*ent.CooperativeExitQuery, predicate.CooperativeExit, cooperativeexit.OrderOption]{typ: ent.TypeCooperativeExit, tq: q}, nil
+	case *ent.DelegationGrantQuery:
+		return &query[*ent.DelegationGrantQuery, predicate.DelegationGrant, delegationgrant.OrderOption]{typ: ent.TypeDelegationGrant, tq: q}, nil
+	case *ent.DelegationGrantSpenderQuery:
+		return &query[*ent.DelegationGrantSpenderQuery, predicate.DelegationGrantSpender, delegationgrantspender.OrderOption]{typ: ent.TypeDelegationGrantSpender, tq: q}, nil
 	case *ent.DepositAddressQuery:
 		return &query[*ent.DepositAddressQuery, predicate.DepositAddress, depositaddress.OrderOption]{typ: ent.TypeDepositAddress, tq: q}, nil
 	case *ent.EntityDkgKeyQuery:
@@ -1354,6 +1442,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.L1TokenOutputWithdrawalQuery, predicate.L1TokenOutputWithdrawal, l1tokenoutputwithdrawal.OrderOption]{typ: ent.TypeL1TokenOutputWithdrawal, tq: q}, nil
 	case *ent.L1WithdrawalTransactionQuery:
 		return &query[*ent.L1WithdrawalTransactionQuery, predicate.L1WithdrawalTransaction, l1withdrawaltransaction.OrderOption]{typ: ent.TypeL1WithdrawalTransaction, tq: q}, nil
+	case *ent.LeafDecompositionQuery:
+		return &query[*ent.LeafDecompositionQuery, predicate.LeafDecomposition, leafdecomposition.OrderOption]{typ: ent.TypeLeafDecomposition, tq: q}, nil
 	case *ent.MultisigConfigQuery:
 		return &query[*ent.MultisigConfigQuery, predicate.MultisigConfig, multisigconfig.OrderOption]{typ: ent.TypeMultisigConfig, tq: q}, nil
 	case *ent.MultisigMemberQuery:

@@ -138,6 +138,9 @@ export class CoopExitService extends BaseTransferService {
       directLeavesToSend: directLeafSigningJobs,
       directFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
       hashVariant: HashVariant.HASH_VARIANT_V2,
+      // Not a delegated spend. Presence decides whether the signing payload binds
+      // the delegation fields, so this stays explicitly absent.
+      delegationIntent: undefined,
     };
 
     const transferPackageSigningPayload = getTransferPackageSigningPayload(

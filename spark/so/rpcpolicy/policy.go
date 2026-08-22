@@ -179,6 +179,12 @@ func sparkServicePolicies() map[string]Policy {
 		pbspark.SparkService_InitiateSwapPrimaryTransfer_FullMethodName:         {AuthMode: AuthSession},
 		pbspark.SparkService_UpdateWalletSetting_FullMethodName:                 {AuthMode: AuthSession},
 		pbspark.SparkService_QueryWalletSetting_FullMethodName:                  {AuthMode: AuthSession},
+		pbspark.SparkService_CreateDelegationGrant_FullMethodName:               {AuthMode: AuthSession},
+		pbspark.SparkService_RevokeDelegationGrant_FullMethodName:               {AuthMode: AuthSession},
+		pbspark.SparkService_QueryDelegationGrants_FullMethodName:               {AuthMode: AuthSession},
+		pbspark.SparkService_InstallLeafDecompositions_FullMethodName:           {AuthMode: AuthSession},
+		pbspark.SparkService_AddDelegationSpender_FullMethodName:                {AuthMode: AuthSession},
+		pbspark.SparkService_RevokeDelegationSpender_FullMethodName:             {AuthMode: AuthSession},
 	}
 }
 

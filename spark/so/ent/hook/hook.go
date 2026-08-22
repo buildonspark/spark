@@ -33,6 +33,30 @@ func (f CooperativeExitFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CooperativeExitMutation", m)
 }
 
+// The DelegationGrantFunc type is an adapter to allow the use of ordinary
+// function as DelegationGrant mutator.
+type DelegationGrantFunc func(context.Context, *ent.DelegationGrantMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DelegationGrantFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DelegationGrantMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DelegationGrantMutation", m)
+}
+
+// The DelegationGrantSpenderFunc type is an adapter to allow the use of ordinary
+// function as DelegationGrantSpender mutator.
+type DelegationGrantSpenderFunc func(context.Context, *ent.DelegationGrantSpenderMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DelegationGrantSpenderFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DelegationGrantSpenderMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DelegationGrantSpenderMutation", m)
+}
+
 // The DepositAddressFunc type is an adapter to allow the use of ordinary
 // function as DepositAddress mutator.
 type DepositAddressFunc func(context.Context, *ent.DepositAddressMutation) (ent.Value, error)
@@ -151,6 +175,18 @@ func (f L1WithdrawalTransactionFunc) Mutate(ctx context.Context, m ent.Mutation)
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.L1WithdrawalTransactionMutation", m)
+}
+
+// The LeafDecompositionFunc type is an adapter to allow the use of ordinary
+// function as LeafDecomposition mutator.
+type LeafDecompositionFunc func(context.Context, *ent.LeafDecompositionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f LeafDecompositionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.LeafDecompositionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.LeafDecompositionMutation", m)
 }
 
 // The MultisigConfigFunc type is an adapter to allow the use of ordinary

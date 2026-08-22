@@ -106,6 +106,28 @@ func (h *Hasher) AddMapStringToBytes(m map[string][]byte) *Hasher {
 	return h
 }
 
+// AddMapStringToUint64 adds a map[string]uint64 to the hash computation.
+// The map is hashed in a deterministic order: first the count of entries,
+// then each key-value pair sorted by key.
+//
+// Format: [count (uint64)] [key1 (string)] [value1 (uint64)] [key2 (string)] [value2 (uint64)] ...
+func (h *Hasher) AddMapStringToUint64(m map[string]uint64) *Hasher {
+	h.AddUint64(uint64(len(m)))
+
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
+	for _, k := range keys {
+		h.AddString(k)
+		h.AddUint64(m[k])
+	}
+
+	return h
+}
+
 // addValue writes a value directly to the hash state.
 // Format: [8-byte length (big-endian uint64)] [value bytes]
 func (h *Hasher) addValue(valueBytes []byte) {

@@ -642,7 +642,11 @@ export function utxoSwapStatusToJSON(object: UtxoSwapStatus): string {
 export enum HashVariant {
   /** HASH_VARIANT_UNSPECIFIED - Legacy */
   HASH_VARIANT_UNSPECIFIED = 0,
-  /** HASH_VARIANT_V2 - Structured hashing */
+  /**
+   * HASH_VARIANT_V2 - Structured hashing. Binds the delegation intent (Spark Pull) too when the
+   * transfer package carries one; a package without an intent hashes exactly as
+   * it did before delegation existed, so already-released SDKs keep verifying.
+   */
   HASH_VARIANT_V2 = 1,
   UNRECOGNIZED = -1,
 }
@@ -877,6 +881,50 @@ export function treeNodeStatusToJSON(object: TreeNodeStatus): string {
     case TreeNodeStatus.TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED:
       return "TREE_NODE_STATUS_WATCHTOWER_EXIT_RECOVERED";
     case TreeNodeStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * DelegationStatus is the server-derived lifecycle status of a delegation
+ * grant or one of its spenders. Output-only: ignored on create/add requests.
+ */
+export enum DelegationStatus {
+  DELEGATION_STATUS_UNSPECIFIED = 0,
+  DELEGATION_STATUS_ACTIVE = 1,
+  /** DELEGATION_STATUS_REVOKED - Tombstone after an owner-signed revoke; never deleted, never resurrected. */
+  DELEGATION_STATUS_REVOKED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function delegationStatusFromJSON(object: any): DelegationStatus {
+  switch (object) {
+    case 0:
+    case "DELEGATION_STATUS_UNSPECIFIED":
+      return DelegationStatus.DELEGATION_STATUS_UNSPECIFIED;
+    case 1:
+    case "DELEGATION_STATUS_ACTIVE":
+      return DelegationStatus.DELEGATION_STATUS_ACTIVE;
+    case 2:
+    case "DELEGATION_STATUS_REVOKED":
+      return DelegationStatus.DELEGATION_STATUS_REVOKED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return DelegationStatus.UNRECOGNIZED;
+  }
+}
+
+export function delegationStatusToJSON(object: DelegationStatus): string {
+  switch (object) {
+    case DelegationStatus.DELEGATION_STATUS_UNSPECIFIED:
+      return "DELEGATION_STATUS_UNSPECIFIED";
+    case DelegationStatus.DELEGATION_STATUS_ACTIVE:
+      return "DELEGATION_STATUS_ACTIVE";
+    case DelegationStatus.DELEGATION_STATUS_REVOKED:
+      return "DELEGATION_STATUS_REVOKED";
+    case DelegationStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -1179,6 +1227,24 @@ export interface RenewLeafRequest {
      */
     { $case: "renewNodeZeroTimelockSigningJob"; renewNodeZeroTimelockSigningJob: RenewNodeZeroTimelockSigningJob }
     | undefined;
+  /**
+   * When set, the renewal is authorized via a delegate decomposition (Spark
+   * Pull) identified by the grant rather than the owner's primary path. Renew
+   * mints fresh exit transactions, so a delegate renewal MUST be grant-gated
+   * (exit-pinning invariant): the handler validates the grant is ACTIVE,
+   * unexpired, scoped for renew, and that the leaf's ACTIVE decomposition
+   * belongs to it (see validateRenewDelegationPath), and pins the renewed
+   * exit outputs to the owner.
+   */
+  delegationPath?: DelegationPathSelector | undefined;
+}
+
+/**
+ * DelegationPathSelector identifies the delegation grant whose decomposition
+ * authorizes a cooperative operation on a leaf.
+ */
+export interface DelegationPathSelector {
+  grantId: string;
 }
 
 export interface RenewNodeTimelockSigningJob {
@@ -1657,11 +1723,38 @@ export interface TransferPackage {
   directFromCpfpLeavesToSend: UserSignedTxSigningJob[];
   /** The hash variant to use for computing the transfer package signing payload. */
   hashVariant: HashVariant;
+  /**
+   * Present when this transfer spends via a delegate decomposition (Spark
+   * Pull). Bound into the V3 signing payload so every SO can check the
+   * delegate's intent (amount and recipients) against the cited grant.
+   */
+  delegationIntent: DelegationIntent | undefined;
 }
 
 export interface TransferPackage_KeyTweakPackageEntry {
   key: string;
   value: Uint8Array;
+}
+
+/**
+ * DelegationIntent binds a delegated (Spark Pull) transfer to the grant it
+ * spends under, the delegate authorizing it, and the exact amounts flowing to
+ * each receiver. It is bound into the V3 transfer-package signing payload so no
+ * SO co-signs a delegate spend that exceeds or diverges from what the delegate
+ * signed for.
+ */
+export interface DelegationIntent {
+  grantId: string;
+  /** The acting spender's identity key (authorized on the grant). */
+  spenderIdentityPublicKey: Uint8Array;
+  totalAmountSats: number;
+  /** Hex-encoded receiver identity public key -> sats delivered to that receiver. */
+  receiverAmountsSats: { [key: string]: number };
+}
+
+export interface DelegationIntent_ReceiverAmountsSatsEntry {
+  key: string;
+  value: number;
 }
 
 export interface SendLeafKeyTweaks {
@@ -2863,6 +2956,230 @@ export interface QueryWalletSettingRequest {
 
 export interface QueryWalletSettingResponse {
   walletSetting: WalletSetting | undefined;
+}
+
+/**
+ * DelegationGrant is the owner-signed policy object for Spark Pull. It defines a
+ * single delegate key path (one decomposition per leaf) and the set of
+ * authorized spenders (e.g. merchants) allowed to spend on it, each fenced by
+ * its own limits. Every SO validates it independently at signing time.
+ *
+ * Authorization is a policy layer: multiple spenders share one delegate path, so
+ * adding merchant N+1 is a metering record, not a new key ceremony. This keeps
+ * the related-key FROST surface bounded to one delegate decomposition per leaf.
+ */
+export interface DelegationGrant {
+  grantId: string;
+  /**
+   * Owner's root identity key. Signs grants, spender changes, and revocations;
+   * never shared.
+   */
+  ownerIdentityPublicKey: Uint8Array;
+  /**
+   * Authorized spenders on this grant's delegate path, each with its own caps
+   * and (server-side) meter. max_items is a wire-level hard bound; the
+   * effective policy cap is the (lower) per-grant spender quota knob.
+   */
+  spenders: DelegationSpender[];
+  /** Wall-clock expiry, matching existing expiry precedent. */
+  expiryTime: Date | undefined;
+  scopeTransfer: boolean;
+  scopeRenew: boolean;
+  scopeClaim: boolean;
+  /** Flat fee (sats) the delegate settlement must pay the fee collector. */
+  feeFlatSats: number;
+  feeCollectorIdentityPublicKey?:
+    | Uint8Array
+    | undefined;
+  /** Monotonic version; owner-signed re-versions supersede lower versions. */
+  version: number;
+  /**
+   * ECDSA DER signature (64-73 bytes) by owner_identity_public_key over the
+   * grant statement (see common.CreateDelegationGrantStatement).
+   */
+  ownerSignature: Uint8Array;
+  /** Output-only: server-populated grant status. Ignored on create requests. */
+  status: DelegationStatus;
+  /**
+   * Bitcoin network this grant applies to. Bound into the signed statement, so
+   * it must ride the wire message; carried here rather than the request so it
+   * is echoed back on query.
+   */
+  network: Network;
+}
+
+/**
+ * DelegationSpender is one authorized spender on a grant, with its own limits.
+ * The federation meters each spender independently.
+ */
+export interface DelegationSpender {
+  spenderIdentityPublicKey: Uint8Array;
+  /**
+   * Maximum sats a single delegated transaction by this spender may spend.
+   * Must be 0 when per_tx_unlimited is true, and > 0 otherwise.
+   */
+  perTxCapSats: number;
+  /**
+   * Maximum sats this spender may spend within rolling_window_seconds.
+   * Must be 0 when rolling_unlimited is true, and > 0 otherwise.
+   */
+  rollingLimitSats: number;
+  rollingWindowSeconds: number;
+  /**
+   * Output-only: server-populated spender status. Ignored on create/add
+   * requests.
+   */
+  status: DelegationStatus;
+  /**
+   * Waives the per-transaction ceiling for this spender. Bound into the
+   * owner-signed grant / spender-add statements (v2); absent/false always
+   * means bounded, so a stripped flag fails closed.
+   */
+  perTxUnlimited: boolean;
+  /**
+   * Waives the rolling-window ceiling for this spender. The meter still
+   * records spend within the window for observability. Bound into the
+   * owner-signed statements (v2) like per_tx_unlimited.
+   */
+  rollingUnlimited: boolean;
+}
+
+export interface CreateDelegationGrantRequest {
+  grant: DelegationGrant | undefined;
+}
+
+export interface CreateDelegationGrantResponse {
+  grant: DelegationGrant | undefined;
+}
+
+export interface RevokeDelegationGrantRequest {
+  grantId: string;
+  ownerIdentityPublicKey: Uint8Array;
+  /** Must match the current grant version; guards against unordered replays. */
+  version: number;
+  /**
+   * ECDSA DER signature (64-73 bytes) by owner_identity_public_key over the
+   * revoke statement (see common.CreateDelegationRevokeStatement).
+   */
+  ownerSignature: Uint8Array;
+}
+
+export interface RevokeDelegationGrantResponse {
+  grant: DelegationGrant | undefined;
+}
+
+export interface AddDelegationSpenderRequest {
+  grantId: string;
+  /** The spender to authorize (caps included; status ignored). */
+  spender:
+    | DelegationSpender
+    | undefined;
+  /** Monotonic version for this spender change; guards unordered replays. */
+  version: number;
+  /**
+   * ECDSA DER signature (64-73 bytes) by the grant owner over the spender-add
+   * statement (see common.CreateDelegationSpenderAddStatement).
+   */
+  ownerSignature: Uint8Array;
+}
+
+export interface AddDelegationSpenderResponse {
+  grant: DelegationGrant | undefined;
+}
+
+export interface RevokeDelegationSpenderRequest {
+  grantId: string;
+  spenderIdentityPublicKey: Uint8Array;
+  /** Monotonic version for this spender change; guards unordered replays. */
+  version: number;
+  /**
+   * ECDSA DER signature (64-73 bytes) by the grant owner over the
+   * spender-revoke statement (see common.CreateDelegationSpenderRevokeStatement).
+   */
+  ownerSignature: Uint8Array;
+}
+
+export interface RevokeDelegationSpenderResponse {
+  grant: DelegationGrant | undefined;
+}
+
+export interface QueryDelegationGrantsRequest {
+  /** Filter grants by the owner or the delegate identity key. */
+  filter?: { $case: "ownerIdentityPublicKey"; ownerIdentityPublicKey: Uint8Array } | {
+    $case: "delegateIdentityPublicKey";
+    delegateIdentityPublicKey: Uint8Array;
+  } | undefined;
+}
+
+/** DelegationGrantInfo pairs a grant with its current runtime metering state. */
+export interface DelegationGrantInfo {
+  grant:
+    | DelegationGrant
+    | undefined;
+  /**
+   * Hex-encoded spender identity public key -> sats spent within that
+   * spender's current rolling window.
+   */
+  spentSatsBySpender: { [key: string]: number };
+}
+
+export interface DelegationGrantInfo_SpentSatsBySpenderEntry {
+  key: string;
+  value: number;
+}
+
+export interface QueryDelegationGrantsResponse {
+  grants: DelegationGrantInfo[];
+}
+
+/**
+ * LeafDecompositionInstall names one leaf and the delegate-path user signing
+ * public key (the "50") to register for it. The matching SE2 share is delivered
+ * encrypted per-SO in InstallLeafDecompositionsRequest.key_tweak_package.
+ */
+export interface LeafDecompositionInstall {
+  leafId: string;
+  delegateSigningPublicKey: Uint8Array;
+}
+
+export interface InstallLeafDecompositionsRequest {
+  grantId: string;
+  ownerIdentityPublicKey: Uint8Array;
+  /**
+   * The effective batch cap is the (lower) max_install_batch knob, enforced
+   * server-side on every SO.
+   */
+  installs: LeafDecompositionInstall[];
+  /**
+   * Map of SO identifier to the ECIES ciphertext of that SO's SendLeafKeyTweaks
+   * batch for the delegate-path (SE2) share install. Mirrors
+   * TransferPackage.key_tweak_package: each SO can only decrypt its own slice,
+   * so the coordinator never sees another SO's plaintext shares.
+   */
+  keyTweakPackage: { [key: string]: Uint8Array };
+  /**
+   * ECDSA DER signature (64-73 bytes) by owner_identity_public_key over the
+   * install statement (see common.CreateDecompositionInstallStatement).
+   */
+  ownerSignature: Uint8Array;
+}
+
+export interface InstallLeafDecompositionsRequest_KeyTweakPackageEntry {
+  key: string;
+  value: Uint8Array;
+}
+
+/**
+ * InstallLeafDecompositionProgress reports whether a given operator has
+ * installed its delegate-path share for the request.
+ */
+export interface InstallLeafDecompositionProgress {
+  operatorIdentifier: string;
+  installed: boolean;
+}
+
+export interface InstallLeafDecompositionsResponse {
+  progress: InstallLeafDecompositionProgress[];
 }
 
 function createBaseSubscribeToEventsRequest(): SubscribeToEventsRequest {
@@ -5526,7 +5843,7 @@ export const SigningResult_SignatureSharesEntry: MessageFns<SigningResult_Signat
 };
 
 function createBaseRenewLeafRequest(): RenewLeafRequest {
-  return { leafId: "", signingJobs: undefined };
+  return { leafId: "", signingJobs: undefined, delegationPath: undefined };
 }
 
 export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
@@ -5551,6 +5868,9 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
           writer.uint32(34).fork(),
         ).join();
         break;
+    }
+    if (message.delegationPath !== undefined) {
+      DelegationPathSelector.encode(message.delegationPath, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -5603,6 +5923,14 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
           };
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.delegationPath = DelegationPathSelector.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5633,6 +5961,7 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
           ),
         }
         : undefined,
+      delegationPath: isSet(object.delegationPath) ? DelegationPathSelector.fromJSON(object.delegationPath) : undefined,
     };
   },
 
@@ -5653,6 +5982,9 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
       obj.renewNodeZeroTimelockSigningJob = RenewNodeZeroTimelockSigningJob.toJSON(
         message.signingJobs.renewNodeZeroTimelockSigningJob,
       );
+    }
+    if (message.delegationPath !== undefined) {
+      obj.delegationPath = DelegationPathSelector.toJSON(message.delegationPath);
     }
     return obj;
   },
@@ -5707,6 +6039,67 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
         break;
       }
     }
+    message.delegationPath = (object.delegationPath !== undefined && object.delegationPath !== null)
+      ? DelegationPathSelector.fromPartial(object.delegationPath)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseDelegationPathSelector(): DelegationPathSelector {
+  return { grantId: "" };
+}
+
+export const DelegationPathSelector: MessageFns<DelegationPathSelector> = {
+  encode(message: DelegationPathSelector, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grantId !== "") {
+      writer.uint32(10).string(message.grantId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DelegationPathSelector {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDelegationPathSelector();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grantId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DelegationPathSelector {
+    return { grantId: isSet(object.grantId) ? globalThis.String(object.grantId) : "" };
+  },
+
+  toJSON(message: DelegationPathSelector): unknown {
+    const obj: any = {};
+    if (message.grantId !== "") {
+      obj.grantId = message.grantId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DelegationPathSelector>): DelegationPathSelector {
+    return DelegationPathSelector.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DelegationPathSelector>): DelegationPathSelector {
+    const message = createBaseDelegationPathSelector();
+    message.grantId = object.grantId ?? "";
     return message;
   },
 };
@@ -9485,6 +9878,7 @@ function createBaseTransferPackage(): TransferPackage {
     directLeavesToSend: [],
     directFromCpfpLeavesToSend: [],
     hashVariant: 0,
+    delegationIntent: undefined,
   };
 }
 
@@ -9507,6 +9901,9 @@ export const TransferPackage: MessageFns<TransferPackage> = {
     }
     if (message.hashVariant !== 0) {
       writer.uint32(48).int32(message.hashVariant);
+    }
+    if (message.delegationIntent !== undefined) {
+      DelegationIntent.encode(message.delegationIntent, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -9569,6 +9966,14 @@ export const TransferPackage: MessageFns<TransferPackage> = {
           message.hashVariant = reader.int32() as any;
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.delegationIntent = DelegationIntent.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9597,6 +10002,7 @@ export const TransferPackage: MessageFns<TransferPackage> = {
         ? object.directFromCpfpLeavesToSend.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
         : [],
       hashVariant: isSet(object.hashVariant) ? hashVariantFromJSON(object.hashVariant) : 0,
+      delegationIntent: isSet(object.delegationIntent) ? DelegationIntent.fromJSON(object.delegationIntent) : undefined,
     };
   },
 
@@ -9626,6 +10032,9 @@ export const TransferPackage: MessageFns<TransferPackage> = {
     if (message.hashVariant !== 0) {
       obj.hashVariant = hashVariantToJSON(message.hashVariant);
     }
+    if (message.delegationIntent !== undefined) {
+      obj.delegationIntent = DelegationIntent.toJSON(message.delegationIntent);
+    }
     return obj;
   },
 
@@ -9649,6 +10058,9 @@ export const TransferPackage: MessageFns<TransferPackage> = {
     message.directFromCpfpLeavesToSend =
       object.directFromCpfpLeavesToSend?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
     message.hashVariant = object.hashVariant ?? 0;
+    message.delegationIntent = (object.delegationIntent !== undefined && object.delegationIntent !== null)
+      ? DelegationIntent.fromPartial(object.delegationIntent)
+      : undefined;
     return message;
   },
 };
@@ -9725,6 +10137,216 @@ export const TransferPackage_KeyTweakPackageEntry: MessageFns<TransferPackage_Ke
     const message = createBaseTransferPackage_KeyTweakPackageEntry();
     message.key = object.key ?? "";
     message.value = object.value ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseDelegationIntent(): DelegationIntent {
+  return { grantId: "", spenderIdentityPublicKey: new Uint8Array(0), totalAmountSats: 0, receiverAmountsSats: {} };
+}
+
+export const DelegationIntent: MessageFns<DelegationIntent> = {
+  encode(message: DelegationIntent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grantId !== "") {
+      writer.uint32(10).string(message.grantId);
+    }
+    if (message.spenderIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.spenderIdentityPublicKey);
+    }
+    if (message.totalAmountSats !== 0) {
+      writer.uint32(24).uint64(message.totalAmountSats);
+    }
+    Object.entries(message.receiverAmountsSats).forEach(([key, value]) => {
+      DelegationIntent_ReceiverAmountsSatsEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
+    });
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DelegationIntent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDelegationIntent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.spenderIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.totalAmountSats = longToNumber(reader.uint64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = DelegationIntent_ReceiverAmountsSatsEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.receiverAmountsSats[entry4.key] = entry4.value;
+          }
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DelegationIntent {
+    return {
+      grantId: isSet(object.grantId) ? globalThis.String(object.grantId) : "",
+      spenderIdentityPublicKey: isSet(object.spenderIdentityPublicKey)
+        ? bytesFromBase64(object.spenderIdentityPublicKey)
+        : new Uint8Array(0),
+      totalAmountSats: isSet(object.totalAmountSats) ? globalThis.Number(object.totalAmountSats) : 0,
+      receiverAmountsSats: isObject(object.receiverAmountsSats)
+        ? Object.entries(object.receiverAmountsSats).reduce<{ [key: string]: number }>((acc, [key, value]) => {
+          acc[key] = Number(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: DelegationIntent): unknown {
+    const obj: any = {};
+    if (message.grantId !== "") {
+      obj.grantId = message.grantId;
+    }
+    if (message.spenderIdentityPublicKey.length !== 0) {
+      obj.spenderIdentityPublicKey = base64FromBytes(message.spenderIdentityPublicKey);
+    }
+    if (message.totalAmountSats !== 0) {
+      obj.totalAmountSats = Math.round(message.totalAmountSats);
+    }
+    if (message.receiverAmountsSats) {
+      const entries = Object.entries(message.receiverAmountsSats);
+      if (entries.length > 0) {
+        obj.receiverAmountsSats = {};
+        entries.forEach(([k, v]) => {
+          obj.receiverAmountsSats[k] = Math.round(v);
+        });
+      }
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DelegationIntent>): DelegationIntent {
+    return DelegationIntent.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DelegationIntent>): DelegationIntent {
+    const message = createBaseDelegationIntent();
+    message.grantId = object.grantId ?? "";
+    message.spenderIdentityPublicKey = object.spenderIdentityPublicKey ?? new Uint8Array(0);
+    message.totalAmountSats = object.totalAmountSats ?? 0;
+    message.receiverAmountsSats = Object.entries(object.receiverAmountsSats ?? {}).reduce<{ [key: string]: number }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = globalThis.Number(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    return message;
+  },
+};
+
+function createBaseDelegationIntent_ReceiverAmountsSatsEntry(): DelegationIntent_ReceiverAmountsSatsEntry {
+  return { key: "", value: 0 };
+}
+
+export const DelegationIntent_ReceiverAmountsSatsEntry: MessageFns<DelegationIntent_ReceiverAmountsSatsEntry> = {
+  encode(message: DelegationIntent_ReceiverAmountsSatsEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== 0) {
+      writer.uint32(16).uint64(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DelegationIntent_ReceiverAmountsSatsEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDelegationIntent_ReceiverAmountsSatsEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.value = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DelegationIntent_ReceiverAmountsSatsEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.Number(object.value) : 0,
+    };
+  },
+
+  toJSON(message: DelegationIntent_ReceiverAmountsSatsEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== 0) {
+      obj.value = Math.round(message.value);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DelegationIntent_ReceiverAmountsSatsEntry>): DelegationIntent_ReceiverAmountsSatsEntry {
+    return DelegationIntent_ReceiverAmountsSatsEntry.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<DelegationIntent_ReceiverAmountsSatsEntry>,
+  ): DelegationIntent_ReceiverAmountsSatsEntry {
+    const message = createBaseDelegationIntent_ReceiverAmountsSatsEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? 0;
     return message;
   },
 };
@@ -23500,6 +24122,1878 @@ export const QueryWalletSettingResponse: MessageFns<QueryWalletSettingResponse> 
   },
 };
 
+function createBaseDelegationGrant(): DelegationGrant {
+  return {
+    grantId: "",
+    ownerIdentityPublicKey: new Uint8Array(0),
+    spenders: [],
+    expiryTime: undefined,
+    scopeTransfer: false,
+    scopeRenew: false,
+    scopeClaim: false,
+    feeFlatSats: 0,
+    feeCollectorIdentityPublicKey: undefined,
+    version: 0,
+    ownerSignature: new Uint8Array(0),
+    status: 0,
+    network: 0,
+  };
+}
+
+export const DelegationGrant: MessageFns<DelegationGrant> = {
+  encode(message: DelegationGrant, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grantId !== "") {
+      writer.uint32(10).string(message.grantId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    for (const v of message.spenders) {
+      DelegationSpender.encode(v!, writer.uint32(26).fork()).join();
+    }
+    if (message.expiryTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(34).fork()).join();
+    }
+    if (message.scopeTransfer !== false) {
+      writer.uint32(40).bool(message.scopeTransfer);
+    }
+    if (message.scopeRenew !== false) {
+      writer.uint32(48).bool(message.scopeRenew);
+    }
+    if (message.scopeClaim !== false) {
+      writer.uint32(56).bool(message.scopeClaim);
+    }
+    if (message.feeFlatSats !== 0) {
+      writer.uint32(64).uint64(message.feeFlatSats);
+    }
+    if (message.feeCollectorIdentityPublicKey !== undefined) {
+      writer.uint32(74).bytes(message.feeCollectorIdentityPublicKey);
+    }
+    if (message.version !== 0) {
+      writer.uint32(80).uint64(message.version);
+    }
+    if (message.ownerSignature.length !== 0) {
+      writer.uint32(90).bytes(message.ownerSignature);
+    }
+    if (message.status !== 0) {
+      writer.uint32(96).int32(message.status);
+    }
+    if (message.network !== 0) {
+      writer.uint32(104).int32(message.network);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DelegationGrant {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDelegationGrant();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.spenders.push(DelegationSpender.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.expiryTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.scopeTransfer = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.scopeRenew = reader.bool();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.scopeClaim = reader.bool();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.feeFlatSats = longToNumber(reader.uint64());
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.feeCollectorIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.version = longToNumber(reader.uint64());
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.ownerSignature = reader.bytes();
+          continue;
+        }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 13: {
+          if (tag !== 104) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DelegationGrant {
+    return {
+      grantId: isSet(object.grantId) ? globalThis.String(object.grantId) : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      spenders: globalThis.Array.isArray(object?.spenders)
+        ? object.spenders.map((e: any) => DelegationSpender.fromJSON(e))
+        : [],
+      expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
+      scopeTransfer: isSet(object.scopeTransfer) ? globalThis.Boolean(object.scopeTransfer) : false,
+      scopeRenew: isSet(object.scopeRenew) ? globalThis.Boolean(object.scopeRenew) : false,
+      scopeClaim: isSet(object.scopeClaim) ? globalThis.Boolean(object.scopeClaim) : false,
+      feeFlatSats: isSet(object.feeFlatSats) ? globalThis.Number(object.feeFlatSats) : 0,
+      feeCollectorIdentityPublicKey: isSet(object.feeCollectorIdentityPublicKey)
+        ? bytesFromBase64(object.feeCollectorIdentityPublicKey)
+        : undefined,
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+      status: isSet(object.status) ? delegationStatusFromJSON(object.status) : 0,
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+    };
+  },
+
+  toJSON(message: DelegationGrant): unknown {
+    const obj: any = {};
+    if (message.grantId !== "") {
+      obj.grantId = message.grantId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.spenders?.length) {
+      obj.spenders = message.spenders.map((e) => DelegationSpender.toJSON(e));
+    }
+    if (message.expiryTime !== undefined) {
+      obj.expiryTime = message.expiryTime.toISOString();
+    }
+    if (message.scopeTransfer !== false) {
+      obj.scopeTransfer = message.scopeTransfer;
+    }
+    if (message.scopeRenew !== false) {
+      obj.scopeRenew = message.scopeRenew;
+    }
+    if (message.scopeClaim !== false) {
+      obj.scopeClaim = message.scopeClaim;
+    }
+    if (message.feeFlatSats !== 0) {
+      obj.feeFlatSats = Math.round(message.feeFlatSats);
+    }
+    if (message.feeCollectorIdentityPublicKey !== undefined) {
+      obj.feeCollectorIdentityPublicKey = base64FromBytes(message.feeCollectorIdentityPublicKey);
+    }
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.ownerSignature.length !== 0) {
+      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    }
+    if (message.status !== 0) {
+      obj.status = delegationStatusToJSON(message.status);
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DelegationGrant>): DelegationGrant {
+    return DelegationGrant.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DelegationGrant>): DelegationGrant {
+    const message = createBaseDelegationGrant();
+    message.grantId = object.grantId ?? "";
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.spenders = object.spenders?.map((e) => DelegationSpender.fromPartial(e)) || [];
+    message.expiryTime = object.expiryTime ?? undefined;
+    message.scopeTransfer = object.scopeTransfer ?? false;
+    message.scopeRenew = object.scopeRenew ?? false;
+    message.scopeClaim = object.scopeClaim ?? false;
+    message.feeFlatSats = object.feeFlatSats ?? 0;
+    message.feeCollectorIdentityPublicKey = object.feeCollectorIdentityPublicKey ?? undefined;
+    message.version = object.version ?? 0;
+    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    message.status = object.status ?? 0;
+    message.network = object.network ?? 0;
+    return message;
+  },
+};
+
+function createBaseDelegationSpender(): DelegationSpender {
+  return {
+    spenderIdentityPublicKey: new Uint8Array(0),
+    perTxCapSats: 0,
+    rollingLimitSats: 0,
+    rollingWindowSeconds: 0,
+    status: 0,
+    perTxUnlimited: false,
+    rollingUnlimited: false,
+  };
+}
+
+export const DelegationSpender: MessageFns<DelegationSpender> = {
+  encode(message: DelegationSpender, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.spenderIdentityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.spenderIdentityPublicKey);
+    }
+    if (message.perTxCapSats !== 0) {
+      writer.uint32(16).uint64(message.perTxCapSats);
+    }
+    if (message.rollingLimitSats !== 0) {
+      writer.uint32(24).uint64(message.rollingLimitSats);
+    }
+    if (message.rollingWindowSeconds !== 0) {
+      writer.uint32(32).uint64(message.rollingWindowSeconds);
+    }
+    if (message.status !== 0) {
+      writer.uint32(40).int32(message.status);
+    }
+    if (message.perTxUnlimited !== false) {
+      writer.uint32(48).bool(message.perTxUnlimited);
+    }
+    if (message.rollingUnlimited !== false) {
+      writer.uint32(56).bool(message.rollingUnlimited);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DelegationSpender {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDelegationSpender();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.spenderIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.perTxCapSats = longToNumber(reader.uint64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.rollingLimitSats = longToNumber(reader.uint64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.rollingWindowSeconds = longToNumber(reader.uint64());
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.perTxUnlimited = reader.bool();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.rollingUnlimited = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DelegationSpender {
+    return {
+      spenderIdentityPublicKey: isSet(object.spenderIdentityPublicKey)
+        ? bytesFromBase64(object.spenderIdentityPublicKey)
+        : new Uint8Array(0),
+      perTxCapSats: isSet(object.perTxCapSats) ? globalThis.Number(object.perTxCapSats) : 0,
+      rollingLimitSats: isSet(object.rollingLimitSats) ? globalThis.Number(object.rollingLimitSats) : 0,
+      rollingWindowSeconds: isSet(object.rollingWindowSeconds) ? globalThis.Number(object.rollingWindowSeconds) : 0,
+      status: isSet(object.status) ? delegationStatusFromJSON(object.status) : 0,
+      perTxUnlimited: isSet(object.perTxUnlimited) ? globalThis.Boolean(object.perTxUnlimited) : false,
+      rollingUnlimited: isSet(object.rollingUnlimited) ? globalThis.Boolean(object.rollingUnlimited) : false,
+    };
+  },
+
+  toJSON(message: DelegationSpender): unknown {
+    const obj: any = {};
+    if (message.spenderIdentityPublicKey.length !== 0) {
+      obj.spenderIdentityPublicKey = base64FromBytes(message.spenderIdentityPublicKey);
+    }
+    if (message.perTxCapSats !== 0) {
+      obj.perTxCapSats = Math.round(message.perTxCapSats);
+    }
+    if (message.rollingLimitSats !== 0) {
+      obj.rollingLimitSats = Math.round(message.rollingLimitSats);
+    }
+    if (message.rollingWindowSeconds !== 0) {
+      obj.rollingWindowSeconds = Math.round(message.rollingWindowSeconds);
+    }
+    if (message.status !== 0) {
+      obj.status = delegationStatusToJSON(message.status);
+    }
+    if (message.perTxUnlimited !== false) {
+      obj.perTxUnlimited = message.perTxUnlimited;
+    }
+    if (message.rollingUnlimited !== false) {
+      obj.rollingUnlimited = message.rollingUnlimited;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DelegationSpender>): DelegationSpender {
+    return DelegationSpender.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DelegationSpender>): DelegationSpender {
+    const message = createBaseDelegationSpender();
+    message.spenderIdentityPublicKey = object.spenderIdentityPublicKey ?? new Uint8Array(0);
+    message.perTxCapSats = object.perTxCapSats ?? 0;
+    message.rollingLimitSats = object.rollingLimitSats ?? 0;
+    message.rollingWindowSeconds = object.rollingWindowSeconds ?? 0;
+    message.status = object.status ?? 0;
+    message.perTxUnlimited = object.perTxUnlimited ?? false;
+    message.rollingUnlimited = object.rollingUnlimited ?? false;
+    return message;
+  },
+};
+
+function createBaseCreateDelegationGrantRequest(): CreateDelegationGrantRequest {
+  return { grant: undefined };
+}
+
+export const CreateDelegationGrantRequest: MessageFns<CreateDelegationGrantRequest> = {
+  encode(message: CreateDelegationGrantRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grant !== undefined) {
+      DelegationGrant.encode(message.grant, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateDelegationGrantRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateDelegationGrantRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grant = DelegationGrant.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateDelegationGrantRequest {
+    return { grant: isSet(object.grant) ? DelegationGrant.fromJSON(object.grant) : undefined };
+  },
+
+  toJSON(message: CreateDelegationGrantRequest): unknown {
+    const obj: any = {};
+    if (message.grant !== undefined) {
+      obj.grant = DelegationGrant.toJSON(message.grant);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateDelegationGrantRequest>): CreateDelegationGrantRequest {
+    return CreateDelegationGrantRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateDelegationGrantRequest>): CreateDelegationGrantRequest {
+    const message = createBaseCreateDelegationGrantRequest();
+    message.grant = (object.grant !== undefined && object.grant !== null)
+      ? DelegationGrant.fromPartial(object.grant)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseCreateDelegationGrantResponse(): CreateDelegationGrantResponse {
+  return { grant: undefined };
+}
+
+export const CreateDelegationGrantResponse: MessageFns<CreateDelegationGrantResponse> = {
+  encode(message: CreateDelegationGrantResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grant !== undefined) {
+      DelegationGrant.encode(message.grant, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateDelegationGrantResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateDelegationGrantResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grant = DelegationGrant.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateDelegationGrantResponse {
+    return { grant: isSet(object.grant) ? DelegationGrant.fromJSON(object.grant) : undefined };
+  },
+
+  toJSON(message: CreateDelegationGrantResponse): unknown {
+    const obj: any = {};
+    if (message.grant !== undefined) {
+      obj.grant = DelegationGrant.toJSON(message.grant);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateDelegationGrantResponse>): CreateDelegationGrantResponse {
+    return CreateDelegationGrantResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateDelegationGrantResponse>): CreateDelegationGrantResponse {
+    const message = createBaseCreateDelegationGrantResponse();
+    message.grant = (object.grant !== undefined && object.grant !== null)
+      ? DelegationGrant.fromPartial(object.grant)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseRevokeDelegationGrantRequest(): RevokeDelegationGrantRequest {
+  return { grantId: "", ownerIdentityPublicKey: new Uint8Array(0), version: 0, ownerSignature: new Uint8Array(0) };
+}
+
+export const RevokeDelegationGrantRequest: MessageFns<RevokeDelegationGrantRequest> = {
+  encode(message: RevokeDelegationGrantRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grantId !== "") {
+      writer.uint32(10).string(message.grantId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    if (message.version !== 0) {
+      writer.uint32(24).uint64(message.version);
+    }
+    if (message.ownerSignature.length !== 0) {
+      writer.uint32(34).bytes(message.ownerSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeDelegationGrantRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeDelegationGrantRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.version = longToNumber(reader.uint64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.ownerSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevokeDelegationGrantRequest {
+    return {
+      grantId: isSet(object.grantId) ? globalThis.String(object.grantId) : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: RevokeDelegationGrantRequest): unknown {
+    const obj: any = {};
+    if (message.grantId !== "") {
+      obj.grantId = message.grantId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.ownerSignature.length !== 0) {
+      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeDelegationGrantRequest>): RevokeDelegationGrantRequest {
+    return RevokeDelegationGrantRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevokeDelegationGrantRequest>): RevokeDelegationGrantRequest {
+    const message = createBaseRevokeDelegationGrantRequest();
+    message.grantId = object.grantId ?? "";
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.version = object.version ?? 0;
+    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseRevokeDelegationGrantResponse(): RevokeDelegationGrantResponse {
+  return { grant: undefined };
+}
+
+export const RevokeDelegationGrantResponse: MessageFns<RevokeDelegationGrantResponse> = {
+  encode(message: RevokeDelegationGrantResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grant !== undefined) {
+      DelegationGrant.encode(message.grant, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeDelegationGrantResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeDelegationGrantResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grant = DelegationGrant.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevokeDelegationGrantResponse {
+    return { grant: isSet(object.grant) ? DelegationGrant.fromJSON(object.grant) : undefined };
+  },
+
+  toJSON(message: RevokeDelegationGrantResponse): unknown {
+    const obj: any = {};
+    if (message.grant !== undefined) {
+      obj.grant = DelegationGrant.toJSON(message.grant);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeDelegationGrantResponse>): RevokeDelegationGrantResponse {
+    return RevokeDelegationGrantResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevokeDelegationGrantResponse>): RevokeDelegationGrantResponse {
+    const message = createBaseRevokeDelegationGrantResponse();
+    message.grant = (object.grant !== undefined && object.grant !== null)
+      ? DelegationGrant.fromPartial(object.grant)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseAddDelegationSpenderRequest(): AddDelegationSpenderRequest {
+  return { grantId: "", spender: undefined, version: 0, ownerSignature: new Uint8Array(0) };
+}
+
+export const AddDelegationSpenderRequest: MessageFns<AddDelegationSpenderRequest> = {
+  encode(message: AddDelegationSpenderRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grantId !== "") {
+      writer.uint32(10).string(message.grantId);
+    }
+    if (message.spender !== undefined) {
+      DelegationSpender.encode(message.spender, writer.uint32(18).fork()).join();
+    }
+    if (message.version !== 0) {
+      writer.uint32(24).uint64(message.version);
+    }
+    if (message.ownerSignature.length !== 0) {
+      writer.uint32(34).bytes(message.ownerSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AddDelegationSpenderRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAddDelegationSpenderRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.spender = DelegationSpender.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.version = longToNumber(reader.uint64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.ownerSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AddDelegationSpenderRequest {
+    return {
+      grantId: isSet(object.grantId) ? globalThis.String(object.grantId) : "",
+      spender: isSet(object.spender) ? DelegationSpender.fromJSON(object.spender) : undefined,
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: AddDelegationSpenderRequest): unknown {
+    const obj: any = {};
+    if (message.grantId !== "") {
+      obj.grantId = message.grantId;
+    }
+    if (message.spender !== undefined) {
+      obj.spender = DelegationSpender.toJSON(message.spender);
+    }
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.ownerSignature.length !== 0) {
+      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AddDelegationSpenderRequest>): AddDelegationSpenderRequest {
+    return AddDelegationSpenderRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AddDelegationSpenderRequest>): AddDelegationSpenderRequest {
+    const message = createBaseAddDelegationSpenderRequest();
+    message.grantId = object.grantId ?? "";
+    message.spender = (object.spender !== undefined && object.spender !== null)
+      ? DelegationSpender.fromPartial(object.spender)
+      : undefined;
+    message.version = object.version ?? 0;
+    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseAddDelegationSpenderResponse(): AddDelegationSpenderResponse {
+  return { grant: undefined };
+}
+
+export const AddDelegationSpenderResponse: MessageFns<AddDelegationSpenderResponse> = {
+  encode(message: AddDelegationSpenderResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grant !== undefined) {
+      DelegationGrant.encode(message.grant, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AddDelegationSpenderResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAddDelegationSpenderResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grant = DelegationGrant.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AddDelegationSpenderResponse {
+    return { grant: isSet(object.grant) ? DelegationGrant.fromJSON(object.grant) : undefined };
+  },
+
+  toJSON(message: AddDelegationSpenderResponse): unknown {
+    const obj: any = {};
+    if (message.grant !== undefined) {
+      obj.grant = DelegationGrant.toJSON(message.grant);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AddDelegationSpenderResponse>): AddDelegationSpenderResponse {
+    return AddDelegationSpenderResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AddDelegationSpenderResponse>): AddDelegationSpenderResponse {
+    const message = createBaseAddDelegationSpenderResponse();
+    message.grant = (object.grant !== undefined && object.grant !== null)
+      ? DelegationGrant.fromPartial(object.grant)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseRevokeDelegationSpenderRequest(): RevokeDelegationSpenderRequest {
+  return { grantId: "", spenderIdentityPublicKey: new Uint8Array(0), version: 0, ownerSignature: new Uint8Array(0) };
+}
+
+export const RevokeDelegationSpenderRequest: MessageFns<RevokeDelegationSpenderRequest> = {
+  encode(message: RevokeDelegationSpenderRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grantId !== "") {
+      writer.uint32(10).string(message.grantId);
+    }
+    if (message.spenderIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.spenderIdentityPublicKey);
+    }
+    if (message.version !== 0) {
+      writer.uint32(24).uint64(message.version);
+    }
+    if (message.ownerSignature.length !== 0) {
+      writer.uint32(34).bytes(message.ownerSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeDelegationSpenderRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeDelegationSpenderRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.spenderIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.version = longToNumber(reader.uint64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.ownerSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevokeDelegationSpenderRequest {
+    return {
+      grantId: isSet(object.grantId) ? globalThis.String(object.grantId) : "",
+      spenderIdentityPublicKey: isSet(object.spenderIdentityPublicKey)
+        ? bytesFromBase64(object.spenderIdentityPublicKey)
+        : new Uint8Array(0),
+      version: isSet(object.version) ? globalThis.Number(object.version) : 0,
+      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: RevokeDelegationSpenderRequest): unknown {
+    const obj: any = {};
+    if (message.grantId !== "") {
+      obj.grantId = message.grantId;
+    }
+    if (message.spenderIdentityPublicKey.length !== 0) {
+      obj.spenderIdentityPublicKey = base64FromBytes(message.spenderIdentityPublicKey);
+    }
+    if (message.version !== 0) {
+      obj.version = Math.round(message.version);
+    }
+    if (message.ownerSignature.length !== 0) {
+      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeDelegationSpenderRequest>): RevokeDelegationSpenderRequest {
+    return RevokeDelegationSpenderRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevokeDelegationSpenderRequest>): RevokeDelegationSpenderRequest {
+    const message = createBaseRevokeDelegationSpenderRequest();
+    message.grantId = object.grantId ?? "";
+    message.spenderIdentityPublicKey = object.spenderIdentityPublicKey ?? new Uint8Array(0);
+    message.version = object.version ?? 0;
+    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseRevokeDelegationSpenderResponse(): RevokeDelegationSpenderResponse {
+  return { grant: undefined };
+}
+
+export const RevokeDelegationSpenderResponse: MessageFns<RevokeDelegationSpenderResponse> = {
+  encode(message: RevokeDelegationSpenderResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grant !== undefined) {
+      DelegationGrant.encode(message.grant, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeDelegationSpenderResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeDelegationSpenderResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grant = DelegationGrant.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevokeDelegationSpenderResponse {
+    return { grant: isSet(object.grant) ? DelegationGrant.fromJSON(object.grant) : undefined };
+  },
+
+  toJSON(message: RevokeDelegationSpenderResponse): unknown {
+    const obj: any = {};
+    if (message.grant !== undefined) {
+      obj.grant = DelegationGrant.toJSON(message.grant);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeDelegationSpenderResponse>): RevokeDelegationSpenderResponse {
+    return RevokeDelegationSpenderResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevokeDelegationSpenderResponse>): RevokeDelegationSpenderResponse {
+    const message = createBaseRevokeDelegationSpenderResponse();
+    message.grant = (object.grant !== undefined && object.grant !== null)
+      ? DelegationGrant.fromPartial(object.grant)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseQueryDelegationGrantsRequest(): QueryDelegationGrantsRequest {
+  return { filter: undefined };
+}
+
+export const QueryDelegationGrantsRequest: MessageFns<QueryDelegationGrantsRequest> = {
+  encode(message: QueryDelegationGrantsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    switch (message.filter?.$case) {
+      case "ownerIdentityPublicKey":
+        writer.uint32(10).bytes(message.filter.ownerIdentityPublicKey);
+        break;
+      case "delegateIdentityPublicKey":
+        writer.uint32(18).bytes(message.filter.delegateIdentityPublicKey);
+        break;
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryDelegationGrantsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryDelegationGrantsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.filter = { $case: "ownerIdentityPublicKey", ownerIdentityPublicKey: reader.bytes() };
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.filter = { $case: "delegateIdentityPublicKey", delegateIdentityPublicKey: reader.bytes() };
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryDelegationGrantsRequest {
+    return {
+      filter: isSet(object.ownerIdentityPublicKey)
+        ? { $case: "ownerIdentityPublicKey", ownerIdentityPublicKey: bytesFromBase64(object.ownerIdentityPublicKey) }
+        : isSet(object.delegateIdentityPublicKey)
+        ? {
+          $case: "delegateIdentityPublicKey",
+          delegateIdentityPublicKey: bytesFromBase64(object.delegateIdentityPublicKey),
+        }
+        : undefined,
+    };
+  },
+
+  toJSON(message: QueryDelegationGrantsRequest): unknown {
+    const obj: any = {};
+    if (message.filter?.$case === "ownerIdentityPublicKey") {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.filter.ownerIdentityPublicKey);
+    } else if (message.filter?.$case === "delegateIdentityPublicKey") {
+      obj.delegateIdentityPublicKey = base64FromBytes(message.filter.delegateIdentityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryDelegationGrantsRequest>): QueryDelegationGrantsRequest {
+    return QueryDelegationGrantsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryDelegationGrantsRequest>): QueryDelegationGrantsRequest {
+    const message = createBaseQueryDelegationGrantsRequest();
+    switch (object.filter?.$case) {
+      case "ownerIdentityPublicKey": {
+        if (object.filter?.ownerIdentityPublicKey !== undefined && object.filter?.ownerIdentityPublicKey !== null) {
+          message.filter = {
+            $case: "ownerIdentityPublicKey",
+            ownerIdentityPublicKey: object.filter.ownerIdentityPublicKey,
+          };
+        }
+        break;
+      }
+      case "delegateIdentityPublicKey": {
+        if (
+          object.filter?.delegateIdentityPublicKey !== undefined && object.filter?.delegateIdentityPublicKey !== null
+        ) {
+          message.filter = {
+            $case: "delegateIdentityPublicKey",
+            delegateIdentityPublicKey: object.filter.delegateIdentityPublicKey,
+          };
+        }
+        break;
+      }
+    }
+    return message;
+  },
+};
+
+function createBaseDelegationGrantInfo(): DelegationGrantInfo {
+  return { grant: undefined, spentSatsBySpender: {} };
+}
+
+export const DelegationGrantInfo: MessageFns<DelegationGrantInfo> = {
+  encode(message: DelegationGrantInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grant !== undefined) {
+      DelegationGrant.encode(message.grant, writer.uint32(10).fork()).join();
+    }
+    Object.entries(message.spentSatsBySpender).forEach(([key, value]) => {
+      DelegationGrantInfo_SpentSatsBySpenderEntry.encode({ key: key as any, value }, writer.uint32(18).fork()).join();
+    });
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DelegationGrantInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDelegationGrantInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grant = DelegationGrant.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          const entry2 = DelegationGrantInfo_SpentSatsBySpenderEntry.decode(reader, reader.uint32());
+          if (entry2.value !== undefined) {
+            message.spentSatsBySpender[entry2.key] = entry2.value;
+          }
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DelegationGrantInfo {
+    return {
+      grant: isSet(object.grant) ? DelegationGrant.fromJSON(object.grant) : undefined,
+      spentSatsBySpender: isObject(object.spentSatsBySpender)
+        ? Object.entries(object.spentSatsBySpender).reduce<{ [key: string]: number }>((acc, [key, value]) => {
+          acc[key] = Number(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: DelegationGrantInfo): unknown {
+    const obj: any = {};
+    if (message.grant !== undefined) {
+      obj.grant = DelegationGrant.toJSON(message.grant);
+    }
+    if (message.spentSatsBySpender) {
+      const entries = Object.entries(message.spentSatsBySpender);
+      if (entries.length > 0) {
+        obj.spentSatsBySpender = {};
+        entries.forEach(([k, v]) => {
+          obj.spentSatsBySpender[k] = Math.round(v);
+        });
+      }
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DelegationGrantInfo>): DelegationGrantInfo {
+    return DelegationGrantInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DelegationGrantInfo>): DelegationGrantInfo {
+    const message = createBaseDelegationGrantInfo();
+    message.grant = (object.grant !== undefined && object.grant !== null)
+      ? DelegationGrant.fromPartial(object.grant)
+      : undefined;
+    message.spentSatsBySpender = Object.entries(object.spentSatsBySpender ?? {}).reduce<{ [key: string]: number }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = globalThis.Number(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    return message;
+  },
+};
+
+function createBaseDelegationGrantInfo_SpentSatsBySpenderEntry(): DelegationGrantInfo_SpentSatsBySpenderEntry {
+  return { key: "", value: 0 };
+}
+
+export const DelegationGrantInfo_SpentSatsBySpenderEntry: MessageFns<DelegationGrantInfo_SpentSatsBySpenderEntry> = {
+  encode(
+    message: DelegationGrantInfo_SpentSatsBySpenderEntry,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== 0) {
+      writer.uint32(16).uint64(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DelegationGrantInfo_SpentSatsBySpenderEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDelegationGrantInfo_SpentSatsBySpenderEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.value = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DelegationGrantInfo_SpentSatsBySpenderEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.Number(object.value) : 0,
+    };
+  },
+
+  toJSON(message: DelegationGrantInfo_SpentSatsBySpenderEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== 0) {
+      obj.value = Math.round(message.value);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DelegationGrantInfo_SpentSatsBySpenderEntry>): DelegationGrantInfo_SpentSatsBySpenderEntry {
+    return DelegationGrantInfo_SpentSatsBySpenderEntry.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<DelegationGrantInfo_SpentSatsBySpenderEntry>,
+  ): DelegationGrantInfo_SpentSatsBySpenderEntry {
+    const message = createBaseDelegationGrantInfo_SpentSatsBySpenderEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryDelegationGrantsResponse(): QueryDelegationGrantsResponse {
+  return { grants: [] };
+}
+
+export const QueryDelegationGrantsResponse: MessageFns<QueryDelegationGrantsResponse> = {
+  encode(message: QueryDelegationGrantsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.grants) {
+      DelegationGrantInfo.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryDelegationGrantsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryDelegationGrantsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grants.push(DelegationGrantInfo.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryDelegationGrantsResponse {
+    return {
+      grants: globalThis.Array.isArray(object?.grants)
+        ? object.grants.map((e: any) => DelegationGrantInfo.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: QueryDelegationGrantsResponse): unknown {
+    const obj: any = {};
+    if (message.grants?.length) {
+      obj.grants = message.grants.map((e) => DelegationGrantInfo.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryDelegationGrantsResponse>): QueryDelegationGrantsResponse {
+    return QueryDelegationGrantsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryDelegationGrantsResponse>): QueryDelegationGrantsResponse {
+    const message = createBaseQueryDelegationGrantsResponse();
+    message.grants = object.grants?.map((e) => DelegationGrantInfo.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseLeafDecompositionInstall(): LeafDecompositionInstall {
+  return { leafId: "", delegateSigningPublicKey: new Uint8Array(0) };
+}
+
+export const LeafDecompositionInstall: MessageFns<LeafDecompositionInstall> = {
+  encode(message: LeafDecompositionInstall, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.leafId !== "") {
+      writer.uint32(10).string(message.leafId);
+    }
+    if (message.delegateSigningPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.delegateSigningPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LeafDecompositionInstall {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLeafDecompositionInstall();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.delegateSigningPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LeafDecompositionInstall {
+    return {
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      delegateSigningPublicKey: isSet(object.delegateSigningPublicKey)
+        ? bytesFromBase64(object.delegateSigningPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: LeafDecompositionInstall): unknown {
+    const obj: any = {};
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
+    if (message.delegateSigningPublicKey.length !== 0) {
+      obj.delegateSigningPublicKey = base64FromBytes(message.delegateSigningPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<LeafDecompositionInstall>): LeafDecompositionInstall {
+    return LeafDecompositionInstall.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<LeafDecompositionInstall>): LeafDecompositionInstall {
+    const message = createBaseLeafDecompositionInstall();
+    message.leafId = object.leafId ?? "";
+    message.delegateSigningPublicKey = object.delegateSigningPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseInstallLeafDecompositionsRequest(): InstallLeafDecompositionsRequest {
+  return {
+    grantId: "",
+    ownerIdentityPublicKey: new Uint8Array(0),
+    installs: [],
+    keyTweakPackage: {},
+    ownerSignature: new Uint8Array(0),
+  };
+}
+
+export const InstallLeafDecompositionsRequest: MessageFns<InstallLeafDecompositionsRequest> = {
+  encode(message: InstallLeafDecompositionsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.grantId !== "") {
+      writer.uint32(10).string(message.grantId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    for (const v of message.installs) {
+      LeafDecompositionInstall.encode(v!, writer.uint32(26).fork()).join();
+    }
+    Object.entries(message.keyTweakPackage).forEach(([key, value]) => {
+      InstallLeafDecompositionsRequest_KeyTweakPackageEntry.encode({ key: key as any, value }, writer.uint32(34).fork())
+        .join();
+    });
+    if (message.ownerSignature.length !== 0) {
+      writer.uint32(42).bytes(message.ownerSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InstallLeafDecompositionsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInstallLeafDecompositionsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.grantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.installs.push(LeafDecompositionInstall.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = InstallLeafDecompositionsRequest_KeyTweakPackageEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.keyTweakPackage[entry4.key] = entry4.value;
+          }
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.ownerSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InstallLeafDecompositionsRequest {
+    return {
+      grantId: isSet(object.grantId) ? globalThis.String(object.grantId) : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      installs: globalThis.Array.isArray(object?.installs)
+        ? object.installs.map((e: any) => LeafDecompositionInstall.fromJSON(e))
+        : [],
+      keyTweakPackage: isObject(object.keyTweakPackage)
+        ? Object.entries(object.keyTweakPackage).reduce<{ [key: string]: Uint8Array }>((acc, [key, value]) => {
+          acc[key] = bytesFromBase64(value as string);
+          return acc;
+        }, {})
+        : {},
+      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: InstallLeafDecompositionsRequest): unknown {
+    const obj: any = {};
+    if (message.grantId !== "") {
+      obj.grantId = message.grantId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.installs?.length) {
+      obj.installs = message.installs.map((e) => LeafDecompositionInstall.toJSON(e));
+    }
+    if (message.keyTweakPackage) {
+      const entries = Object.entries(message.keyTweakPackage);
+      if (entries.length > 0) {
+        obj.keyTweakPackage = {};
+        entries.forEach(([k, v]) => {
+          obj.keyTweakPackage[k] = base64FromBytes(v);
+        });
+      }
+    }
+    if (message.ownerSignature.length !== 0) {
+      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InstallLeafDecompositionsRequest>): InstallLeafDecompositionsRequest {
+    return InstallLeafDecompositionsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InstallLeafDecompositionsRequest>): InstallLeafDecompositionsRequest {
+    const message = createBaseInstallLeafDecompositionsRequest();
+    message.grantId = object.grantId ?? "";
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.installs = object.installs?.map((e) => LeafDecompositionInstall.fromPartial(e)) || [];
+    message.keyTweakPackage = Object.entries(object.keyTweakPackage ?? {}).reduce<{ [key: string]: Uint8Array }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      },
+      {},
+    );
+    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseInstallLeafDecompositionsRequest_KeyTweakPackageEntry(): InstallLeafDecompositionsRequest_KeyTweakPackageEntry {
+  return { key: "", value: new Uint8Array(0) };
+}
+
+export const InstallLeafDecompositionsRequest_KeyTweakPackageEntry: MessageFns<
+  InstallLeafDecompositionsRequest_KeyTweakPackageEntry
+> = {
+  encode(
+    message: InstallLeafDecompositionsRequest_KeyTweakPackageEntry,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value.length !== 0) {
+      writer.uint32(18).bytes(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InstallLeafDecompositionsRequest_KeyTweakPackageEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInstallLeafDecompositionsRequest_KeyTweakPackageEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InstallLeafDecompositionsRequest_KeyTweakPackageEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? bytesFromBase64(object.value) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: InstallLeafDecompositionsRequest_KeyTweakPackageEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value.length !== 0) {
+      obj.value = base64FromBytes(message.value);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<InstallLeafDecompositionsRequest_KeyTweakPackageEntry>,
+  ): InstallLeafDecompositionsRequest_KeyTweakPackageEntry {
+    return InstallLeafDecompositionsRequest_KeyTweakPackageEntry.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<InstallLeafDecompositionsRequest_KeyTweakPackageEntry>,
+  ): InstallLeafDecompositionsRequest_KeyTweakPackageEntry {
+    const message = createBaseInstallLeafDecompositionsRequest_KeyTweakPackageEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseInstallLeafDecompositionProgress(): InstallLeafDecompositionProgress {
+  return { operatorIdentifier: "", installed: false };
+}
+
+export const InstallLeafDecompositionProgress: MessageFns<InstallLeafDecompositionProgress> = {
+  encode(message: InstallLeafDecompositionProgress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operatorIdentifier !== "") {
+      writer.uint32(10).string(message.operatorIdentifier);
+    }
+    if (message.installed !== false) {
+      writer.uint32(16).bool(message.installed);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InstallLeafDecompositionProgress {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInstallLeafDecompositionProgress();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.operatorIdentifier = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.installed = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InstallLeafDecompositionProgress {
+    return {
+      operatorIdentifier: isSet(object.operatorIdentifier) ? globalThis.String(object.operatorIdentifier) : "",
+      installed: isSet(object.installed) ? globalThis.Boolean(object.installed) : false,
+    };
+  },
+
+  toJSON(message: InstallLeafDecompositionProgress): unknown {
+    const obj: any = {};
+    if (message.operatorIdentifier !== "") {
+      obj.operatorIdentifier = message.operatorIdentifier;
+    }
+    if (message.installed !== false) {
+      obj.installed = message.installed;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InstallLeafDecompositionProgress>): InstallLeafDecompositionProgress {
+    return InstallLeafDecompositionProgress.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InstallLeafDecompositionProgress>): InstallLeafDecompositionProgress {
+    const message = createBaseInstallLeafDecompositionProgress();
+    message.operatorIdentifier = object.operatorIdentifier ?? "";
+    message.installed = object.installed ?? false;
+    return message;
+  },
+};
+
+function createBaseInstallLeafDecompositionsResponse(): InstallLeafDecompositionsResponse {
+  return { progress: [] };
+}
+
+export const InstallLeafDecompositionsResponse: MessageFns<InstallLeafDecompositionsResponse> = {
+  encode(message: InstallLeafDecompositionsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.progress) {
+      InstallLeafDecompositionProgress.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InstallLeafDecompositionsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInstallLeafDecompositionsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.progress.push(InstallLeafDecompositionProgress.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InstallLeafDecompositionsResponse {
+    return {
+      progress: globalThis.Array.isArray(object?.progress)
+        ? object.progress.map((e: any) => InstallLeafDecompositionProgress.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: InstallLeafDecompositionsResponse): unknown {
+    const obj: any = {};
+    if (message.progress?.length) {
+      obj.progress = message.progress.map((e) => InstallLeafDecompositionProgress.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InstallLeafDecompositionsResponse>): InstallLeafDecompositionsResponse {
+    return InstallLeafDecompositionsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InstallLeafDecompositionsResponse>): InstallLeafDecompositionsResponse {
+    const message = createBaseInstallLeafDecompositionsResponse();
+    message.progress = object.progress?.map((e) => InstallLeafDecompositionProgress.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -23886,6 +26380,64 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * Spark Pull: delegated spending via parallel key decomposition. An owner
+     * installs a second key decomposition (delegate share + SE2 keyshare)
+     * alongside the primary one, bounded by an owner-signed grant the SO
+     * federation enforces at signing time.
+     */
+    create_delegation_grant: {
+      name: "create_delegation_grant",
+      requestType: CreateDelegationGrantRequest,
+      requestStream: false,
+      responseType: CreateDelegationGrantResponse,
+      responseStream: false,
+      options: {},
+    },
+    revoke_delegation_grant: {
+      name: "revoke_delegation_grant",
+      requestType: RevokeDelegationGrantRequest,
+      requestStream: false,
+      responseType: RevokeDelegationGrantResponse,
+      responseStream: false,
+      options: {},
+    },
+    query_delegation_grants: {
+      name: "query_delegation_grants",
+      requestType: QueryDelegationGrantsRequest,
+      requestStream: false,
+      responseType: QueryDelegationGrantsResponse,
+      responseStream: false,
+      options: {},
+    },
+    install_leaf_decompositions: {
+      name: "install_leaf_decompositions",
+      requestType: InstallLeafDecompositionsRequest,
+      requestStream: false,
+      responseType: InstallLeafDecompositionsResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * Owner-signed addition / removal of an authorized spender on an existing
+     * grant's delegate path. No new key material — a metering record only.
+     */
+    add_delegation_spender: {
+      name: "add_delegation_spender",
+      requestType: AddDelegationSpenderRequest,
+      requestStream: false,
+      responseType: AddDelegationSpenderResponse,
+      responseStream: false,
+      options: {},
+    },
+    revoke_delegation_spender: {
+      name: "revoke_delegation_spender",
+      requestType: RevokeDelegationSpenderRequest,
+      requestStream: false,
+      responseType: RevokeDelegationSpenderResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -24097,6 +26649,40 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryWalletSettingRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryWalletSettingResponse>>;
+  /**
+   * Spark Pull: delegated spending via parallel key decomposition. An owner
+   * installs a second key decomposition (delegate share + SE2 keyshare)
+   * alongside the primary one, bounded by an owner-signed grant the SO
+   * federation enforces at signing time.
+   */
+  create_delegation_grant(
+    request: CreateDelegationGrantRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CreateDelegationGrantResponse>>;
+  revoke_delegation_grant(
+    request: RevokeDelegationGrantRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<RevokeDelegationGrantResponse>>;
+  query_delegation_grants(
+    request: QueryDelegationGrantsRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryDelegationGrantsResponse>>;
+  install_leaf_decompositions(
+    request: InstallLeafDecompositionsRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<InstallLeafDecompositionsResponse>>;
+  /**
+   * Owner-signed addition / removal of an authorized spender on an existing
+   * grant's delegate path. No new key material — a metering record only.
+   */
+  add_delegation_spender(
+    request: AddDelegationSpenderRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<AddDelegationSpenderResponse>>;
+  revoke_delegation_spender(
+    request: RevokeDelegationSpenderRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<RevokeDelegationSpenderResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -24313,6 +26899,40 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryWalletSettingRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryWalletSettingResponse>;
+  /**
+   * Spark Pull: delegated spending via parallel key decomposition. An owner
+   * installs a second key decomposition (delegate share + SE2 keyshare)
+   * alongside the primary one, bounded by an owner-signed grant the SO
+   * federation enforces at signing time.
+   */
+  create_delegation_grant(
+    request: DeepPartial<CreateDelegationGrantRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CreateDelegationGrantResponse>;
+  revoke_delegation_grant(
+    request: DeepPartial<RevokeDelegationGrantRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<RevokeDelegationGrantResponse>;
+  query_delegation_grants(
+    request: DeepPartial<QueryDelegationGrantsRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryDelegationGrantsResponse>;
+  install_leaf_decompositions(
+    request: DeepPartial<InstallLeafDecompositionsRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<InstallLeafDecompositionsResponse>;
+  /**
+   * Owner-signed addition / removal of an authorized spender on an existing
+   * grant's delegate path. No new key material — a metering record only.
+   */
+  add_delegation_spender(
+    request: DeepPartial<AddDelegationSpenderRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<AddDelegationSpenderResponse>;
+  revoke_delegation_spender(
+    request: DeepPartial<RevokeDelegationSpenderRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<RevokeDelegationSpenderResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
