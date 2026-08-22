@@ -99,8 +99,10 @@ func TestZmqSubscribe(t *testing.T) {
 
 		t.Logf("Waiting for message (attempt %d / 5)...", attempts+1)
 		select {
-		case <-subscribeChan:
+		case notification, ok := <-subscribeChan:
+			require.True(t, ok, "notification channel closed before a message arrived")
 			received = true
+			require.False(t, notification.Parsed, "non-block payload must yield an unparsed notification")
 		case err := <-errChan:
 			require.NoError(t, err, "Failed to receive message")
 		case <-time.After(200 * time.Millisecond):

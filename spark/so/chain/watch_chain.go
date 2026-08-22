@@ -57,6 +57,7 @@ var (
 	blockHeightGauge                   metric.Int64Gauge
 	blockHeightProcessingTimeHistogram metric.Int64Histogram
 	sparkChainActionTimeHistogram      metric.Int64Histogram
+	scanRetryCounter                   metric.Int64Counter
 
 	// tweakKeysForCoopExitFunc is a function variable that can be mocked in tests
 	tweakKeysForCoopExitFunc = tweakKeysForCoopExit
@@ -213,6 +214,15 @@ func init() {
 		otel.Handle(err)
 		sparkChainActionTimeHistogram = noop.Int64Histogram{}
 	}
+
+	scanRetryCounter, err = meter.Int64Counter(
+		"chain_watcher.scan_retries",
+		metric.WithDescription("Chain scans retried after a failed scan or one that missed the notified block"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		scanRetryCounter = noop.Int64Counter{}
+	}
 }
 
 func pollInterval(network btcnetwork.Network) time.Duration {
@@ -304,15 +314,15 @@ func scanChainUpdates(
 	bitcoinClient *rpcclient.Client,
 	network btcnetwork.Network,
 	bitcoindConfig so.BitcoindConfig,
-) error {
+) (Tip, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	latestBlockHeight, err := bitcoinClient.GetBlockCount()
 	if err != nil {
-		return fmt.Errorf("failed to get block count: %w", err)
+		return Tip{}, fmt.Errorf("failed to get block count: %w", err)
 	}
 	latestBlockHash, err := bitcoinClient.GetBlockHash(latestBlockHeight)
 	if err != nil {
-		return fmt.Errorf("failed to get block hash at height %d: %w", latestBlockHeight, err)
+		return Tip{}, fmt.Errorf("failed to get block hash at height %d: %w", latestBlockHeight, err)
 	}
 	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
 	logger.Sugar().Infof("Latest chain tip height: %d, hash: %s", latestBlockHeight, latestBlockHash)
@@ -325,7 +335,7 @@ func scanChainUpdates(
 		logger.Sugar().Infof("Block height %d not found, creating new entry", startHeight)
 		startBlockHash, hashErr := bitcoinClient.GetBlockHash(startHeight)
 		if hashErr != nil {
-			return fmt.Errorf("failed to get block hash at start height %d: %w", startHeight, hashErr)
+			return Tip{}, fmt.Errorf("failed to get block hash at start height %d: %w", startHeight, hashErr)
 		}
 		dbBlockHeight, err = dbClient.BlockHeight.Create().
 			SetHeight(startHeight).
@@ -334,13 +344,13 @@ func scanChainUpdates(
 			Save(ctx)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to query block height: %w", err)
+		return Tip{}, fmt.Errorf("failed to query block height: %w", err)
 	}
 	var dbChainTip Tip
 	if dbBlockHeight.BlockHash != nil && len(*dbBlockHeight.BlockHash) == chainhash.HashSize {
 		storedHash, err := chainhash.NewHash(*dbBlockHeight.BlockHash)
 		if err != nil {
-			return fmt.Errorf("failed to parse stored block hash at height %d: %w", dbBlockHeight.Height, err)
+			return Tip{}, fmt.Errorf("failed to parse stored block hash at height %d: %w", dbBlockHeight.Height, err)
 		}
 		dbChainTip = NewTip(dbBlockHeight.Height, *storedHash)
 		logger.Sugar().Infof("DB chain tip height: %d, hash: %s (from stored hash)", dbBlockHeight.Height, storedHash)
@@ -349,18 +359,18 @@ func scanChainUpdates(
 		// After the next block is processed, the hash will be stored.
 		dbBlockHash, err := bitcoinClient.GetBlockHash(dbBlockHeight.Height)
 		if err != nil {
-			return fmt.Errorf("failed to get block hash at db height %d: %w", dbBlockHeight.Height, err)
+			return Tip{}, fmt.Errorf("failed to get block hash at db height %d: %w", dbBlockHeight.Height, err)
 		}
 		dbChainTip = NewTip(dbBlockHeight.Height, *dbBlockHash)
 		logger.Sugar().Infof("DB chain tip height: %d, hash: %s (from node, no stored hash)", dbBlockHeight.Height, dbBlockHash)
 	}
 	difference, err := findDifference(dbChainTip, latestChainTip, bitcoinClient)
 	if err != nil {
-		return fmt.Errorf("failed to find difference: %w", err)
+		return Tip{}, fmt.Errorf("failed to find difference: %w", err)
 	}
 	err = disconnectBlocks(ctx, dbClient, difference.Disconnected, network)
 	if err != nil {
-		return fmt.Errorf("failed to disconnect blocks: %w", err)
+		return Tip{}, fmt.Errorf("failed to disconnect blocks: %w", err)
 	}
 
 	// Save the old block height before connecting new blocks so we can query deposits
@@ -382,7 +392,7 @@ func scanChainUpdates(
 		network,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to connect blocks: %w", err)
+		return Tip{}, fmt.Errorf("failed to connect blocks: %w", err)
 	}
 	logger.Sugar().Infof("Connected %d blocks", len(difference.Connected))
 
@@ -393,7 +403,7 @@ func scanChainUpdates(
 	// starve watchtower broadcasts and coop-exit tweaks.
 	if err := processSparkChainActions(ctx, config, dbClient, ephemeralDBClient, bitcoinClient, network); err != nil {
 		if errors.Is(err, errEphemeralMainDBDiverged) {
-			return err
+			return Tip{}, err
 		}
 		logger.Error("Failed to perform Spark chain actions", zap.Error(err))
 	}
@@ -402,11 +412,11 @@ func scanChainUpdates(
 	// to avoid potential issues with parallel database transactions.
 	deposits, err := loadDepositAvailabilityCandidates(ctx, dbClient, latestBlockHeight, oldBlockHeight, bitcoindConfig)
 	if err != nil {
-		return fmt.Errorf("failed to load deposit availability candidates: %w", err)
+		return Tip{}, fmt.Errorf("failed to load deposit availability candidates: %w", err)
 	}
 	err = setDepositAvailability(ctx, dbClient, deposits, network)
 	if err != nil {
-		return fmt.Errorf("failed to set deposit availability: %w", err)
+		return Tip{}, fmt.Errorf("failed to set deposit availability: %w", err)
 	}
 
 	// Mark individual UTXOs as confirmed once they meet the confirmation threshold.
@@ -425,13 +435,13 @@ func scanChainUpdates(
 		SetAvailabilityConfirmedAt(time.Now()).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to mark UTXOs as confirmed: %w", err)
+		return Tip{}, fmt.Errorf("failed to mark UTXOs as confirmed: %w", err)
 	}
 
-	return nil
+	return latestChainTip, nil
 }
 
-func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
+func rpcClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
 	return rpcclient.ConnConfig{
 		Host:         cfg.Host,
 		User:         cfg.User,
@@ -455,13 +465,8 @@ func WatchChain(
 	if err != nil {
 		return err
 	}
-	bitcoinClient, err := rpcclient.New(new(RPCClientConfig(bitcoindConfig)), nil)
-	if err != nil {
-		return err
-	}
 
-	err = scanChainUpdates(ctx, config, dbClient, ephemeralDBClient, bitcoinClient, network, bitcoindConfig)
-	if err != nil {
+	if _, err := scanOnce(ctx, config, dbClient, ephemeralDBClient, bitcoindConfig, network); err != nil {
 		if errors.Is(err, errEphemeralMainDBDiverged) {
 			return err
 		}
@@ -487,6 +492,7 @@ func WatchChain(
 
 	// TODO: we should consider alerting on errors within this loop
 	for {
+		notification := BlockNotification{}
 		select {
 		case err := <-errChan:
 			logger.Error("Error receiving ZMQ message", zap.Error(err))
@@ -494,19 +500,107 @@ func WatchChain(
 		case <-ctx.Done():
 			logger.Info("Context done, stopping chain watcher")
 			return nil
-		case <-newBlockNotification:
+		case n := <-newBlockNotification:
+			notification = n
 		case <-time.After(pollInterval(network)):
 		}
-		// We don't actually do anything with the block receive since
-		// we need to query bitcoind for the height anyway. We just
-		// treat it as a notification that a new block appeared.
 
-		err = scanChainUpdates(ctx, config, dbClient, ephemeralDBClient, bitcoinClient, network, bitcoindConfig)
-		if err != nil {
-			if errors.Is(err, errEphemeralMainDBDiverged) {
-				return err
+		if err := scanWithRetry(ctx, config, dbClient, ephemeralDBClient, bitcoindConfig, network, notification); err != nil {
+			return err
+		}
+	}
+}
+
+// scanOnce runs one full chain scan on a fresh bitcoind client. The fresh
+// client per attempt is load-bearing: bitcoind is a multi-replica Service and
+// the client's keep-alive connection pins it to one replica, so a retry on the
+// same client would keep asking the lagging replica that just failed it; a new
+// client re-round-robins.
+func scanOnce(
+	ctx context.Context,
+	config *so.Config,
+	dbClient *ent.Client,
+	ephemeralDBClient *entephemeral.Client,
+	bitcoindConfig so.BitcoindConfig,
+	network btcnetwork.Network,
+) (Tip, error) {
+	bitcoinClient, err := rpcclient.New(new(rpcClientConfig(bitcoindConfig)), nil)
+	if err != nil {
+		return Tip{}, err
+	}
+	defer bitcoinClient.Shutdown()
+	return scanChainUpdates(ctx, config, dbClient, ephemeralDBClient, bitcoinClient, network, bitcoindConfig)
+}
+
+// reachedNotification reports whether a committed tip covers the notified
+// block. Unparsed notifications have no target, so any successful scan
+// suffices; the hash comparison (not height alone) catches same-height reorgs.
+func reachedNotification(tip Tip, n BlockNotification) bool {
+	if !n.Parsed {
+		return true
+	}
+	return tip.Hash.IsEqual(&n.Hash) || tip.Height > n.Height
+}
+
+// scanRetryDelays are the waits before each retry.
+var scanRetryDelays = []time.Duration{500 * time.Millisecond, 2 * time.Second, 5 * time.Second}
+
+// scanWithRetry drives the scans for one wake-up. Scans that error — or miss
+// the notified block because a lagging replica answered a stale tip — retry on
+// the fixed schedule in scanRetryDelays; after that the poll timer is the
+// fallback. Only fatal errors are returned.
+func scanWithRetry(
+	ctx context.Context,
+	config *so.Config,
+	dbClient *ent.Client,
+	ephemeralDBClient *entephemeral.Client,
+	bitcoindConfig so.BitcoindConfig,
+	network btcnetwork.Network,
+	notification BlockNotification,
+) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	start := time.Now()
+
+	for attempt := 0; ; attempt++ {
+		tip, err := scanOnce(ctx, config, dbClient, ephemeralDBClient, bitcoindConfig, network)
+
+		if errors.Is(err, errEphemeralMainDBDiverged) {
+			return err
+		}
+
+		// A scan can succeed and still miss the announced block, when a lagging
+		// replica answers the old tip and the reconcile no-ops.
+		if err == nil && reachedNotification(tip, notification) {
+			if attempt > 0 {
+				logger.Sugar().Infof("Chain scan reached tip %d after %d retries, %.1fs after wake-up", tip.Height, attempt, time.Since(start).Seconds())
 			}
+			return nil
+		}
+
+		reason := "stale_tip"
+		if err != nil {
 			logger.Error("Failed to scan chain updates", zap.Error(err))
+			reason = "error"
+		}
+
+		// Give up once the schedule is spent, or once the next wait would
+		// outlast the poll interval that re-drives the scan anyway.
+		elapsed := time.Since(start)
+		if attempt >= len(scanRetryDelays) || elapsed+scanRetryDelays[attempt] >= pollInterval(network) {
+			logger.Sugar().Warnf("Giving up chain scan after %d attempts (%.1fs, last reason %s); falling back to poll timer", attempt+1, elapsed.Seconds(), reason)
+			return nil
+		}
+		scanRetryCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("network", network.String()),
+			attribute.String("reason", reason),
+		))
+
+		// Back off, or bail out immediately on shutdown: scanOnce's bitcoind RPCs
+		// take no context, so finishing the schedule could cost ~7s of a SIGTERM.
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(scanRetryDelays[attempt]):
 		}
 	}
 }

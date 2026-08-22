@@ -1,14 +1,51 @@
 package chain
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/pebbe/zmq4"
 	"go.uber.org/zap"
 )
+
+// BlockNotification identifies the block announced by a ZMQ rawblock
+// publication. Parsed is false when the payload lacks a decodable block with
+// a BIP34 coinbase height; the notification then carries no target identity.
+type BlockNotification struct {
+	Hash   chainhash.Hash
+	Height int64
+	Parsed bool
+}
+
+// parseBlockNotification extracts the announced block's hash (header) and
+// height (BIP34 coinbase) with no RPC round trips; the payload's remaining
+// megabytes of transactions are deliberately not deserialized.
+func parseBlockNotification(payload []byte) BlockNotification {
+	r := bytes.NewReader(payload)
+	var header wire.BlockHeader
+	if err := header.Deserialize(r); err != nil {
+		return BlockNotification{}
+	}
+	if _, err := wire.ReadVarInt(r, 0); err != nil {
+		return BlockNotification{}
+	}
+	var coinbase wire.MsgTx
+	if err := coinbase.Deserialize(r); err != nil {
+		return BlockNotification{}
+	}
+	height, err := blockchain.ExtractCoinbaseHeight(btcutil.NewTx(&coinbase))
+	if err != nil {
+		return BlockNotification{}
+	}
+	return BlockNotification{Hash: header.BlockHash(), Height: int64(height), Parsed: true}
+}
 
 type ZmqSubscriber struct {
 	ctx *zmq4.Context
@@ -25,8 +62,9 @@ func NewZmqSubscriber() (*ZmqSubscriber, error) {
 	return &ZmqSubscriber{ctx: zmqCtx}, nil
 }
 
-// Subscribe starts receiving messages from the ZMQ socket. Note that it does not return the message
-// itself, it merely notifies the subscriber that a message has been received.
+// Subscribe starts receiving messages from the ZMQ socket. Each received message is parsed into
+// a BlockNotification identifying the announced block when possible; unparseable payloads yield
+// a zero BlockNotification (Parsed=false) that still signals a message arrived.
 //
 // The returned channels are closed when one of the following happens:
 //  1. The context is cancelled.
@@ -36,7 +74,7 @@ func NewZmqSubscriber() (*ZmqSubscriber, error) {
 //
 // Calling `Subscribe` multiple times with the same endpoint & filter will result in undefined
 // behavior, do not do this!
-func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter string) (<-chan struct{}, <-chan error, error) {
+func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter string) (<-chan BlockNotification, <-chan error, error) {
 	zmqSocket, err := z.ctx.NewSocket(zmq4.SUB)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create ZMQ subscriber socket: %w", err)
@@ -44,7 +82,7 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 
 	// Until the receive goroutine below takes ownership, every error path must close the
 	// socket — a leaked socket blocks Close()'s ctx.Term() forever.
-	closeAndErr := func(err error) (<-chan struct{}, <-chan error, error) {
+	closeAndErr := func(err error) (<-chan BlockNotification, <-chan error, error) {
 		if closeErr := zmqSocket.Close(); closeErr != nil {
 			err = fmt.Errorf("%w (also failed to close socket: %w)", err, closeErr)
 		}
@@ -68,7 +106,7 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 
 	logger := logging.GetLoggerFromContext(ctx).With(zap.String("subscription", filter))
 
-	msgChan := make(chan struct{}, 10)
+	msgChan := make(chan BlockNotification, 10)
 	errChan := make(chan error)
 
 	go func() {
@@ -90,7 +128,7 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 				return
 			default:
 				logger.Info("[zmq] Waiting for message...")
-				_, err := zmqSocket.RecvMessage(0)
+				msg, err := zmqSocket.RecvMessageBytes(0)
 				if err != nil {
 					if zmq4.AsErrno(err) != zmq4.ETERM {
 						logger.Error("[zmq] Failed to receive message", zap.Error(err))
@@ -106,8 +144,13 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 				}
 
 				logger.Info("[zmq] Message received!")
+				// Message parts are [topic, payload, sequence].
+				notification := BlockNotification{}
+				if len(msg) >= 2 {
+					notification = parseBlockNotification(msg[1])
+				}
 				select {
-				case msgChan <- struct{}{}:
+				case msgChan <- notification:
 				case <-time.After(5 * time.Second):
 					logger.Warn("[zmq] Message channel is full, dropping message...")
 				case <-ctx.Done():
