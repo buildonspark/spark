@@ -16729,6 +16729,272 @@ var _ interface {
 	ErrorName() string
 } = TokenTransactionRollbackRequestValidationError{}
 
+// Validate checks the field values on DelegationGrantPrepareRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *DelegationGrantPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DelegationGrantPrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// DelegationGrantPrepareRequestMultiError, or nil if none found.
+func (m *DelegationGrantPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DelegationGrantPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DelegationGrantPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DelegationGrantPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DelegationGrantPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return DelegationGrantPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// DelegationGrantPrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by DelegationGrantPrepareRequest.ValidateAll()
+// if the designated constraints aren't met.
+type DelegationGrantPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DelegationGrantPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DelegationGrantPrepareRequestMultiError) AllErrors() []error { return m }
+
+// DelegationGrantPrepareRequestValidationError is the validation error
+// returned by DelegationGrantPrepareRequest.Validate if the designated
+// constraints aren't met.
+type DelegationGrantPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DelegationGrantPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DelegationGrantPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DelegationGrantPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DelegationGrantPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DelegationGrantPrepareRequestValidationError) ErrorName() string {
+	return "DelegationGrantPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DelegationGrantPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDelegationGrantPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DelegationGrantPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DelegationGrantPrepareRequestValidationError{}
+
+// Validate checks the field values on InstallDecompositionsPrepareRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InstallDecompositionsPrepareRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InstallDecompositionsPrepareRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InstallDecompositionsPrepareRequestMultiError, or nil if none found.
+func (m *InstallDecompositionsPrepareRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InstallDecompositionsPrepareRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOriginalRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InstallDecompositionsPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InstallDecompositionsPrepareRequestValidationError{
+					field:  "OriginalRequest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOriginalRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InstallDecompositionsPrepareRequestValidationError{
+				field:  "OriginalRequest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return InstallDecompositionsPrepareRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InstallDecompositionsPrepareRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// InstallDecompositionsPrepareRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InstallDecompositionsPrepareRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InstallDecompositionsPrepareRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InstallDecompositionsPrepareRequestMultiError) AllErrors() []error { return m }
+
+// InstallDecompositionsPrepareRequestValidationError is the validation error
+// returned by InstallDecompositionsPrepareRequest.Validate if the designated
+// constraints aren't met.
+type InstallDecompositionsPrepareRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InstallDecompositionsPrepareRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InstallDecompositionsPrepareRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InstallDecompositionsPrepareRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InstallDecompositionsPrepareRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InstallDecompositionsPrepareRequestValidationError) ErrorName() string {
+	return "InstallDecompositionsPrepareRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InstallDecompositionsPrepareRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInstallDecompositionsPrepareRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InstallDecompositionsPrepareRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InstallDecompositionsPrepareRequestValidationError{}
+
 // Validate checks the field values on ConsensusPrepareRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

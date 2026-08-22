@@ -274,6 +274,493 @@ func (ce *CooperativeExitExample) Exec(ctx context.Context) (*ent.CooperativeExi
 	return create.Save(ctx)
 }
 
+// DelegationGrantExample is a test fixture builder for DelegationGrant.
+type DelegationGrantExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	OwnerIdentityPubkey        *keys.Public
+	Network                    *btcnetwork.Network
+	ExpiryTime                 *time.Time
+	ScopeTransfer              *bool
+	ScopeRenew                 *bool
+	ScopeClaim                 *bool
+	FeeFlatSats                *uint64
+	FeeCollectorIdentityPubkey *keys.Public
+	Version                    *uint64
+	OwnerSignature             *[]byte
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	Spenders           []*ent.DelegationGrantSpender
+	LeafDecompositions []*ent.LeafDecomposition
+}
+
+// NewDelegationGrantExample creates a new DelegationGrantExample for testing.
+func NewDelegationGrantExample(t *testing.T, client *ent.Client) *DelegationGrantExample {
+	return &DelegationGrantExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetOwnerIdentityPubkey sets the owner_identity_pubkey field.
+func (dg *DelegationGrantExample) SetOwnerIdentityPubkey(v keys.Public) *DelegationGrantExample {
+	dg.OwnerIdentityPubkey = &v
+	return dg
+}
+
+// SetNetwork sets the network field.
+func (dg *DelegationGrantExample) SetNetwork(v btcnetwork.Network) *DelegationGrantExample {
+	dg.Network = &v
+	return dg
+}
+
+// SetExpiryTime sets the expiry_time field.
+func (dg *DelegationGrantExample) SetExpiryTime(v time.Time) *DelegationGrantExample {
+	dg.ExpiryTime = &v
+	return dg
+}
+
+// SetScopeTransfer sets the scope_transfer field.
+func (dg *DelegationGrantExample) SetScopeTransfer(v bool) *DelegationGrantExample {
+	dg.ScopeTransfer = &v
+	return dg
+}
+
+// SetScopeRenew sets the scope_renew field.
+func (dg *DelegationGrantExample) SetScopeRenew(v bool) *DelegationGrantExample {
+	dg.ScopeRenew = &v
+	return dg
+}
+
+// SetScopeClaim sets the scope_claim field.
+func (dg *DelegationGrantExample) SetScopeClaim(v bool) *DelegationGrantExample {
+	dg.ScopeClaim = &v
+	return dg
+}
+
+// SetFeeFlatSats sets the fee_flat_sats field.
+func (dg *DelegationGrantExample) SetFeeFlatSats(v uint64) *DelegationGrantExample {
+	dg.FeeFlatSats = &v
+	return dg
+}
+
+// SetFeeCollectorIdentityPubkey sets the fee_collector_identity_pubkey field.
+func (dg *DelegationGrantExample) SetFeeCollectorIdentityPubkey(v keys.Public) *DelegationGrantExample {
+	dg.FeeCollectorIdentityPubkey = &v
+	return dg
+}
+
+// SetVersion sets the version field.
+func (dg *DelegationGrantExample) SetVersion(v uint64) *DelegationGrantExample {
+	dg.Version = &v
+	return dg
+}
+
+// SetOwnerSignature sets the owner_signature field.
+func (dg *DelegationGrantExample) SetOwnerSignature(v []byte) *DelegationGrantExample {
+	dg.OwnerSignature = &v
+	return dg
+}
+
+// AddSpender adds a DelegationGrantSpender to the spenders edge.
+func (dg *DelegationGrantExample) AddSpender(v *ent.DelegationGrantSpender) *DelegationGrantExample {
+	dg.Spenders = append(dg.Spenders, v)
+	return dg
+}
+
+// SetSpenders sets the spenders edge.
+func (dg *DelegationGrantExample) SetSpenders(v []*ent.DelegationGrantSpender) *DelegationGrantExample {
+	dg.Spenders = v
+	return dg
+}
+
+// AddLeafDecomposition adds a LeafDecomposition to the leaf_decompositions edge.
+func (dg *DelegationGrantExample) AddLeafDecomposition(v *ent.LeafDecomposition) *DelegationGrantExample {
+	dg.LeafDecompositions = append(dg.LeafDecompositions, v)
+	return dg
+}
+
+// SetLeafDecompositions sets the leaf_decompositions edge.
+func (dg *DelegationGrantExample) SetLeafDecompositions(v []*ent.LeafDecomposition) *DelegationGrantExample {
+	dg.LeafDecompositions = v
+	return dg
+}
+
+// MustExec builds and saves the DelegationGrant entity to the database.
+// It panics if the save fails.
+func (dg *DelegationGrantExample) MustExec(ctx context.Context) *ent.DelegationGrant {
+	create := dg.client.DelegationGrant.Create()
+
+	// Set fields
+	if dg.OwnerIdentityPubkey != nil {
+		create.SetOwnerIdentityPubkey(*dg.OwnerIdentityPubkey)
+	} else {
+		// Use default from annotation
+		create.SetOwnerIdentityPubkey(keys.MustParsePublicKeyHex("02e6858515f7f886842537c752983fa3c3bc7f4b7d35057ae1e0477f637551d7e8"))
+	}
+	if dg.Network != nil {
+		create.SetNetwork(*dg.Network)
+	} else {
+		// Use default from annotation
+		create.SetNetwork(2)
+	}
+	if dg.ExpiryTime != nil {
+		create.SetExpiryTime(*dg.ExpiryTime)
+	} else {
+		// Use default from annotation
+		create.SetExpiryTime(func() time.Time { t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z"); return t }())
+	}
+	if dg.ScopeTransfer != nil {
+		create.SetScopeTransfer(*dg.ScopeTransfer)
+	} else {
+		// Use default from annotation
+		create.SetScopeTransfer(true)
+	}
+	if dg.ScopeRenew != nil {
+		create.SetScopeRenew(*dg.ScopeRenew)
+	} else {
+		// Use default from annotation
+		create.SetScopeRenew(false)
+	}
+	if dg.ScopeClaim != nil {
+		create.SetScopeClaim(*dg.ScopeClaim)
+	} else {
+		// Use default from annotation
+		create.SetScopeClaim(false)
+	}
+	if dg.FeeFlatSats != nil {
+		create.SetFeeFlatSats(*dg.FeeFlatSats)
+	} else {
+		// Use default from annotation
+		create.SetFeeFlatSats(uint64(0))
+	}
+	if dg.FeeCollectorIdentityPubkey != nil {
+		create.SetFeeCollectorIdentityPubkey(*dg.FeeCollectorIdentityPubkey)
+	} else {
+	}
+	if dg.Version != nil {
+		create.SetVersion(*dg.Version)
+	} else {
+		// Use default from annotation
+		create.SetVersion(uint64(1))
+	}
+	if dg.OwnerSignature != nil {
+		create.SetOwnerSignature(*dg.OwnerSignature)
+	} else {
+		// Use default from annotation
+		create.SetOwnerSignature(func() []byte {
+			b, _ := hex.DecodeString("304402207608dd0339b19f4be059b9ca48bfe17f580f887227e30451eb35f6eb5c59ec7e02201950d40ae09d7d6c2c7ede109573021ac59a65347b0512d94172758ab4a3918f")
+			return b
+		}())
+	}
+
+	// Handle edges
+	if len(dg.Spenders) > 0 {
+		create.AddSpenders(dg.Spenders...)
+	}
+	if len(dg.LeafDecompositions) > 0 {
+		create.AddLeafDecompositions(dg.LeafDecompositions...)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		dg.t.Helper()
+		dg.t.Fatalf("failed to create DelegationGrant: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the DelegationGrant entity to the database.
+// It returns an error if the save fails.
+func (dg *DelegationGrantExample) Exec(ctx context.Context) (*ent.DelegationGrant, error) {
+	create := dg.client.DelegationGrant.Create()
+
+	// Set fields
+	if dg.OwnerIdentityPubkey != nil {
+		create.SetOwnerIdentityPubkey(*dg.OwnerIdentityPubkey)
+	} else {
+		// Use default from annotation
+		create.SetOwnerIdentityPubkey(keys.MustParsePublicKeyHex("02e6858515f7f886842537c752983fa3c3bc7f4b7d35057ae1e0477f637551d7e8"))
+	}
+	if dg.Network != nil {
+		create.SetNetwork(*dg.Network)
+	} else {
+		// Use default from annotation
+		create.SetNetwork(2)
+	}
+	if dg.ExpiryTime != nil {
+		create.SetExpiryTime(*dg.ExpiryTime)
+	} else {
+		// Use default from annotation
+		create.SetExpiryTime(func() time.Time { t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z"); return t }())
+	}
+	if dg.ScopeTransfer != nil {
+		create.SetScopeTransfer(*dg.ScopeTransfer)
+	} else {
+		// Use default from annotation
+		create.SetScopeTransfer(true)
+	}
+	if dg.ScopeRenew != nil {
+		create.SetScopeRenew(*dg.ScopeRenew)
+	} else {
+		// Use default from annotation
+		create.SetScopeRenew(false)
+	}
+	if dg.ScopeClaim != nil {
+		create.SetScopeClaim(*dg.ScopeClaim)
+	} else {
+		// Use default from annotation
+		create.SetScopeClaim(false)
+	}
+	if dg.FeeFlatSats != nil {
+		create.SetFeeFlatSats(*dg.FeeFlatSats)
+	} else {
+		// Use default from annotation
+		create.SetFeeFlatSats(uint64(0))
+	}
+	if dg.FeeCollectorIdentityPubkey != nil {
+		create.SetFeeCollectorIdentityPubkey(*dg.FeeCollectorIdentityPubkey)
+	} else {
+	}
+	if dg.Version != nil {
+		create.SetVersion(*dg.Version)
+	} else {
+		// Use default from annotation
+		create.SetVersion(uint64(1))
+	}
+	if dg.OwnerSignature != nil {
+		create.SetOwnerSignature(*dg.OwnerSignature)
+	} else {
+		// Use default from annotation
+		create.SetOwnerSignature(func() []byte {
+			b, _ := hex.DecodeString("304402207608dd0339b19f4be059b9ca48bfe17f580f887227e30451eb35f6eb5c59ec7e02201950d40ae09d7d6c2c7ede109573021ac59a65347b0512d94172758ab4a3918f")
+			return b
+		}())
+	}
+
+	// Handle edges
+	if len(dg.Spenders) > 0 {
+		create.AddSpenders(dg.Spenders...)
+	}
+	if len(dg.LeafDecompositions) > 0 {
+		create.AddLeafDecompositions(dg.LeafDecompositions...)
+	}
+
+	return create.Save(ctx)
+}
+
+// DelegationGrantSpenderExample is a test fixture builder for DelegationGrantSpender.
+type DelegationGrantSpenderExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	SpenderIdentityPubkey *keys.Public
+	PerTxCapSats          *uint64
+	RollingLimitSats      *uint64
+	RollingWindowSeconds  *uint64
+	WindowStart           *time.Time
+	Version               *uint64
+	OwnerSignature        *[]byte
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	DelegationGrant *ent.DelegationGrant
+}
+
+// NewDelegationGrantSpenderExample creates a new DelegationGrantSpenderExample for testing.
+func NewDelegationGrantSpenderExample(t *testing.T, client *ent.Client) *DelegationGrantSpenderExample {
+	return &DelegationGrantSpenderExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetSpenderIdentityPubkey sets the spender_identity_pubkey field.
+func (dgs *DelegationGrantSpenderExample) SetSpenderIdentityPubkey(v keys.Public) *DelegationGrantSpenderExample {
+	dgs.SpenderIdentityPubkey = &v
+	return dgs
+}
+
+// SetPerTxCapSats sets the per_tx_cap_sats field.
+func (dgs *DelegationGrantSpenderExample) SetPerTxCapSats(v uint64) *DelegationGrantSpenderExample {
+	dgs.PerTxCapSats = &v
+	return dgs
+}
+
+// SetRollingLimitSats sets the rolling_limit_sats field.
+func (dgs *DelegationGrantSpenderExample) SetRollingLimitSats(v uint64) *DelegationGrantSpenderExample {
+	dgs.RollingLimitSats = &v
+	return dgs
+}
+
+// SetRollingWindowSeconds sets the rolling_window_seconds field.
+func (dgs *DelegationGrantSpenderExample) SetRollingWindowSeconds(v uint64) *DelegationGrantSpenderExample {
+	dgs.RollingWindowSeconds = &v
+	return dgs
+}
+
+// SetWindowStart sets the window_start field.
+func (dgs *DelegationGrantSpenderExample) SetWindowStart(v time.Time) *DelegationGrantSpenderExample {
+	dgs.WindowStart = &v
+	return dgs
+}
+
+// SetVersion sets the version field.
+func (dgs *DelegationGrantSpenderExample) SetVersion(v uint64) *DelegationGrantSpenderExample {
+	dgs.Version = &v
+	return dgs
+}
+
+// SetOwnerSignature sets the owner_signature field.
+func (dgs *DelegationGrantSpenderExample) SetOwnerSignature(v []byte) *DelegationGrantSpenderExample {
+	dgs.OwnerSignature = &v
+	return dgs
+}
+
+// SetDelegationGrant sets the delegation_grant edge.
+func (dgs *DelegationGrantSpenderExample) SetDelegationGrant(v *ent.DelegationGrant) *DelegationGrantSpenderExample {
+	dgs.DelegationGrant = v
+	return dgs
+}
+
+// MustExec builds and saves the DelegationGrantSpender entity to the database.
+// It panics if the save fails.
+func (dgs *DelegationGrantSpenderExample) MustExec(ctx context.Context) *ent.DelegationGrantSpender {
+	create := dgs.client.DelegationGrantSpender.Create()
+
+	// Set fields
+	if dgs.SpenderIdentityPubkey != nil {
+		create.SetSpenderIdentityPubkey(*dgs.SpenderIdentityPubkey)
+	} else {
+		// Use default from annotation
+		create.SetSpenderIdentityPubkey(keys.MustParsePublicKeyHex("02ca75659458529755b77663f18282f4aa130313e098fac40deffb1208207a2ffe"))
+	}
+	if dgs.PerTxCapSats != nil {
+		create.SetPerTxCapSats(*dgs.PerTxCapSats)
+	} else {
+		// Use default from annotation
+		create.SetPerTxCapSats(uint64(0))
+	}
+	if dgs.RollingLimitSats != nil {
+		create.SetRollingLimitSats(*dgs.RollingLimitSats)
+	} else {
+		// Use default from annotation
+		create.SetRollingLimitSats(uint64(0))
+	}
+	if dgs.RollingWindowSeconds != nil {
+		create.SetRollingWindowSeconds(*dgs.RollingWindowSeconds)
+	} else {
+		// Use default from annotation
+		create.SetRollingWindowSeconds(uint64(0))
+	}
+	if dgs.WindowStart != nil {
+		create.SetWindowStart(*dgs.WindowStart)
+	} else {
+	}
+	if dgs.Version != nil {
+		create.SetVersion(*dgs.Version)
+	} else {
+		// Use default from annotation
+		create.SetVersion(uint64(1))
+	}
+	if dgs.OwnerSignature != nil {
+		create.SetOwnerSignature(*dgs.OwnerSignature)
+	} else {
+		// Use default from annotation
+		create.SetOwnerSignature(func() []byte {
+			b, _ := hex.DecodeString("304402207608dd0339b19f4be059b9ca48bfe17f580f887227e30451eb35f6eb5c59ec7e02201950d40ae09d7d6c2c7ede109573021ac59a65347b0512d94172758ab4a3918f")
+			return b
+		}())
+	}
+
+	// Handle edges
+	if dgs.DelegationGrant != nil {
+		create.SetDelegationGrant(dgs.DelegationGrant)
+	} else {
+		// Auto-create required edge
+		dgs.t.Helper()
+		dgs.DelegationGrant = NewDelegationGrantExample(dgs.t, dgs.client).MustExec(ctx)
+		create.SetDelegationGrant(dgs.DelegationGrant)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		dgs.t.Helper()
+		dgs.t.Fatalf("failed to create DelegationGrantSpender: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the DelegationGrantSpender entity to the database.
+// It returns an error if the save fails.
+func (dgs *DelegationGrantSpenderExample) Exec(ctx context.Context) (*ent.DelegationGrantSpender, error) {
+	create := dgs.client.DelegationGrantSpender.Create()
+
+	// Set fields
+	if dgs.SpenderIdentityPubkey != nil {
+		create.SetSpenderIdentityPubkey(*dgs.SpenderIdentityPubkey)
+	} else {
+		// Use default from annotation
+		create.SetSpenderIdentityPubkey(keys.MustParsePublicKeyHex("02ca75659458529755b77663f18282f4aa130313e098fac40deffb1208207a2ffe"))
+	}
+	if dgs.PerTxCapSats != nil {
+		create.SetPerTxCapSats(*dgs.PerTxCapSats)
+	} else {
+		// Use default from annotation
+		create.SetPerTxCapSats(uint64(0))
+	}
+	if dgs.RollingLimitSats != nil {
+		create.SetRollingLimitSats(*dgs.RollingLimitSats)
+	} else {
+		// Use default from annotation
+		create.SetRollingLimitSats(uint64(0))
+	}
+	if dgs.RollingWindowSeconds != nil {
+		create.SetRollingWindowSeconds(*dgs.RollingWindowSeconds)
+	} else {
+		// Use default from annotation
+		create.SetRollingWindowSeconds(uint64(0))
+	}
+	if dgs.WindowStart != nil {
+		create.SetWindowStart(*dgs.WindowStart)
+	} else {
+	}
+	if dgs.Version != nil {
+		create.SetVersion(*dgs.Version)
+	} else {
+		// Use default from annotation
+		create.SetVersion(uint64(1))
+	}
+	if dgs.OwnerSignature != nil {
+		create.SetOwnerSignature(*dgs.OwnerSignature)
+	} else {
+		// Use default from annotation
+		create.SetOwnerSignature(func() []byte {
+			b, _ := hex.DecodeString("304402207608dd0339b19f4be059b9ca48bfe17f580f887227e30451eb35f6eb5c59ec7e02201950d40ae09d7d6c2c7ede109573021ac59a65347b0512d94172758ab4a3918f")
+			return b
+		}())
+	}
+
+	// Handle edges
+	if dgs.DelegationGrant != nil {
+		create.SetDelegationGrant(dgs.DelegationGrant)
+	} else {
+		// Auto-create required edge
+		var err error
+		dgs.DelegationGrant, err = NewDelegationGrantExample(dgs.t, dgs.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create delegation_grant: %w", err)
+		}
+		create.SetDelegationGrant(dgs.DelegationGrant)
+	}
+
+	return create.Save(ctx)
+}
+
 // DepositAddressExample is a test fixture builder for DepositAddress.
 type DepositAddressExample struct {
 	client *ent.Client
@@ -1878,6 +2365,138 @@ func (lt *L1WithdrawalTransactionExample) Exec(ctx context.Context) (*ent.L1With
 			return nil, fmt.Errorf("failed to create se_entity: %w", err)
 		}
 		create.SetSeEntity(lt.SeEntity)
+	}
+
+	return create.Save(ctx)
+}
+
+// LeafDecompositionExample is a test fixture builder for LeafDecomposition.
+type LeafDecompositionExample struct {
+	client *ent.Client
+	t      *testing.T
+
+	// Fields - use pointers to distinguish between "not set" and "set to zero value"
+	DelegateSigningPubkey *keys.Public
+
+	// Edges - if set, use the provided entity; if nil, create a default one
+	TreeNode        *ent.TreeNode
+	SigningKeyshare *ent.SigningKeyshare
+	DelegationGrant *ent.DelegationGrant
+}
+
+// NewLeafDecompositionExample creates a new LeafDecompositionExample for testing.
+func NewLeafDecompositionExample(t *testing.T, client *ent.Client) *LeafDecompositionExample {
+	return &LeafDecompositionExample{
+		client: client,
+		t:      t,
+	}
+}
+
+// SetDelegateSigningPubkey sets the delegate_signing_pubkey field.
+func (ld *LeafDecompositionExample) SetDelegateSigningPubkey(v keys.Public) *LeafDecompositionExample {
+	ld.DelegateSigningPubkey = &v
+	return ld
+}
+
+// SetTreeNode sets the tree_node edge.
+func (ld *LeafDecompositionExample) SetTreeNode(v *ent.TreeNode) *LeafDecompositionExample {
+	ld.TreeNode = v
+	return ld
+}
+
+// SetSigningKeyshare sets the signing_keyshare edge.
+func (ld *LeafDecompositionExample) SetSigningKeyshare(v *ent.SigningKeyshare) *LeafDecompositionExample {
+	ld.SigningKeyshare = v
+	return ld
+}
+
+// SetDelegationGrant sets the delegation_grant edge.
+func (ld *LeafDecompositionExample) SetDelegationGrant(v *ent.DelegationGrant) *LeafDecompositionExample {
+	ld.DelegationGrant = v
+	return ld
+}
+
+// MustExec builds and saves the LeafDecomposition entity to the database.
+// It panics if the save fails.
+func (ld *LeafDecompositionExample) MustExec(ctx context.Context) *ent.LeafDecomposition {
+	create := ld.client.LeafDecomposition.Create()
+
+	// Set fields
+	if ld.DelegateSigningPubkey != nil {
+		create.SetDelegateSigningPubkey(*ld.DelegateSigningPubkey)
+	} else {
+		// Use default from annotation
+		create.SetDelegateSigningPubkey(keys.MustParsePublicKeyHex("02008022cc74b350a1fea49d1cfc2ded422ad1bfe8eeea0f25cb90b02dad091706"))
+	}
+
+	// Handle edges
+	if ld.TreeNode != nil {
+		create.SetTreeNode(ld.TreeNode)
+	} else {
+		// Auto-create required edge
+		ld.t.Helper()
+		ld.TreeNode = NewTreeNodeExample(ld.t, ld.client).MustExec(ctx)
+		create.SetTreeNode(ld.TreeNode)
+	}
+	if ld.SigningKeyshare != nil {
+		create.SetSigningKeyshare(ld.SigningKeyshare)
+	}
+	if ld.DelegationGrant != nil {
+		create.SetDelegationGrant(ld.DelegationGrant)
+	} else {
+		// Auto-create required edge
+		ld.t.Helper()
+		ld.DelegationGrant = NewDelegationGrantExample(ld.t, ld.client).MustExec(ctx)
+		create.SetDelegationGrant(ld.DelegationGrant)
+	}
+
+	entity, err := create.Save(ctx)
+	if err != nil {
+		ld.t.Helper()
+		ld.t.Fatalf("failed to create LeafDecomposition: %v", err)
+	}
+
+	return entity
+}
+
+// Exec builds and saves the LeafDecomposition entity to the database.
+// It returns an error if the save fails.
+func (ld *LeafDecompositionExample) Exec(ctx context.Context) (*ent.LeafDecomposition, error) {
+	create := ld.client.LeafDecomposition.Create()
+
+	// Set fields
+	if ld.DelegateSigningPubkey != nil {
+		create.SetDelegateSigningPubkey(*ld.DelegateSigningPubkey)
+	} else {
+		// Use default from annotation
+		create.SetDelegateSigningPubkey(keys.MustParsePublicKeyHex("02008022cc74b350a1fea49d1cfc2ded422ad1bfe8eeea0f25cb90b02dad091706"))
+	}
+
+	// Handle edges
+	if ld.TreeNode != nil {
+		create.SetTreeNode(ld.TreeNode)
+	} else {
+		// Auto-create required edge
+		var err error
+		ld.TreeNode, err = NewTreeNodeExample(ld.t, ld.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tree_node: %w", err)
+		}
+		create.SetTreeNode(ld.TreeNode)
+	}
+	if ld.SigningKeyshare != nil {
+		create.SetSigningKeyshare(ld.SigningKeyshare)
+	}
+	if ld.DelegationGrant != nil {
+		create.SetDelegationGrant(ld.DelegationGrant)
+	} else {
+		// Auto-create required edge
+		var err error
+		ld.DelegationGrant, err = NewDelegationGrantExample(ld.t, ld.client).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create delegation_grant: %w", err)
+		}
+		create.SetDelegationGrant(ld.DelegationGrant)
 	}
 
 	return create.Save(ctx)

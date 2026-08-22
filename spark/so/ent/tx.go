@@ -18,6 +18,10 @@ type Tx struct {
 	BlockHeight *BlockHeightClient
 	// CooperativeExit is the client for interacting with the CooperativeExit builders.
 	CooperativeExit *CooperativeExitClient
+	// DelegationGrant is the client for interacting with the DelegationGrant builders.
+	DelegationGrant *DelegationGrantClient
+	// DelegationGrantSpender is the client for interacting with the DelegationGrantSpender builders.
+	DelegationGrantSpender *DelegationGrantSpenderClient
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
 	// EntityDkgKey is the client for interacting with the EntityDkgKey builders.
@@ -38,6 +42,8 @@ type Tx struct {
 	L1TokenOutputWithdrawal *L1TokenOutputWithdrawalClient
 	// L1WithdrawalTransaction is the client for interacting with the L1WithdrawalTransaction builders.
 	L1WithdrawalTransaction *L1WithdrawalTransactionClient
+	// LeafDecomposition is the client for interacting with the LeafDecomposition builders.
+	LeafDecomposition *LeafDecompositionClient
 	// MultisigConfig is the client for interacting with the MultisigConfig builders.
 	MultisigConfig *MultisigConfigClient
 	// MultisigMember is the client for interacting with the MultisigMember builders.
@@ -237,6 +243,8 @@ func (tx *Tx) Client() *Client {
 func (tx *Tx) init() {
 	tx.BlockHeight = NewBlockHeightClient(tx.config)
 	tx.CooperativeExit = NewCooperativeExitClient(tx.config)
+	tx.DelegationGrant = NewDelegationGrantClient(tx.config)
+	tx.DelegationGrantSpender = NewDelegationGrantSpenderClient(tx.config)
 	tx.DepositAddress = NewDepositAddressClient(tx.config)
 	tx.EntityDkgKey = NewEntityDkgKeyClient(tx.config)
 	tx.EventMessage = NewEventMessageClient(tx.config)
@@ -247,6 +255,7 @@ func (tx *Tx) init() {
 	tx.L1TokenJusticeTransaction = NewL1TokenJusticeTransactionClient(tx.config)
 	tx.L1TokenOutputWithdrawal = NewL1TokenOutputWithdrawalClient(tx.config)
 	tx.L1WithdrawalTransaction = NewL1WithdrawalTransactionClient(tx.config)
+	tx.LeafDecomposition = NewLeafDecompositionClient(tx.config)
 	tx.MultisigConfig = NewMultisigConfigClient(tx.config)
 	tx.MultisigMember = NewMultisigMemberClient(tx.config)
 	tx.Partner = NewPartnerClient(tx.config)

@@ -39,6 +39,9 @@ var (
 	_ = spark.Network(0)
 )
 
+// define the regex for a UUID once up-front
+var _gossip_uuidPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
 // Validate checks the field values on GossipMessage with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -966,6 +969,129 @@ func (m *GossipMessage) validate(all bool) error {
 			}
 		}
 
+	case *GossipMessage_RevokeDelegationGrant:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetRevokeDelegationGrant()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "RevokeDelegationGrant",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "RevokeDelegationGrant",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetRevokeDelegationGrant()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "RevokeDelegationGrant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *GossipMessage_AddDelegationSpender:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetAddDelegationSpender()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "AddDelegationSpender",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "AddDelegationSpender",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAddDelegationSpender()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "AddDelegationSpender",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *GossipMessage_RevokeDelegationSpender:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetRevokeDelegationSpender()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "RevokeDelegationSpender",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "RevokeDelegationSpender",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetRevokeDelegationSpender()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "RevokeDelegationSpender",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	case *GossipMessage_RevokeTokenAllowance:
 		if v == nil {
 			err := GossipMessageValidationError{
@@ -1088,6 +1214,567 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GossipMessageValidationError{}
+
+// Validate checks the field values on GossipMessageRevokeDelegationGrant with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *GossipMessageRevokeDelegationGrant) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GossipMessageRevokeDelegationGrant
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// GossipMessageRevokeDelegationGrantMultiError, or nil if none found.
+func (m *GossipMessageRevokeDelegationGrant) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessageRevokeDelegationGrant) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = GossipMessageRevokeDelegationGrantValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetVersion() < 1 {
+		err := GossipMessageRevokeDelegationGrantValidationError{
+			field:  "Version",
+			reason: "value must be greater than or equal to 1",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetOwnerIdentityPublicKey()) != 33 {
+		err := GossipMessageRevokeDelegationGrantValidationError{
+			field:  "OwnerIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := GossipMessageRevokeDelegationGrantValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetRevokedAt()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GossipMessageRevokeDelegationGrantValidationError{
+					field:  "RevokedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GossipMessageRevokeDelegationGrantValidationError{
+					field:  "RevokedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRevokedAt()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GossipMessageRevokeDelegationGrantValidationError{
+				field:  "RevokedAt",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GossipMessageRevokeDelegationGrantMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *GossipMessageRevokeDelegationGrant) _validateUuid(uuid string) error {
+	if matched := _gossip_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// GossipMessageRevokeDelegationGrantMultiError is an error wrapping multiple
+// validation errors returned by
+// GossipMessageRevokeDelegationGrant.ValidateAll() if the designated
+// constraints aren't met.
+type GossipMessageRevokeDelegationGrantMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessageRevokeDelegationGrantMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessageRevokeDelegationGrantMultiError) AllErrors() []error { return m }
+
+// GossipMessageRevokeDelegationGrantValidationError is the validation error
+// returned by GossipMessageRevokeDelegationGrant.Validate if the designated
+// constraints aren't met.
+type GossipMessageRevokeDelegationGrantValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessageRevokeDelegationGrantValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessageRevokeDelegationGrantValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessageRevokeDelegationGrantValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessageRevokeDelegationGrantValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessageRevokeDelegationGrantValidationError) ErrorName() string {
+	return "GossipMessageRevokeDelegationGrantValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessageRevokeDelegationGrantValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessageRevokeDelegationGrant.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessageRevokeDelegationGrantValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessageRevokeDelegationGrantValidationError{}
+
+// Validate checks the field values on GossipMessageAddDelegationSpender with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *GossipMessageAddDelegationSpender) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GossipMessageAddDelegationSpender
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// GossipMessageAddDelegationSpenderMultiError, or nil if none found.
+func (m *GossipMessageAddDelegationSpender) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessageAddDelegationSpender) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = GossipMessageAddDelegationSpenderValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetSpender() == nil {
+		err := GossipMessageAddDelegationSpenderValidationError{
+			field:  "Spender",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetSpender()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GossipMessageAddDelegationSpenderValidationError{
+					field:  "Spender",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GossipMessageAddDelegationSpenderValidationError{
+					field:  "Spender",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSpender()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GossipMessageAddDelegationSpenderValidationError{
+				field:  "Spender",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetVersion() < 1 {
+		err := GossipMessageAddDelegationSpenderValidationError{
+			field:  "Version",
+			reason: "value must be greater than or equal to 1",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := GossipMessageAddDelegationSpenderValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return GossipMessageAddDelegationSpenderMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *GossipMessageAddDelegationSpender) _validateUuid(uuid string) error {
+	if matched := _gossip_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// GossipMessageAddDelegationSpenderMultiError is an error wrapping multiple
+// validation errors returned by
+// GossipMessageAddDelegationSpender.ValidateAll() if the designated
+// constraints aren't met.
+type GossipMessageAddDelegationSpenderMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessageAddDelegationSpenderMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessageAddDelegationSpenderMultiError) AllErrors() []error { return m }
+
+// GossipMessageAddDelegationSpenderValidationError is the validation error
+// returned by GossipMessageAddDelegationSpender.Validate if the designated
+// constraints aren't met.
+type GossipMessageAddDelegationSpenderValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessageAddDelegationSpenderValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessageAddDelegationSpenderValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessageAddDelegationSpenderValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessageAddDelegationSpenderValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessageAddDelegationSpenderValidationError) ErrorName() string {
+	return "GossipMessageAddDelegationSpenderValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessageAddDelegationSpenderValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessageAddDelegationSpender.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessageAddDelegationSpenderValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessageAddDelegationSpenderValidationError{}
+
+// Validate checks the field values on GossipMessageRevokeDelegationSpender
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *GossipMessageRevokeDelegationSpender) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GossipMessageRevokeDelegationSpender
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// GossipMessageRevokeDelegationSpenderMultiError, or nil if none found.
+func (m *GossipMessageRevokeDelegationSpender) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessageRevokeDelegationSpender) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = GossipMessageRevokeDelegationSpenderValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetSpenderIdentityPublicKey()) != 33 {
+		err := GossipMessageRevokeDelegationSpenderValidationError{
+			field:  "SpenderIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetVersion() < 1 {
+		err := GossipMessageRevokeDelegationSpenderValidationError{
+			field:  "Version",
+			reason: "value must be greater than or equal to 1",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := GossipMessageRevokeDelegationSpenderValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetRevokedAt()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GossipMessageRevokeDelegationSpenderValidationError{
+					field:  "RevokedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GossipMessageRevokeDelegationSpenderValidationError{
+					field:  "RevokedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRevokedAt()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GossipMessageRevokeDelegationSpenderValidationError{
+				field:  "RevokedAt",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GossipMessageRevokeDelegationSpenderMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *GossipMessageRevokeDelegationSpender) _validateUuid(uuid string) error {
+	if matched := _gossip_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// GossipMessageRevokeDelegationSpenderMultiError is an error wrapping multiple
+// validation errors returned by
+// GossipMessageRevokeDelegationSpender.ValidateAll() if the designated
+// constraints aren't met.
+type GossipMessageRevokeDelegationSpenderMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessageRevokeDelegationSpenderMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessageRevokeDelegationSpenderMultiError) AllErrors() []error { return m }
+
+// GossipMessageRevokeDelegationSpenderValidationError is the validation error
+// returned by GossipMessageRevokeDelegationSpender.Validate if the designated
+// constraints aren't met.
+type GossipMessageRevokeDelegationSpenderValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessageRevokeDelegationSpenderValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessageRevokeDelegationSpenderValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessageRevokeDelegationSpenderValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessageRevokeDelegationSpenderValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessageRevokeDelegationSpenderValidationError) ErrorName() string {
+	return "GossipMessageRevokeDelegationSpenderValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessageRevokeDelegationSpenderValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessageRevokeDelegationSpender.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessageRevokeDelegationSpenderValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessageRevokeDelegationSpenderValidationError{}
 
 // Validate checks the field values on GossipMessageCancelTransfer with the
 // rules defined in the proto definition for this message. If any rules are

@@ -170,6 +170,32 @@ export class Hasher {
   }
 
   /**
+   * Adds a map<string, uint64> to the hash computation. Mirrors Go's
+   * hashstructure.AddMapStringToUint64 exactly: the count, then each pair
+   * sorted by key, keys compared bytewise as Go's slices.Sort does on strings.
+   *
+   * Format: [count (uint64)] [key1 (string)] [value1 (uint64)] ...
+   */
+  addMapStringToUint64(m: Record<string, number | bigint>): Hasher {
+    this.addUint64(Object.keys(m).length);
+
+    const encoder = new TextEncoder();
+    const pairs = Object.entries(m).map(([key, value]) => ({
+      key,
+      value,
+      keyBytes: encoder.encode(key),
+    }));
+    pairs.sort((a, b) => compareBytes(a.keyBytes, b.keyBytes));
+
+    for (const pair of pairs) {
+      this.addString(pair.key);
+      this.addUint64(pair.value);
+    }
+
+    return this;
+  }
+
+  /**
    * Writes a value directly to the hash state.
    * Format: [8-byte length (big-endian uint64)] [value bytes]
    */

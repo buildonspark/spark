@@ -3346,6 +3346,39 @@ func (m *RenewLeafRequest) validate(all bool) error {
 		_ = v // ensures v is used
 	}
 
+	if m.DelegationPath != nil {
+
+		if all {
+			switch v := interface{}(m.GetDelegationPath()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, RenewLeafRequestValidationError{
+						field:  "DelegationPath",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, RenewLeafRequestValidationError{
+						field:  "DelegationPath",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDelegationPath()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return RenewLeafRequestValidationError{
+					field:  "DelegationPath",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return RenewLeafRequestMultiError(errors)
 	}
@@ -3423,6 +3456,128 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = RenewLeafRequestValidationError{}
+
+// Validate checks the field values on DelegationPathSelector with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *DelegationPathSelector) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DelegationPathSelector with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DelegationPathSelectorMultiError, or nil if none found.
+func (m *DelegationPathSelector) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DelegationPathSelector) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = DelegationPathSelectorValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return DelegationPathSelectorMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *DelegationPathSelector) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// DelegationPathSelectorMultiError is an error wrapping multiple validation
+// errors returned by DelegationPathSelector.ValidateAll() if the designated
+// constraints aren't met.
+type DelegationPathSelectorMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DelegationPathSelectorMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DelegationPathSelectorMultiError) AllErrors() []error { return m }
+
+// DelegationPathSelectorValidationError is the validation error returned by
+// DelegationPathSelector.Validate if the designated constraints aren't met.
+type DelegationPathSelectorValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DelegationPathSelectorValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DelegationPathSelectorValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DelegationPathSelectorValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DelegationPathSelectorValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DelegationPathSelectorValidationError) ErrorName() string {
+	return "DelegationPathSelectorValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DelegationPathSelectorValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDelegationPathSelector.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DelegationPathSelectorValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DelegationPathSelectorValidationError{}
 
 // Validate checks the field values on RenewNodeTimelockSigningJob with the
 // rules defined in the proto definition for this message. If any rules are
@@ -8774,6 +8929,35 @@ func (m *TransferPackage) validate(all bool) error {
 
 	// no validation rules for HashVariant
 
+	if all {
+		switch v := interface{}(m.GetDelegationIntent()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferPackageValidationError{
+					field:  "DelegationIntent",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferPackageValidationError{
+					field:  "DelegationIntent",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDelegationIntent()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferPackageValidationError{
+				field:  "DelegationIntent",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return TransferPackageMultiError(errors)
 	}
@@ -8851,6 +9035,141 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = TransferPackageValidationError{}
+
+// Validate checks the field values on DelegationIntent with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *DelegationIntent) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DelegationIntent with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DelegationIntentMultiError, or nil if none found.
+func (m *DelegationIntent) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DelegationIntent) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = DelegationIntentValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetSpenderIdentityPublicKey()) != 33 {
+		err := DelegationIntentValidationError{
+			field:  "SpenderIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for TotalAmountSats
+
+	// no validation rules for ReceiverAmountsSats
+
+	if len(errors) > 0 {
+		return DelegationIntentMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *DelegationIntent) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// DelegationIntentMultiError is an error wrapping multiple validation errors
+// returned by DelegationIntent.ValidateAll() if the designated constraints
+// aren't met.
+type DelegationIntentMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DelegationIntentMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DelegationIntentMultiError) AllErrors() []error { return m }
+
+// DelegationIntentValidationError is the validation error returned by
+// DelegationIntent.Validate if the designated constraints aren't met.
+type DelegationIntentValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DelegationIntentValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DelegationIntentValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DelegationIntentValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DelegationIntentValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DelegationIntentValidationError) ErrorName() string { return "DelegationIntentValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DelegationIntentValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDelegationIntent.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DelegationIntentValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DelegationIntentValidationError{}
 
 // Validate checks the field values on SendLeafKeyTweaks with the rules defined
 // in the proto definition for this message. If any rules are violated, the
@@ -27075,3 +27394,2544 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = QueryWalletSettingResponseValidationError{}
+
+// Validate checks the field values on DelegationGrant with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *DelegationGrant) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DelegationGrant with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DelegationGrantMultiError, or nil if none found.
+func (m *DelegationGrant) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DelegationGrant) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = DelegationGrantValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetOwnerIdentityPublicKey()) != 33 {
+		err := DelegationGrantValidationError{
+			field:  "OwnerIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetSpenders()) > 256 {
+		err := DelegationGrantValidationError{
+			field:  "Spenders",
+			reason: "value must contain no more than 256 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetSpenders() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, DelegationGrantValidationError{
+						field:  fmt.Sprintf("Spenders[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, DelegationGrantValidationError{
+						field:  fmt.Sprintf("Spenders[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return DelegationGrantValidationError{
+					field:  fmt.Sprintf("Spenders[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.GetExpiryTime() == nil {
+		err := DelegationGrantValidationError{
+			field:  "ExpiryTime",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for ScopeTransfer
+
+	// no validation rules for ScopeRenew
+
+	// no validation rules for ScopeClaim
+
+	// no validation rules for FeeFlatSats
+
+	if m.GetVersion() < 1 {
+		err := DelegationGrantValidationError{
+			field:  "Version",
+			reason: "value must be greater than or equal to 1",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := DelegationGrantValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for Status
+
+	if _, ok := _DelegationGrant_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := DelegationGrantValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.FeeCollectorIdentityPublicKey != nil {
+
+		if len(m.GetFeeCollectorIdentityPublicKey()) != 33 {
+			err := DelegationGrantValidationError{
+				field:  "FeeCollectorIdentityPublicKey",
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return DelegationGrantMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *DelegationGrant) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// DelegationGrantMultiError is an error wrapping multiple validation errors
+// returned by DelegationGrant.ValidateAll() if the designated constraints
+// aren't met.
+type DelegationGrantMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DelegationGrantMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DelegationGrantMultiError) AllErrors() []error { return m }
+
+// DelegationGrantValidationError is the validation error returned by
+// DelegationGrant.Validate if the designated constraints aren't met.
+type DelegationGrantValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DelegationGrantValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DelegationGrantValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DelegationGrantValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DelegationGrantValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DelegationGrantValidationError) ErrorName() string { return "DelegationGrantValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DelegationGrantValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDelegationGrant.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DelegationGrantValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DelegationGrantValidationError{}
+
+var _DelegationGrant_Network_NotInLookup = map[Network]struct{}{
+	0: {},
+}
+
+// Validate checks the field values on DelegationSpender with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *DelegationSpender) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DelegationSpender with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DelegationSpenderMultiError, or nil if none found.
+func (m *DelegationSpender) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DelegationSpender) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetSpenderIdentityPublicKey()) != 33 {
+		err := DelegationSpenderValidationError{
+			field:  "SpenderIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for PerTxCapSats
+
+	// no validation rules for RollingLimitSats
+
+	// no validation rules for RollingWindowSeconds
+
+	// no validation rules for Status
+
+	// no validation rules for PerTxUnlimited
+
+	// no validation rules for RollingUnlimited
+
+	if len(errors) > 0 {
+		return DelegationSpenderMultiError(errors)
+	}
+
+	return nil
+}
+
+// DelegationSpenderMultiError is an error wrapping multiple validation errors
+// returned by DelegationSpender.ValidateAll() if the designated constraints
+// aren't met.
+type DelegationSpenderMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DelegationSpenderMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DelegationSpenderMultiError) AllErrors() []error { return m }
+
+// DelegationSpenderValidationError is the validation error returned by
+// DelegationSpender.Validate if the designated constraints aren't met.
+type DelegationSpenderValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DelegationSpenderValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DelegationSpenderValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DelegationSpenderValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DelegationSpenderValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DelegationSpenderValidationError) ErrorName() string {
+	return "DelegationSpenderValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DelegationSpenderValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDelegationSpender.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DelegationSpenderValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DelegationSpenderValidationError{}
+
+// Validate checks the field values on CreateDelegationGrantRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CreateDelegationGrantRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateDelegationGrantRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CreateDelegationGrantRequestMultiError, or nil if none found.
+func (m *CreateDelegationGrantRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateDelegationGrantRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetGrant() == nil {
+		err := CreateDelegationGrantRequestValidationError{
+			field:  "Grant",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetGrant()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateDelegationGrantRequestValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateDelegationGrantRequestValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetGrant()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateDelegationGrantRequestValidationError{
+				field:  "Grant",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CreateDelegationGrantRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateDelegationGrantRequestMultiError is an error wrapping multiple
+// validation errors returned by CreateDelegationGrantRequest.ValidateAll() if
+// the designated constraints aren't met.
+type CreateDelegationGrantRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateDelegationGrantRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateDelegationGrantRequestMultiError) AllErrors() []error { return m }
+
+// CreateDelegationGrantRequestValidationError is the validation error returned
+// by CreateDelegationGrantRequest.Validate if the designated constraints
+// aren't met.
+type CreateDelegationGrantRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateDelegationGrantRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateDelegationGrantRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateDelegationGrantRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateDelegationGrantRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateDelegationGrantRequestValidationError) ErrorName() string {
+	return "CreateDelegationGrantRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateDelegationGrantRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateDelegationGrantRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateDelegationGrantRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateDelegationGrantRequestValidationError{}
+
+// Validate checks the field values on CreateDelegationGrantResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CreateDelegationGrantResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateDelegationGrantResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// CreateDelegationGrantResponseMultiError, or nil if none found.
+func (m *CreateDelegationGrantResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateDelegationGrantResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetGrant()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateDelegationGrantResponseValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateDelegationGrantResponseValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetGrant()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateDelegationGrantResponseValidationError{
+				field:  "Grant",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CreateDelegationGrantResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateDelegationGrantResponseMultiError is an error wrapping multiple
+// validation errors returned by CreateDelegationGrantResponse.ValidateAll()
+// if the designated constraints aren't met.
+type CreateDelegationGrantResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateDelegationGrantResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateDelegationGrantResponseMultiError) AllErrors() []error { return m }
+
+// CreateDelegationGrantResponseValidationError is the validation error
+// returned by CreateDelegationGrantResponse.Validate if the designated
+// constraints aren't met.
+type CreateDelegationGrantResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateDelegationGrantResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateDelegationGrantResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateDelegationGrantResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateDelegationGrantResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateDelegationGrantResponseValidationError) ErrorName() string {
+	return "CreateDelegationGrantResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateDelegationGrantResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateDelegationGrantResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateDelegationGrantResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateDelegationGrantResponseValidationError{}
+
+// Validate checks the field values on RevokeDelegationGrantRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RevokeDelegationGrantRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RevokeDelegationGrantRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RevokeDelegationGrantRequestMultiError, or nil if none found.
+func (m *RevokeDelegationGrantRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RevokeDelegationGrantRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = RevokeDelegationGrantRequestValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetOwnerIdentityPublicKey()) != 33 {
+		err := RevokeDelegationGrantRequestValidationError{
+			field:  "OwnerIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetVersion() < 1 {
+		err := RevokeDelegationGrantRequestValidationError{
+			field:  "Version",
+			reason: "value must be greater than or equal to 1",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := RevokeDelegationGrantRequestValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return RevokeDelegationGrantRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *RevokeDelegationGrantRequest) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// RevokeDelegationGrantRequestMultiError is an error wrapping multiple
+// validation errors returned by RevokeDelegationGrantRequest.ValidateAll() if
+// the designated constraints aren't met.
+type RevokeDelegationGrantRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RevokeDelegationGrantRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RevokeDelegationGrantRequestMultiError) AllErrors() []error { return m }
+
+// RevokeDelegationGrantRequestValidationError is the validation error returned
+// by RevokeDelegationGrantRequest.Validate if the designated constraints
+// aren't met.
+type RevokeDelegationGrantRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RevokeDelegationGrantRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RevokeDelegationGrantRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RevokeDelegationGrantRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RevokeDelegationGrantRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RevokeDelegationGrantRequestValidationError) ErrorName() string {
+	return "RevokeDelegationGrantRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RevokeDelegationGrantRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRevokeDelegationGrantRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RevokeDelegationGrantRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RevokeDelegationGrantRequestValidationError{}
+
+// Validate checks the field values on RevokeDelegationGrantResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RevokeDelegationGrantResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RevokeDelegationGrantResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// RevokeDelegationGrantResponseMultiError, or nil if none found.
+func (m *RevokeDelegationGrantResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RevokeDelegationGrantResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetGrant()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RevokeDelegationGrantResponseValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RevokeDelegationGrantResponseValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetGrant()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RevokeDelegationGrantResponseValidationError{
+				field:  "Grant",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RevokeDelegationGrantResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// RevokeDelegationGrantResponseMultiError is an error wrapping multiple
+// validation errors returned by RevokeDelegationGrantResponse.ValidateAll()
+// if the designated constraints aren't met.
+type RevokeDelegationGrantResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RevokeDelegationGrantResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RevokeDelegationGrantResponseMultiError) AllErrors() []error { return m }
+
+// RevokeDelegationGrantResponseValidationError is the validation error
+// returned by RevokeDelegationGrantResponse.Validate if the designated
+// constraints aren't met.
+type RevokeDelegationGrantResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RevokeDelegationGrantResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RevokeDelegationGrantResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RevokeDelegationGrantResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RevokeDelegationGrantResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RevokeDelegationGrantResponseValidationError) ErrorName() string {
+	return "RevokeDelegationGrantResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RevokeDelegationGrantResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRevokeDelegationGrantResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RevokeDelegationGrantResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RevokeDelegationGrantResponseValidationError{}
+
+// Validate checks the field values on AddDelegationSpenderRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AddDelegationSpenderRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AddDelegationSpenderRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AddDelegationSpenderRequestMultiError, or nil if none found.
+func (m *AddDelegationSpenderRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AddDelegationSpenderRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = AddDelegationSpenderRequestValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetSpender() == nil {
+		err := AddDelegationSpenderRequestValidationError{
+			field:  "Spender",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetSpender()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, AddDelegationSpenderRequestValidationError{
+					field:  "Spender",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, AddDelegationSpenderRequestValidationError{
+					field:  "Spender",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSpender()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return AddDelegationSpenderRequestValidationError{
+				field:  "Spender",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.GetVersion() < 1 {
+		err := AddDelegationSpenderRequestValidationError{
+			field:  "Version",
+			reason: "value must be greater than or equal to 1",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := AddDelegationSpenderRequestValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return AddDelegationSpenderRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *AddDelegationSpenderRequest) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// AddDelegationSpenderRequestMultiError is an error wrapping multiple
+// validation errors returned by AddDelegationSpenderRequest.ValidateAll() if
+// the designated constraints aren't met.
+type AddDelegationSpenderRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AddDelegationSpenderRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AddDelegationSpenderRequestMultiError) AllErrors() []error { return m }
+
+// AddDelegationSpenderRequestValidationError is the validation error returned
+// by AddDelegationSpenderRequest.Validate if the designated constraints
+// aren't met.
+type AddDelegationSpenderRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AddDelegationSpenderRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AddDelegationSpenderRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AddDelegationSpenderRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AddDelegationSpenderRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AddDelegationSpenderRequestValidationError) ErrorName() string {
+	return "AddDelegationSpenderRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AddDelegationSpenderRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAddDelegationSpenderRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AddDelegationSpenderRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AddDelegationSpenderRequestValidationError{}
+
+// Validate checks the field values on AddDelegationSpenderResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AddDelegationSpenderResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AddDelegationSpenderResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AddDelegationSpenderResponseMultiError, or nil if none found.
+func (m *AddDelegationSpenderResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AddDelegationSpenderResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetGrant()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, AddDelegationSpenderResponseValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, AddDelegationSpenderResponseValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetGrant()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return AddDelegationSpenderResponseValidationError{
+				field:  "Grant",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return AddDelegationSpenderResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// AddDelegationSpenderResponseMultiError is an error wrapping multiple
+// validation errors returned by AddDelegationSpenderResponse.ValidateAll() if
+// the designated constraints aren't met.
+type AddDelegationSpenderResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AddDelegationSpenderResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AddDelegationSpenderResponseMultiError) AllErrors() []error { return m }
+
+// AddDelegationSpenderResponseValidationError is the validation error returned
+// by AddDelegationSpenderResponse.Validate if the designated constraints
+// aren't met.
+type AddDelegationSpenderResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AddDelegationSpenderResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AddDelegationSpenderResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AddDelegationSpenderResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AddDelegationSpenderResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AddDelegationSpenderResponseValidationError) ErrorName() string {
+	return "AddDelegationSpenderResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AddDelegationSpenderResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAddDelegationSpenderResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AddDelegationSpenderResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AddDelegationSpenderResponseValidationError{}
+
+// Validate checks the field values on RevokeDelegationSpenderRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RevokeDelegationSpenderRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RevokeDelegationSpenderRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// RevokeDelegationSpenderRequestMultiError, or nil if none found.
+func (m *RevokeDelegationSpenderRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RevokeDelegationSpenderRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = RevokeDelegationSpenderRequestValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetSpenderIdentityPublicKey()) != 33 {
+		err := RevokeDelegationSpenderRequestValidationError{
+			field:  "SpenderIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetVersion() < 1 {
+		err := RevokeDelegationSpenderRequestValidationError{
+			field:  "Version",
+			reason: "value must be greater than or equal to 1",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := RevokeDelegationSpenderRequestValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return RevokeDelegationSpenderRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *RevokeDelegationSpenderRequest) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// RevokeDelegationSpenderRequestMultiError is an error wrapping multiple
+// validation errors returned by RevokeDelegationSpenderRequest.ValidateAll()
+// if the designated constraints aren't met.
+type RevokeDelegationSpenderRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RevokeDelegationSpenderRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RevokeDelegationSpenderRequestMultiError) AllErrors() []error { return m }
+
+// RevokeDelegationSpenderRequestValidationError is the validation error
+// returned by RevokeDelegationSpenderRequest.Validate if the designated
+// constraints aren't met.
+type RevokeDelegationSpenderRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RevokeDelegationSpenderRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RevokeDelegationSpenderRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RevokeDelegationSpenderRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RevokeDelegationSpenderRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RevokeDelegationSpenderRequestValidationError) ErrorName() string {
+	return "RevokeDelegationSpenderRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RevokeDelegationSpenderRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRevokeDelegationSpenderRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RevokeDelegationSpenderRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RevokeDelegationSpenderRequestValidationError{}
+
+// Validate checks the field values on RevokeDelegationSpenderResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RevokeDelegationSpenderResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RevokeDelegationSpenderResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// RevokeDelegationSpenderResponseMultiError, or nil if none found.
+func (m *RevokeDelegationSpenderResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RevokeDelegationSpenderResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetGrant()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RevokeDelegationSpenderResponseValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RevokeDelegationSpenderResponseValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetGrant()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RevokeDelegationSpenderResponseValidationError{
+				field:  "Grant",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RevokeDelegationSpenderResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// RevokeDelegationSpenderResponseMultiError is an error wrapping multiple
+// validation errors returned by RevokeDelegationSpenderResponse.ValidateAll()
+// if the designated constraints aren't met.
+type RevokeDelegationSpenderResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RevokeDelegationSpenderResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RevokeDelegationSpenderResponseMultiError) AllErrors() []error { return m }
+
+// RevokeDelegationSpenderResponseValidationError is the validation error
+// returned by RevokeDelegationSpenderResponse.Validate if the designated
+// constraints aren't met.
+type RevokeDelegationSpenderResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RevokeDelegationSpenderResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RevokeDelegationSpenderResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RevokeDelegationSpenderResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RevokeDelegationSpenderResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RevokeDelegationSpenderResponseValidationError) ErrorName() string {
+	return "RevokeDelegationSpenderResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RevokeDelegationSpenderResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRevokeDelegationSpenderResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RevokeDelegationSpenderResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RevokeDelegationSpenderResponseValidationError{}
+
+// Validate checks the field values on QueryDelegationGrantsRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryDelegationGrantsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryDelegationGrantsRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryDelegationGrantsRequestMultiError, or nil if none found.
+func (m *QueryDelegationGrantsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryDelegationGrantsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Filter.(type) {
+	case *QueryDelegationGrantsRequest_OwnerIdentityPublicKey:
+		if v == nil {
+			err := QueryDelegationGrantsRequestValidationError{
+				field:  "Filter",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if len(m.GetOwnerIdentityPublicKey()) != 33 {
+			err := QueryDelegationGrantsRequestValidationError{
+				field:  "OwnerIdentityPublicKey",
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	case *QueryDelegationGrantsRequest_DelegateIdentityPublicKey:
+		if v == nil {
+			err := QueryDelegationGrantsRequestValidationError{
+				field:  "Filter",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if len(m.GetDelegateIdentityPublicKey()) != 33 {
+			err := QueryDelegationGrantsRequestValidationError{
+				field:  "DelegateIdentityPublicKey",
+				reason: "value length must be 33 bytes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return QueryDelegationGrantsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryDelegationGrantsRequestMultiError is an error wrapping multiple
+// validation errors returned by QueryDelegationGrantsRequest.ValidateAll() if
+// the designated constraints aren't met.
+type QueryDelegationGrantsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryDelegationGrantsRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryDelegationGrantsRequestMultiError) AllErrors() []error { return m }
+
+// QueryDelegationGrantsRequestValidationError is the validation error returned
+// by QueryDelegationGrantsRequest.Validate if the designated constraints
+// aren't met.
+type QueryDelegationGrantsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryDelegationGrantsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryDelegationGrantsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryDelegationGrantsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryDelegationGrantsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryDelegationGrantsRequestValidationError) ErrorName() string {
+	return "QueryDelegationGrantsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryDelegationGrantsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryDelegationGrantsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryDelegationGrantsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryDelegationGrantsRequestValidationError{}
+
+// Validate checks the field values on DelegationGrantInfo with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *DelegationGrantInfo) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DelegationGrantInfo with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DelegationGrantInfoMultiError, or nil if none found.
+func (m *DelegationGrantInfo) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DelegationGrantInfo) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetGrant()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DelegationGrantInfoValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DelegationGrantInfoValidationError{
+					field:  "Grant",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetGrant()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DelegationGrantInfoValidationError{
+				field:  "Grant",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for SpentSatsBySpender
+
+	if len(errors) > 0 {
+		return DelegationGrantInfoMultiError(errors)
+	}
+
+	return nil
+}
+
+// DelegationGrantInfoMultiError is an error wrapping multiple validation
+// errors returned by DelegationGrantInfo.ValidateAll() if the designated
+// constraints aren't met.
+type DelegationGrantInfoMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DelegationGrantInfoMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DelegationGrantInfoMultiError) AllErrors() []error { return m }
+
+// DelegationGrantInfoValidationError is the validation error returned by
+// DelegationGrantInfo.Validate if the designated constraints aren't met.
+type DelegationGrantInfoValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DelegationGrantInfoValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DelegationGrantInfoValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DelegationGrantInfoValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DelegationGrantInfoValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DelegationGrantInfoValidationError) ErrorName() string {
+	return "DelegationGrantInfoValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DelegationGrantInfoValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDelegationGrantInfo.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DelegationGrantInfoValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DelegationGrantInfoValidationError{}
+
+// Validate checks the field values on QueryDelegationGrantsResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryDelegationGrantsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryDelegationGrantsResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// QueryDelegationGrantsResponseMultiError, or nil if none found.
+func (m *QueryDelegationGrantsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryDelegationGrantsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetGrants() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueryDelegationGrantsResponseValidationError{
+						field:  fmt.Sprintf("Grants[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueryDelegationGrantsResponseValidationError{
+						field:  fmt.Sprintf("Grants[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueryDelegationGrantsResponseValidationError{
+					field:  fmt.Sprintf("Grants[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return QueryDelegationGrantsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryDelegationGrantsResponseMultiError is an error wrapping multiple
+// validation errors returned by QueryDelegationGrantsResponse.ValidateAll()
+// if the designated constraints aren't met.
+type QueryDelegationGrantsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryDelegationGrantsResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryDelegationGrantsResponseMultiError) AllErrors() []error { return m }
+
+// QueryDelegationGrantsResponseValidationError is the validation error
+// returned by QueryDelegationGrantsResponse.Validate if the designated
+// constraints aren't met.
+type QueryDelegationGrantsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryDelegationGrantsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryDelegationGrantsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryDelegationGrantsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryDelegationGrantsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryDelegationGrantsResponseValidationError) ErrorName() string {
+	return "QueryDelegationGrantsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryDelegationGrantsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryDelegationGrantsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryDelegationGrantsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryDelegationGrantsResponseValidationError{}
+
+// Validate checks the field values on LeafDecompositionInstall with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *LeafDecompositionInstall) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on LeafDecompositionInstall with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// LeafDecompositionInstallMultiError, or nil if none found.
+func (m *LeafDecompositionInstall) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *LeafDecompositionInstall) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetLeafId()); err != nil {
+		err = LeafDecompositionInstallValidationError{
+			field:  "LeafId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetDelegateSigningPublicKey()) != 33 {
+		err := LeafDecompositionInstallValidationError{
+			field:  "DelegateSigningPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return LeafDecompositionInstallMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *LeafDecompositionInstall) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// LeafDecompositionInstallMultiError is an error wrapping multiple validation
+// errors returned by LeafDecompositionInstall.ValidateAll() if the designated
+// constraints aren't met.
+type LeafDecompositionInstallMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m LeafDecompositionInstallMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m LeafDecompositionInstallMultiError) AllErrors() []error { return m }
+
+// LeafDecompositionInstallValidationError is the validation error returned by
+// LeafDecompositionInstall.Validate if the designated constraints aren't met.
+type LeafDecompositionInstallValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e LeafDecompositionInstallValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e LeafDecompositionInstallValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e LeafDecompositionInstallValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e LeafDecompositionInstallValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e LeafDecompositionInstallValidationError) ErrorName() string {
+	return "LeafDecompositionInstallValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e LeafDecompositionInstallValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sLeafDecompositionInstall.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = LeafDecompositionInstallValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = LeafDecompositionInstallValidationError{}
+
+// Validate checks the field values on InstallLeafDecompositionsRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InstallLeafDecompositionsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InstallLeafDecompositionsRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// InstallLeafDecompositionsRequestMultiError, or nil if none found.
+func (m *InstallLeafDecompositionsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InstallLeafDecompositionsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetGrantId()); err != nil {
+		err = InstallLeafDecompositionsRequestValidationError{
+			field:  "GrantId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetOwnerIdentityPublicKey()) != 33 {
+		err := InstallLeafDecompositionsRequestValidationError{
+			field:  "OwnerIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetInstalls()) < 1 {
+		err := InstallLeafDecompositionsRequestValidationError{
+			field:  "Installs",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetInstalls() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InstallLeafDecompositionsRequestValidationError{
+						field:  fmt.Sprintf("Installs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InstallLeafDecompositionsRequestValidationError{
+						field:  fmt.Sprintf("Installs[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InstallLeafDecompositionsRequestValidationError{
+					field:  fmt.Sprintf("Installs[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for KeyTweakPackage
+
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
+		err := InstallLeafDecompositionsRequestValidationError{
+			field:  "OwnerSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return InstallLeafDecompositionsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *InstallLeafDecompositionsRequest) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// InstallLeafDecompositionsRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// InstallLeafDecompositionsRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InstallLeafDecompositionsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InstallLeafDecompositionsRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InstallLeafDecompositionsRequestMultiError) AllErrors() []error { return m }
+
+// InstallLeafDecompositionsRequestValidationError is the validation error
+// returned by InstallLeafDecompositionsRequest.Validate if the designated
+// constraints aren't met.
+type InstallLeafDecompositionsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InstallLeafDecompositionsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InstallLeafDecompositionsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InstallLeafDecompositionsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InstallLeafDecompositionsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InstallLeafDecompositionsRequestValidationError) ErrorName() string {
+	return "InstallLeafDecompositionsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InstallLeafDecompositionsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInstallLeafDecompositionsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InstallLeafDecompositionsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InstallLeafDecompositionsRequestValidationError{}
+
+// Validate checks the field values on InstallLeafDecompositionProgress with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InstallLeafDecompositionProgress) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InstallLeafDecompositionProgress with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// InstallLeafDecompositionProgressMultiError, or nil if none found.
+func (m *InstallLeafDecompositionProgress) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InstallLeafDecompositionProgress) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for OperatorIdentifier
+
+	// no validation rules for Installed
+
+	if len(errors) > 0 {
+		return InstallLeafDecompositionProgressMultiError(errors)
+	}
+
+	return nil
+}
+
+// InstallLeafDecompositionProgressMultiError is an error wrapping multiple
+// validation errors returned by
+// InstallLeafDecompositionProgress.ValidateAll() if the designated
+// constraints aren't met.
+type InstallLeafDecompositionProgressMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InstallLeafDecompositionProgressMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InstallLeafDecompositionProgressMultiError) AllErrors() []error { return m }
+
+// InstallLeafDecompositionProgressValidationError is the validation error
+// returned by InstallLeafDecompositionProgress.Validate if the designated
+// constraints aren't met.
+type InstallLeafDecompositionProgressValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InstallLeafDecompositionProgressValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InstallLeafDecompositionProgressValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InstallLeafDecompositionProgressValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InstallLeafDecompositionProgressValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InstallLeafDecompositionProgressValidationError) ErrorName() string {
+	return "InstallLeafDecompositionProgressValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InstallLeafDecompositionProgressValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInstallLeafDecompositionProgress.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InstallLeafDecompositionProgressValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InstallLeafDecompositionProgressValidationError{}
+
+// Validate checks the field values on InstallLeafDecompositionsResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InstallLeafDecompositionsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InstallLeafDecompositionsResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InstallLeafDecompositionsResponseMultiError, or nil if none found.
+func (m *InstallLeafDecompositionsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InstallLeafDecompositionsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetProgress() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InstallLeafDecompositionsResponseValidationError{
+						field:  fmt.Sprintf("Progress[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InstallLeafDecompositionsResponseValidationError{
+						field:  fmt.Sprintf("Progress[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InstallLeafDecompositionsResponseValidationError{
+					field:  fmt.Sprintf("Progress[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return InstallLeafDecompositionsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// InstallLeafDecompositionsResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// InstallLeafDecompositionsResponse.ValidateAll() if the designated
+// constraints aren't met.
+type InstallLeafDecompositionsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InstallLeafDecompositionsResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InstallLeafDecompositionsResponseMultiError) AllErrors() []error { return m }
+
+// InstallLeafDecompositionsResponseValidationError is the validation error
+// returned by InstallLeafDecompositionsResponse.Validate if the designated
+// constraints aren't met.
+type InstallLeafDecompositionsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InstallLeafDecompositionsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InstallLeafDecompositionsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InstallLeafDecompositionsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InstallLeafDecompositionsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InstallLeafDecompositionsResponseValidationError) ErrorName() string {
+	return "InstallLeafDecompositionsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InstallLeafDecompositionsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInstallLeafDecompositionsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InstallLeafDecompositionsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InstallLeafDecompositionsResponseValidationError{}

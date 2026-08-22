@@ -12,6 +12,12 @@ type BlockHeight func(*sql.Selector)
 // CooperativeExit is the predicate function for cooperativeexit builders.
 type CooperativeExit func(*sql.Selector)
 
+// DelegationGrant is the predicate function for delegationgrant builders.
+type DelegationGrant func(*sql.Selector)
+
+// DelegationGrantSpender is the predicate function for delegationgrantspender builders.
+type DelegationGrantSpender func(*sql.Selector)
+
 // DepositAddress is the predicate function for depositaddress builders.
 type DepositAddress func(*sql.Selector)
 
@@ -41,6 +47,9 @@ type L1TokenOutputWithdrawal func(*sql.Selector)
 
 // L1WithdrawalTransaction is the predicate function for l1withdrawaltransaction builders.
 type L1WithdrawalTransaction func(*sql.Selector)
+
+// LeafDecomposition is the predicate function for leafdecomposition builders.
+type LeafDecomposition func(*sql.Selector)
 
 // MultisigConfig is the predicate function for multisigconfig builders.
 type MultisigConfig func(*sql.Selector)

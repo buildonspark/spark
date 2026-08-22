@@ -56,6 +56,83 @@ var (
 			},
 		},
 	}
+	// DelegationGrantsColumns holds the columns for the "delegation_grants" table.
+	DelegationGrantsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "REVOKED"}, Default: "ACTIVE"},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "expiry_time", Type: field.TypeTime},
+		{Name: "scope_transfer", Type: field.TypeBool},
+		{Name: "scope_renew", Type: field.TypeBool},
+		{Name: "scope_claim", Type: field.TypeBool},
+		{Name: "fee_flat_sats", Type: field.TypeUint64},
+		{Name: "fee_collector_identity_pubkey", Type: field.TypeBytes, Nullable: true},
+		{Name: "version", Type: field.TypeUint64},
+		{Name: "owner_signature", Type: field.TypeBytes},
+	}
+	// DelegationGrantsTable holds the schema information for the "delegation_grants" table.
+	DelegationGrantsTable = &schema.Table{
+		Name:       "delegation_grants",
+		Columns:    DelegationGrantsColumns,
+		PrimaryKey: []*schema.Column{DelegationGrantsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "delegationgrant_owner_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{DelegationGrantsColumns[3]},
+			},
+		},
+	}
+	// DelegationGrantSpendersColumns holds the columns for the "delegation_grant_spenders" table.
+	DelegationGrantSpendersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "spender_identity_pubkey", Type: field.TypeBytes},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "REVOKED"}, Default: "ACTIVE"},
+		{Name: "per_tx_cap_sats", Type: field.TypeUint64},
+		{Name: "rolling_limit_sats", Type: field.TypeUint64},
+		{Name: "rolling_window_seconds", Type: field.TypeUint64},
+		{Name: "per_tx_unlimited", Type: field.TypeBool, Default: false},
+		{Name: "rolling_unlimited", Type: field.TypeBool, Default: false},
+		{Name: "spent_sats", Type: field.TypeUint64, Default: 0},
+		{Name: "window_start", Type: field.TypeTime, Nullable: true},
+		{Name: "version", Type: field.TypeUint64},
+		{Name: "owner_signature", Type: field.TypeBytes},
+		{Name: "delegation_grant_spenders", Type: field.TypeUUID},
+	}
+	// DelegationGrantSpendersTable holds the schema information for the "delegation_grant_spenders" table.
+	DelegationGrantSpendersTable = &schema.Table{
+		Name:       "delegation_grant_spenders",
+		Columns:    DelegationGrantSpendersColumns,
+		PrimaryKey: []*schema.Column{DelegationGrantSpendersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "delegation_grant_spenders_delegation_grants_spenders",
+				Columns:    []*schema.Column{DelegationGrantSpendersColumns[14]},
+				RefColumns: []*schema.Column{DelegationGrantsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "delegationgrantspender_unique_active_per_grant_spender",
+				Unique:  true,
+				Columns: []*schema.Column{DelegationGrantSpendersColumns[3], DelegationGrantSpendersColumns[14]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'ACTIVE'",
+				},
+			},
+			{
+				Name:    "delegationgrantspender_spender_identity_pubkey_status",
+				Unique:  false,
+				Columns: []*schema.Column{DelegationGrantSpendersColumns[3], DelegationGrantSpendersColumns[4]},
+			},
+		},
+	}
 	// DepositAddressesColumns holds the columns for the "deposit_addresses" table.
 	DepositAddressesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -367,6 +444,58 @@ var (
 				Columns:    []*schema.Column{L1withdrawalTransactionsColumns[8]},
 				RefColumns: []*schema.Column{EntityDkgKeysColumns[0]},
 				OnDelete:   schema.NoAction,
+			},
+		},
+	}
+	// LeafDecompositionsColumns holds the columns for the "leaf_decompositions" table.
+	LeafDecompositionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "delegate_signing_pubkey", Type: field.TypeBytes},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "CONSUMED", "REVOKED", "REVOKE_PENDING", "EXPIRED"}, Default: "ACTIVE"},
+		{Name: "delegation_grant_leaf_decompositions", Type: field.TypeUUID},
+		{Name: "leaf_decomposition_tree_node", Type: field.TypeUUID},
+		{Name: "leaf_decomposition_signing_keyshare", Type: field.TypeUUID, Nullable: true},
+	}
+	// LeafDecompositionsTable holds the schema information for the "leaf_decompositions" table.
+	LeafDecompositionsTable = &schema.Table{
+		Name:       "leaf_decompositions",
+		Columns:    LeafDecompositionsColumns,
+		PrimaryKey: []*schema.Column{LeafDecompositionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "leaf_decompositions_delegation_grants_leaf_decompositions",
+				Columns:    []*schema.Column{LeafDecompositionsColumns[5]},
+				RefColumns: []*schema.Column{DelegationGrantsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "leaf_decompositions_tree_nodes_tree_node",
+				Columns:    []*schema.Column{LeafDecompositionsColumns[6]},
+				RefColumns: []*schema.Column{TreeNodesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "leaf_decompositions_signing_keyshares_signing_keyshare",
+				Columns:    []*schema.Column{LeafDecompositionsColumns[7]},
+				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "leafdecomposition_unique_active_per_leaf",
+				Unique:  true,
+				Columns: []*schema.Column{LeafDecompositionsColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'ACTIVE'",
+				},
+			},
+			{
+				Name:    "leafdecomposition_delegation_grant_leaf_decompositions",
+				Unique:  false,
+				Columns: []*schema.Column{LeafDecompositionsColumns[5]},
 			},
 		},
 	}
@@ -2223,6 +2352,8 @@ var (
 	Tables = []*schema.Table{
 		BlockHeightsTable,
 		CooperativeExitsTable,
+		DelegationGrantsTable,
+		DelegationGrantSpendersTable,
 		DepositAddressesTable,
 		EntityDkgKeysTable,
 		EventMessagesTable,
@@ -2233,6 +2364,7 @@ var (
 		L1tokenJusticeTransactionsTable,
 		L1tokenOutputWithdrawalsTable,
 		L1withdrawalTransactionsTable,
+		LeafDecompositionsTable,
 		MultisigConfigsTable,
 		MultisigMembersTable,
 		PartnersTable,
@@ -2273,6 +2405,7 @@ var (
 
 func init() {
 	CooperativeExitsTable.ForeignKeys[0].RefTable = TransfersTable
+	DelegationGrantSpendersTable.ForeignKeys[0].RefTable = DelegationGrantsTable
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	EntityDkgKeysTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	L1tokenJusticeTransactionsTable.ForeignKeys[0].RefTable = L1tokenOutputWithdrawalsTable
@@ -2280,6 +2413,9 @@ func init() {
 	L1tokenOutputWithdrawalsTable.ForeignKeys[0].RefTable = L1withdrawalTransactionsTable
 	L1tokenOutputWithdrawalsTable.ForeignKeys[1].RefTable = TokenOutputsTable
 	L1withdrawalTransactionsTable.ForeignKeys[0].RefTable = EntityDkgKeysTable
+	LeafDecompositionsTable.ForeignKeys[0].RefTable = DelegationGrantsTable
+	LeafDecompositionsTable.ForeignKeys[1].RefTable = TreeNodesTable
+	LeafDecompositionsTable.ForeignKeys[2].RefTable = SigningKeysharesTable
 	MultisigMembersTable.ForeignKeys[0].RefTable = MultisigConfigsTable
 	PartnersTable.ForeignKeys[0].RefTable = PartnerKeysTable
 	PreimageRequestsTable.ForeignKeys[0].RefTable = TransfersTable

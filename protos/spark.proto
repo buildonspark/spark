@@ -107,6 +107,19 @@ service SparkService {
 
     rpc update_wallet_setting(UpdateWalletSettingRequest) returns (UpdateWalletSettingResponse) {}
     rpc query_wallet_setting(QueryWalletSettingRequest) returns (QueryWalletSettingResponse) {}
+
+    // Spark Pull: delegated spending via parallel key decomposition. An owner
+    // installs a second key decomposition (delegate share + SE2 keyshare)
+    // alongside the primary one, bounded by an owner-signed grant the SO
+    // federation enforces at signing time.
+    rpc create_delegation_grant(CreateDelegationGrantRequest) returns (CreateDelegationGrantResponse) {}
+    rpc revoke_delegation_grant(RevokeDelegationGrantRequest) returns (RevokeDelegationGrantResponse) {}
+    rpc query_delegation_grants(QueryDelegationGrantsRequest) returns (QueryDelegationGrantsResponse) {}
+    rpc install_leaf_decompositions(InstallLeafDecompositionsRequest) returns (InstallLeafDecompositionsResponse) {}
+    // Owner-signed addition / removal of an authorized spender on an existing
+    // grant's delegate path. No new key material — a metering record only.
+    rpc add_delegation_spender(AddDelegationSpenderRequest) returns (AddDelegationSpenderResponse) {}
+    rpc revoke_delegation_spender(RevokeDelegationSpenderRequest) returns (RevokeDelegationSpenderResponse) {}
 }
 
 message SubscribeToEventsRequest {
@@ -388,6 +401,21 @@ message RenewLeafRequest {
       // This case is mostly used for user-created trees from L1 deposits.
       RenewNodeZeroTimelockSigningJob renew_node_zero_timelock_signing_job = 4;
     }
+
+    // When set, the renewal is authorized via a delegate decomposition (Spark
+    // Pull) identified by the grant rather than the owner's primary path. Renew
+    // mints fresh exit transactions, so a delegate renewal MUST be grant-gated
+    // (exit-pinning invariant): the handler validates the grant is ACTIVE,
+    // unexpired, scoped for renew, and that the leaf's ACTIVE decomposition
+    // belongs to it (see validateRenewDelegationPath), and pins the renewed
+    // exit outputs to the owner.
+    optional DelegationPathSelector delegation_path = 5;
+}
+
+// DelegationPathSelector identifies the delegation grant whose decomposition
+// authorizes a cooperative operation on a leaf.
+message DelegationPathSelector {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
 }
 
 message RenewNodeTimelockSigningJob {
@@ -783,6 +811,24 @@ message TransferPackage {
     repeated UserSignedTxSigningJob direct_from_cpfp_leaves_to_send = 5;
     // The hash variant to use for computing the transfer package signing payload.
     HashVariant hash_variant = 6;
+    // Present when this transfer spends via a delegate decomposition (Spark
+    // Pull). Bound into the V3 signing payload so every SO can check the
+    // delegate's intent (amount and recipients) against the cited grant.
+    DelegationIntent delegation_intent = 7;
+}
+
+// DelegationIntent binds a delegated (Spark Pull) transfer to the grant it
+// spends under, the delegate authorizing it, and the exact amounts flowing to
+// each receiver. It is bound into the V3 transfer-package signing payload so no
+// SO co-signs a delegate spend that exceeds or diverges from what the delegate
+// signed for.
+message DelegationIntent {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    // The acting spender's identity key (authorized on the grant).
+    bytes spender_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+    uint64 total_amount_sats = 3;
+    // Hex-encoded receiver identity public key -> sats delivered to that receiver.
+    map<string, uint64> receiver_amounts_sats = 4;
 }
 
 message SendLeafKeyTweaks {
@@ -1668,7 +1714,10 @@ enum UtxoSwapStatus {
 // Which hash variant to use in cryptographic operations.
 enum HashVariant {
   HASH_VARIANT_UNSPECIFIED = 0; // Legacy
-  HASH_VARIANT_V2 = 1; // Structured hashing
+  // Structured hashing. Binds the delegation intent (Spark Pull) too when the
+  // transfer package carries one; a package without an intent hashes exactly as
+  // it did before delegation existed, so already-released SDKs keep verifying.
+  HASH_VARIANT_V2 = 1;
 }
 
 
@@ -1959,4 +2008,181 @@ message QueryWalletSettingRequest {
 
 message QueryWalletSettingResponse {
     WalletSetting wallet_setting = 1;
+}
+
+// DelegationStatus is the server-derived lifecycle status of a delegation
+// grant or one of its spenders. Output-only: ignored on create/add requests.
+enum DelegationStatus {
+    DELEGATION_STATUS_UNSPECIFIED = 0;
+    DELEGATION_STATUS_ACTIVE = 1;
+    // Tombstone after an owner-signed revoke; never deleted, never resurrected.
+    DELEGATION_STATUS_REVOKED = 2;
+}
+
+// DelegationGrant is the owner-signed policy object for Spark Pull. It defines a
+// single delegate key path (one decomposition per leaf) and the set of
+// authorized spenders (e.g. merchants) allowed to spend on it, each fenced by
+// its own limits. Every SO validates it independently at signing time.
+//
+// Authorization is a policy layer: multiple spenders share one delegate path, so
+// adding merchant N+1 is a metering record, not a new key ceremony. This keeps
+// the related-key FROST surface bounded to one delegate decomposition per leaf.
+message DelegationGrant {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    // Owner's root identity key. Signs grants, spender changes, and revocations;
+    // never shared.
+    bytes owner_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+    // Authorized spenders on this grant's delegate path, each with its own caps
+    // and (server-side) meter. max_items is a wire-level hard bound; the
+    // effective policy cap is the (lower) per-grant spender quota knob.
+    repeated DelegationSpender spenders = 3 [(validate.rules).repeated.max_items = 256];
+    // Wall-clock expiry, matching existing expiry precedent.
+    google.protobuf.Timestamp expiry_time = 4 [(validate.rules).timestamp.required = true];
+    bool scope_transfer = 5;
+    bool scope_renew = 6;
+    bool scope_claim = 7;
+    // Flat fee (sats) the delegate settlement must pay the fee collector.
+    uint64 fee_flat_sats = 8;
+    optional bytes fee_collector_identity_public_key = 9 [(validate.rules).bytes.len = 33];
+    // Monotonic version; owner-signed re-versions supersede lower versions.
+    uint64 version = 10 [(validate.rules).uint64.gte = 1];
+    // ECDSA DER signature (64-73 bytes) by owner_identity_public_key over the
+    // grant statement (see common.CreateDelegationGrantStatement).
+    bytes owner_signature = 11 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+    // Output-only: server-populated grant status. Ignored on create requests.
+    DelegationStatus status = 12;
+    // Bitcoin network this grant applies to. Bound into the signed statement, so
+    // it must ride the wire message; carried here rather than the request so it
+    // is echoed back on query.
+    Network network = 13 [(validate.rules).enum = {not_in: [0]}];
+}
+
+// DelegationSpender is one authorized spender on a grant, with its own limits.
+// The federation meters each spender independently.
+message DelegationSpender {
+    bytes spender_identity_public_key = 1 [(validate.rules).bytes.len = 33];
+    // Maximum sats a single delegated transaction by this spender may spend.
+    // Must be 0 when per_tx_unlimited is true, and > 0 otherwise.
+    uint64 per_tx_cap_sats = 2;
+    // Maximum sats this spender may spend within rolling_window_seconds.
+    // Must be 0 when rolling_unlimited is true, and > 0 otherwise.
+    uint64 rolling_limit_sats = 3;
+    uint64 rolling_window_seconds = 4;
+    // Output-only: server-populated spender status. Ignored on create/add
+    // requests.
+    DelegationStatus status = 5;
+    // Waives the per-transaction ceiling for this spender. Bound into the
+    // owner-signed grant / spender-add statements (v2); absent/false always
+    // means bounded, so a stripped flag fails closed.
+    bool per_tx_unlimited = 6;
+    // Waives the rolling-window ceiling for this spender. The meter still
+    // records spend within the window for observability. Bound into the
+    // owner-signed statements (v2) like per_tx_unlimited.
+    bool rolling_unlimited = 7;
+}
+
+message CreateDelegationGrantRequest {
+    DelegationGrant grant = 1 [(validate.rules).message.required = true];
+}
+
+message CreateDelegationGrantResponse {
+    DelegationGrant grant = 1;
+}
+
+message RevokeDelegationGrantRequest {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    bytes owner_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+    // Must match the current grant version; guards against unordered replays.
+    uint64 version = 3 [(validate.rules).uint64.gte = 1];
+    // ECDSA DER signature (64-73 bytes) by owner_identity_public_key over the
+    // revoke statement (see common.CreateDelegationRevokeStatement).
+    bytes owner_signature = 4 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+message RevokeDelegationGrantResponse {
+    DelegationGrant grant = 1;
+}
+
+message AddDelegationSpenderRequest {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    // The spender to authorize (caps included; status ignored).
+    DelegationSpender spender = 2 [(validate.rules).message.required = true];
+    // Monotonic version for this spender change; guards unordered replays.
+    uint64 version = 3 [(validate.rules).uint64.gte = 1];
+    // ECDSA DER signature (64-73 bytes) by the grant owner over the spender-add
+    // statement (see common.CreateDelegationSpenderAddStatement).
+    bytes owner_signature = 4 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+message AddDelegationSpenderResponse {
+    DelegationGrant grant = 1;
+}
+
+message RevokeDelegationSpenderRequest {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    bytes spender_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+    // Monotonic version for this spender change; guards unordered replays.
+    uint64 version = 3 [(validate.rules).uint64.gte = 1];
+    // ECDSA DER signature (64-73 bytes) by the grant owner over the
+    // spender-revoke statement (see common.CreateDelegationSpenderRevokeStatement).
+    bytes owner_signature = 4 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+message RevokeDelegationSpenderResponse {
+    DelegationGrant grant = 1;
+}
+
+message QueryDelegationGrantsRequest {
+    // Filter grants by the owner or the delegate identity key.
+    oneof filter {
+        bytes owner_identity_public_key = 1 [(validate.rules).bytes.len = 33];
+        bytes delegate_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+    }
+}
+
+// DelegationGrantInfo pairs a grant with its current runtime metering state.
+message DelegationGrantInfo {
+    DelegationGrant grant = 1;
+    // Hex-encoded spender identity public key -> sats spent within that
+    // spender's current rolling window.
+    map<string, uint64> spent_sats_by_spender = 2;
+}
+
+message QueryDelegationGrantsResponse {
+    repeated DelegationGrantInfo grants = 1;
+}
+
+// LeafDecompositionInstall names one leaf and the delegate-path user signing
+// public key (the "50") to register for it. The matching SE2 share is delivered
+// encrypted per-SO in InstallLeafDecompositionsRequest.key_tweak_package.
+message LeafDecompositionInstall {
+    string leaf_id = 1 [(validate.rules).string.uuid = true];
+    bytes delegate_signing_public_key = 2 [(validate.rules).bytes.len = 33];
+}
+
+message InstallLeafDecompositionsRequest {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    bytes owner_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+    // The effective batch cap is the (lower) max_install_batch knob, enforced
+    // server-side on every SO.
+    repeated LeafDecompositionInstall installs = 3 [(validate.rules).repeated.min_items = 1];
+    // Map of SO identifier to the ECIES ciphertext of that SO's SendLeafKeyTweaks
+    // batch for the delegate-path (SE2) share install. Mirrors
+    // TransferPackage.key_tweak_package: each SO can only decrypt its own slice,
+    // so the coordinator never sees another SO's plaintext shares.
+    map<string, bytes> key_tweak_package = 4;
+    // ECDSA DER signature (64-73 bytes) by owner_identity_public_key over the
+    // install statement (see common.CreateDecompositionInstallStatement).
+    bytes owner_signature = 5 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+// InstallLeafDecompositionProgress reports whether a given operator has
+// installed its delegate-path share for the request.
+message InstallLeafDecompositionProgress {
+    string operator_identifier = 1;
+    bool installed = 2;
+}
+
+message InstallLeafDecompositionsResponse {
+    repeated InstallLeafDecompositionProgress progress = 1;
 }

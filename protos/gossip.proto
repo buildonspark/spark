@@ -40,8 +40,44 @@ message GossipMessage {
         GossipMessageConsensusCommit consensus_commit = 22;
         GossipMessageConsensusRollback consensus_rollback = 23;
         GossipMessagePreimageSwap preimage_swap = 24;
+        GossipMessageRevokeDelegationGrant revoke_delegation_grant = 25;
+        GossipMessageAddDelegationSpender add_delegation_spender = 26;
+        GossipMessageRevokeDelegationSpender revoke_delegation_spender = 27;
         GossipMessageRevokeTokenAllowance revoke_token_allowance = 28;
     }
+}
+
+// GossipMessageRevokeDelegationGrant replicates a Spark Pull grant revocation.
+// Each SO tombstones the grant row (never deletes it - the tombstone plus the
+// monotonic version is the replay protection) and refuses further delegate
+// operations. Share deletion of the delegate-path SE2 keyshares runs separately.
+message GossipMessageRevokeDelegationGrant {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    uint64 version = 2 [(validate.rules).uint64.gte = 1];
+    bytes owner_identity_public_key = 3 [(validate.rules).bytes.len = 33];
+    bytes owner_signature = 4 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+    google.protobuf.Timestamp revoked_at = 5;
+}
+
+// GossipMessageAddDelegationSpender replicates authorizing a new spender on an
+// existing grant. Each SO persists the spender metering record. No key material
+// is involved - one delegate decomposition serves all spenders.
+message GossipMessageAddDelegationSpender {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    spark.DelegationSpender spender = 2 [(validate.rules).message.required = true];
+    uint64 version = 3 [(validate.rules).uint64.gte = 1];
+    bytes owner_signature = 4 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+// GossipMessageRevokeDelegationSpender replicates removing a spender from a
+// grant. Each SO tombstones that spender's record (never deletes it) and refuses
+// further operations by that spender.
+message GossipMessageRevokeDelegationSpender {
+    string grant_id = 1 [(validate.rules).string.uuid = true];
+    bytes spender_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+    uint64 version = 3 [(validate.rules).uint64.gte = 1];
+    bytes owner_signature = 4 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+    google.protobuf.Timestamp revoked_at = 5;
 }
 
 message GossipMessageCancelTransfer {
@@ -220,6 +256,8 @@ enum ConsensusOperationType {
     CONSENSUS_OPERATION_TYPE_TOKEN_TRANSACTION = 19;
     CONSENSUS_OPERATION_TYPE_CREATE_TOKEN_ALLOWANCE = 21;
     CONSENSUS_OPERATION_TYPE_STATIC_DEPOSIT_SWEEP = 22;
+    CONSENSUS_OPERATION_TYPE_DELEGATION_GRANT = 23;
+    CONSENSUS_OPERATION_TYPE_INSTALL_DECOMPOSITIONS = 24;
 }
 
 // GossipMessageConsensusCommit delivers the commit phase of a consensus operation.
