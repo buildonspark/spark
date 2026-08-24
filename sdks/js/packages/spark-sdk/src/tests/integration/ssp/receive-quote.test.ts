@@ -1,6 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/utils";
+import { TransferManifest } from "../../../proto/spark.js";
 import { decodeInvoice } from "../../../services/bolt11-spark.js";
+import { hashSerializedTransferManifest } from "../../../utils/manifest-hashing.js";
+import {
+  quoteEnvelopeDigest,
+  QuoteReason,
+  QuoteRole,
+  receiveAttestorTarget,
+} from "../../../utils/quote-envelope.js";
 import {
   manifestFeeSats,
   manifestGrossSats,
@@ -28,8 +36,7 @@ async function fundedWallet() {
   return wallet;
 }
 
-// TODO(SP-3812): re-enable — these sign the pre-attestor-envelope attestation format.
-describe.skip("fee-quoted lightning receive", () => {
+describe("fee-quoted lightning receive", () => {
   it("settles an invoice issued against a signed quote", async () => {
     const payer = await fundedWallet();
     const { wallet: receiver } = await SparkWalletTestingWithStream.initialize({
@@ -104,5 +111,106 @@ describe.skip("fee-quoted lightning receive", () => {
     await expect(
       receiver.createLightningInvoice({ amountSats: QUOTE_AMOUNT, quote }),
     ).rejects.toThrow(/already been committed/);
+  }, 120_000);
+
+  it("pays a receiver that signs no part of the quote", async () => {
+    const payer = await fundedWallet();
+    const { wallet: attestor } = await SparkWalletTestingWithStream.initialize({
+      options: { network: "LOCAL" },
+    });
+    const { wallet: payee } = await SparkWalletTestingWithStream.initialize({
+      options: { network: "LOCAL" },
+    });
+
+    const payeeIdentity = await payee.getIdentityPublicKey();
+    const quote = await attestor.getLightningReceiveQuote({
+      amountSats: QUOTE_AMOUNT,
+      receiverIdentityPubkey: payeeIdentity,
+    });
+
+    expect(manifestNetSatsFor(quote.manifest, hexToBytes(payeeIdentity))).toBe(
+      QUOTE_AMOUNT,
+    );
+
+    const request = await attestor.createLightningInvoice({
+      amountSats: QUOTE_AMOUNT,
+      memo: "delegated receive",
+      receiverIdentityPubkey: payeeIdentity,
+      quote,
+    });
+
+    const payeeClaimed = waitForClaim({ wallet: payee, throwOnTimeout: true });
+    await payer.payLightningInvoice({
+      invoice: request.invoice.encodedInvoice,
+      maxFeeSats: 100,
+    });
+    await payeeClaimed;
+
+    expect((await payee.getBalance()).balance).toBe(BigInt(QUOTE_AMOUNT));
+    expect((await attestor.getBalance()).balance).toBe(0n);
+  }, 180_000);
+
+  it("refuses an attestation bound to another invoice", async () => {
+    const { wallet: receiver } = await SparkWalletTestingWithStream.initialize({
+      options: { network: "LOCAL" },
+    });
+
+    const committed = await receiver.getLightningReceiveQuote({
+      amountSats: QUOTE_AMOUNT,
+    });
+    const spent = await receiver.createLightningInvoice({
+      amountSats: QUOTE_AMOUNT,
+      quote: committed,
+    });
+    const spentPaymentHash = hexToBytes(spent.invoice.paymentHash);
+
+    const substituted = await receiver.getLightningReceiveQuote({
+      amountSats: QUOTE_AMOUNT,
+    });
+
+    // The wallet mints the payment hash itself, so the only seam to substitute
+    // one is the signer: this attests to an invoice that already exists.
+    const signer = receiver.getSigner();
+    const realSign = signer.signMessageWithIdentityKey.bind(signer);
+    const staleDigest = await quoteEnvelopeDigest({
+      network: TransferManifest.decode(
+        hexToBytes(substituted.serializedManifest),
+      ).network,
+      manifestHash: await hashSerializedTransferManifest(
+        hexToBytes(substituted.serializedManifest),
+      ),
+      reason: QuoteReason.RECEIVE,
+      role: QuoteRole.ATTESTOR,
+      target: await receiveAttestorTarget(spentPaymentHash),
+    });
+
+    // Matched by length, not content: the honest digest binds a payment hash the
+    // wallet has not minted yet. The call index below is what pins it.
+    let identitySignCount = 0;
+    let substitutedAtCall = -1;
+    signer.signMessageWithIdentityKey = async (message: Uint8Array) => {
+      identitySignCount += 1;
+      if (substitutedAtCall < 0 && message.length === staleDigest.length) {
+        substitutedAtCall = identitySignCount;
+        return realSign(staleDigest);
+      }
+      return realSign(message);
+    };
+
+    try {
+      await expect(
+        receiver.createLightningInvoice({
+          amountSats: QUOTE_AMOUNT,
+          quote: substituted,
+        }),
+      ).rejects.toThrow(
+        /the attestor signature does not cover the committed manifest and payment hash/,
+      );
+    } finally {
+      signer.signMessageWithIdentityKey = realSign;
+    }
+
+    // A no-op swap measures nothing; a later one refuses for another reason.
+    expect(substitutedAtCall).toBe(1);
   }, 120_000);
 });
