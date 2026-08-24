@@ -3577,16 +3577,6 @@ func validateReceivedRefundTransactions(ctx context.Context, job *pb.LeafRefundT
 		return signingJob.GetRawTx()
 	}
 
-	// If ALL incoming txs match what's already in the DB,
-	// this is a retry of a previous signing request - skip validation
-	if bytes.Equal(job.GetRefundTxSigningJob().GetRawTx(), leaf.RawRefundTx) {
-		if !bytes.Equal(getRawTx(job.GetDirectRefundTxSigningJob()), leaf.DirectRefundTx) ||
-			!bytes.Equal(getRawTx(job.GetDirectFromCpfpRefundTxSigningJob()), leaf.DirectFromCpfpRefundTx) {
-			return fmt.Errorf("refund signing retry for leaf %s must not change direct refund transactions", job.GetLeafId())
-		}
-		return nil
-	}
-
 	refundDestPubKey, err := keys.ParsePublicKey(job.GetRefundTxSigningJob().GetSigningPublicKey())
 	if err != nil {
 		return fmt.Errorf("invalid refund signing public key for leaf %s: %w", job.GetLeafId(), err)
@@ -4175,7 +4165,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	isDirectSigningJob := make(map[uuid.UUID]bool)
 	isDirectFromCpfpSigningJob := make(map[uuid.UUID]bool)
 	isSwap := transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap || transfer.Type == st.TransferTypePrimarySwapV3 || transfer.Type == st.TransferTypeCounterSwapV3
-	isSupportedTransferType := transfer.Type == st.TransferTypeTransfer || transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap || transfer.Type == st.TransferTypePrimarySwapV3 || transfer.Type == st.TransferTypeCounterSwapV3 || transfer.Type == st.TransferTypeCooperativeExit
+	isSupportedTransferType := transfer.Type == st.TransferTypeTransfer || transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap || transfer.Type == st.TransferTypePrimarySwapV3 || transfer.Type == st.TransferTypeCounterSwapV3 || transfer.Type == st.TransferTypeCooperativeExit || transfer.Type == st.TransferTypePreimageSwap || transfer.Type == st.TransferTypeUtxoSwap
 
 	for _, job := range req.GetSigningJobs() {
 		leaf, exists := leaves[job.GetLeafId()]

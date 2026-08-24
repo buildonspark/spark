@@ -258,12 +258,49 @@ func TestLoadLeaves_NegativeBranches(t *testing.T) {
 	}
 }
 
-// TestValidateUtxoSwapLeafRefundTxsV3 pins the consensus-path utxo-swap refund
-// validation: direct refund txs are optional (requireDirectTx=false wire
-// contract) but must pay the receiver when present — every submitted tx is
-// FROST-signed, so accepting an arbitrary output would let the sender hijack
-// the receiver's direct unilateral-exit path.
-func TestValidateUtxoSwapLeafRefundTxsV3(t *testing.T) {
+type utxoSwapRefundSet struct {
+	cpfp           []byte
+	direct         []byte
+	directFromCpfp []byte
+}
+
+func mutateUtxoSwapRefund(t *testing.T, set utxoSwapRefundSet, variant string, mutate func(*wire.MsgTx)) utxoSwapRefundSet {
+	t.Helper()
+
+	var rawTx []byte
+	switch variant {
+	case "cpfp":
+		rawTx = set.cpfp
+	case "direct":
+		rawTx = set.direct
+	case "direct-from-cpfp":
+		rawTx = set.directFromCpfp
+	default:
+		t.Fatalf("unknown refund variant %q", variant)
+	}
+
+	tx, err := common.TxFromRawTxBytes(rawTx)
+	require.NoError(t, err)
+	mutate(tx)
+	mutated := mustSerializeTx(t, tx)
+	switch variant {
+	case "cpfp":
+		set.cpfp = mutated
+	case "direct":
+		set.direct = mutated
+	case "direct-from-cpfp":
+		set.directFromCpfp = mutated
+	}
+	return set
+}
+
+// TestValidateUtxoSwapRefundTxsExact exercises both UTXO-swap creation entry
+// points. Both must use the same reconstruction validator before FROST signing:
+// legacy createTransfer through validateUtxoSwapLeaves, and consensus/V3
+// createTransferV3 through validateUtxoSwapLeafRefundTxsV3.
+func TestValidateUtxoSwapRefundTxsExact(t *testing.T) {
+	ctx := t.Context()
+	senderPub := keys.GeneratePrivateKey().Public()
 	receiverPub := keys.GeneratePrivateKey().Public()
 	attackerPub := keys.GeneratePrivateKey().Public()
 	receiverScript, err := common.P2TRScriptFromPubKey(receiverPub)
@@ -271,82 +308,185 @@ func TestValidateUtxoSwapLeafRefundTxsV3(t *testing.T) {
 	attackerScript, err := common.P2TRScriptFromPubKey(attackerPub)
 	require.NoError(t, err)
 
+	const sourceValue int64 = 100_000
 	nodeTx := wire.NewMsgTx(3)
-	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
-	nodeTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: receiverScript})
-	nodeHash := nodeTx.TxHash()
+	nodeTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: spark.ZeroSequence})
+	nodeTx.AddTxOut(&wire.TxOut{Value: sourceValue, PkScript: receiverScript})
 
 	directTx := wire.NewMsgTx(3)
-	directTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: 0})
-	directTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: receiverScript})
-	directHash := directTx.TxHash()
+	directTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{}, Sequence: spark.ZeroSequence})
+	directTx.AddTxOut(&wire.TxOut{Value: sourceValue, PkScript: receiverScript})
 
 	const oldTimelock uint32 = 600
-	senderRefundTx := wire.NewMsgTx(3)
-	senderRefundTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: nodeHash, Index: 0},
-		Sequence:         oldTimelock,
+	oldRefundTx := wire.NewMsgTx(3)
+	oldRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0},
+		Sequence:         spark.ZeroSequence | oldTimelock,
 	})
 
 	leaf := &ent.TreeNode{
-		RawTx:       mustSerializeTx(t, nodeTx),
-		DirectTx:    mustSerializeTx(t, directTx),
-		RawRefundTx: mustSerializeTx(t, senderRefundTx),
+		ID:                  uuid.New(),
+		Status:              st.TreeNodeStatusAvailable,
+		Network:             btcnetwork.Regtest,
+		OwnerIdentityPubkey: senderPub,
+		RawTx:               mustSerializeTx(t, nodeTx),
+		DirectTx:            mustSerializeTx(t, directTx),
+		RawRefundTx:         mustSerializeTx(t, oldRefundTx),
 	}
 	leafID := leaf.ID.String()
 
-	buildRefundTxBytes := func(outPoint wire.OutPoint, sequence uint32, pkScript []byte) []byte {
+	buildRefundTx := func(outPoint wire.OutPoint, sequence uint32, value int64, includeAnchor bool) []byte {
 		tx := wire.NewMsgTx(3)
 		tx.AddTxIn(&wire.TxIn{PreviousOutPoint: outPoint, Sequence: sequence})
-		tx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: pkScript})
+		tx.AddTxOut(&wire.TxOut{Value: value, PkScript: receiverScript})
+		if includeAnchor {
+			tx.AddTxOut(common.EphemeralAnchorOutput())
+		}
 		return mustSerializeTx(t, tx)
 	}
-	cpfpSeq := oldTimelock - spark.TimeLockInterval
-	directSeq := oldTimelock - spark.TimeLockInterval + spark.DirectTimelockOffset
-	goodCpfp := buildRefundTxBytes(wire.OutPoint{Hash: nodeHash, Index: 0}, cpfpSeq, receiverScript)
-	goodDirect := buildRefundTxBytes(wire.OutPoint{Hash: directHash, Index: 0}, directSeq, receiverScript)
-	goodDfc := buildRefundTxBytes(wire.OutPoint{Hash: nodeHash, Index: 0}, directSeq, receiverScript)
-	attackerDirect := buildRefundTxBytes(wire.OutPoint{Hash: directHash, Index: 0}, directSeq, attackerScript)
+	cpfpSequence := spark.ZeroSequence | (oldTimelock - spark.TimeLockInterval)
+	directSequence := spark.ZeroSequence | (oldTimelock - spark.TimeLockInterval + spark.DirectTimelockOffset)
+	canonical := utxoSwapRefundSet{
+		cpfp: buildRefundTx(
+			wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0},
+			cpfpSequence,
+			sourceValue,
+			true,
+		),
+		direct: buildRefundTx(
+			wire.OutPoint{Hash: directTx.TxHash(), Index: 0},
+			directSequence,
+			common.MaybeApplyFee(sourceValue),
+			false,
+		),
+		directFromCpfp: buildRefundTx(
+			wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0},
+			directSequence,
+			common.MaybeApplyFee(sourceValue),
+			false,
+		),
+	}
 
-	leaves := []*ent.TreeNode{leaf}
+	transfer := &ent.Transfer{
+		Edges: ent.TransferEdges{
+			TransferSenders: []*ent.TransferSender{{IdentityPubkey: senderPub}},
+		},
+	}
+	handler := &BaseTransferHandler{}
+	validators := []struct {
+		name     string
+		validate func(utxoSwapRefundSet) error
+	}{
+		{
+			name: "legacy",
+			validate: func(set utxoSwapRefundSet) error {
+				return handler.validateUtxoSwapLeaves(
+					ctx,
+					transfer,
+					[]*ent.TreeNode{leaf},
+					map[string][]byte{leafID: set.cpfp},
+					map[string][]byte{leafID: set.direct},
+					map[string][]byte{leafID: set.directFromCpfp},
+					receiverPub,
+					false,
+				)
+			},
+		},
+		{
+			name: "consensus-v3",
+			validate: func(set utxoSwapRefundSet) error {
+				return validateUtxoSwapLeafRefundTxsV3(
+					ctx,
+					[]*ent.TreeNode{leaf},
+					map[string][]byte{leafID: set.cpfp},
+					map[string][]byte{leafID: set.direct},
+					map[string][]byte{leafID: set.directFromCpfp},
+					receiverPub,
+					false,
+				)
+			},
+		},
+	}
 
-	t.Run("valid direct refunds pass", func(t *testing.T) {
-		require.NoError(t, validateUtxoSwapLeafRefundTxsV3(
-			leaves,
-			map[string][]byte{leafID: goodCpfp},
-			map[string][]byte{leafID: goodDirect},
-			map[string][]byte{leafID: goodDfc},
-			receiverPub, false))
-	})
+	for _, validator := range validators {
+		t.Run(validator.name, func(t *testing.T) {
+			require.NoError(t, validator.validate(canonical), "canonical SDK-shaped refund set must pass")
+			require.NoError(t, validator.validate(utxoSwapRefundSet{cpfp: canonical.cpfp}), "documented no-direct-refund UTXO-swap shape must pass")
 
-	t.Run("direct refunds are optional", func(t *testing.T) {
-		require.NoError(t, validateUtxoSwapLeafRefundTxsV3(
-			leaves,
-			map[string][]byte{leafID: goodCpfp},
-			map[string][]byte{},
-			map[string][]byte{},
-			receiverPub, false))
-	})
+			err := validator.validate(utxoSwapRefundSet{cpfp: canonical.cpfp, direct: canonical.direct})
+			require.ErrorContains(t, err, "both direct refund txs are required")
+			err = validator.validate(utxoSwapRefundSet{cpfp: canonical.cpfp, directFromCpfp: canonical.directFromCpfp})
+			require.ErrorContains(t, err, "both direct refund txs are required")
 
-	t.Run("direct refund paying the wrong key is rejected", func(t *testing.T) {
-		err := validateUtxoSwapLeafRefundTxsV3(
-			leaves,
-			map[string][]byte{leafID: goodCpfp},
-			map[string][]byte{leafID: attackerDirect},
-			map[string][]byte{leafID: goodDfc},
-			receiverPub, false)
-		require.Error(t, err, "attacker-destination direct refund tx must not pass validation")
-	})
-
-	t.Run("missing cpfp refund is rejected", func(t *testing.T) {
-		err := validateUtxoSwapLeafRefundTxsV3(
-			leaves,
-			map[string][]byte{},
-			map[string][]byte{},
-			map[string][]byte{},
-			receiverPub, false)
-		require.ErrorContains(t, err, "not found in cpfp refund map")
-	})
+			for _, variant := range []string{"cpfp", "direct", "direct-from-cpfp"} {
+				mutationTests := []struct {
+					name   string
+					mutate func(*wire.MsgTx)
+				}{
+					{
+						name: "extra-output",
+						mutate: func(tx *wire.MsgTx) {
+							tx.AddTxOut(&wire.TxOut{Value: 1, PkScript: attackerScript})
+						},
+					},
+					{
+						name: "shortened-sequence",
+						mutate: func(tx *wire.MsgTx) {
+							tx.TxIn[0].Sequence--
+						},
+					},
+					{
+						name: "zero-delay-sequence",
+						mutate: func(tx *wire.MsgTx) {
+							tx.TxIn[0].Sequence = spark.ZeroSequence
+						},
+					},
+					{
+						name: "wrong-outpoint",
+						mutate: func(tx *wire.MsgTx) {
+							tx.TxIn[0].PreviousOutPoint.Index++
+						},
+					},
+					{
+						name: "wrong-destination",
+						mutate: func(tx *wire.MsgTx) {
+							tx.TxOut[0].PkScript = attackerScript
+						},
+					},
+					{
+						name: "wrong-value",
+						mutate: func(tx *wire.MsgTx) {
+							tx.TxOut[0].Value--
+						},
+					},
+					{
+						name: "wrong-version",
+						mutate: func(tx *wire.MsgTx) {
+							tx.Version = 2
+						},
+					},
+					{
+						name: "extra-input",
+						mutate: func(tx *wire.MsgTx) {
+							tx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Index: 1}, Sequence: tx.TxIn[0].Sequence})
+						},
+					},
+					{
+						name: "missing-output",
+						mutate: func(tx *wire.MsgTx) {
+							tx.TxOut = nil
+						},
+					},
+				}
+				for _, tc := range mutationTests {
+					t.Run(variant+"/"+tc.name, func(t *testing.T) {
+						mutated := mutateUtxoSwapRefund(t, canonical, variant, tc.mutate)
+						require.Error(t, validator.validate(mutated))
+					})
+				}
+			}
+		})
+	}
 }
 
 func TestCreateTransfer_UsesNodeTxOutpoint_SucceedsWithCorruptedOldRefund(t *testing.T) {
