@@ -67,6 +67,10 @@ knobs:
     spark.so.deposit_tree.require_prepare_binding: 0
     # Lightning
     spark.so.shutdown_hodl_invoices: 0
+    # Off locally: turning it on would reject every lightning receive in the
+    # suite, since the allowlist entries are targeted per-pubkey knobs that
+    # cannot be set here.
+    spark.so.lightning.receive_sender_allowlist.enabled: 0
     # Multiparty (user-side MPC) transfer send — fail-closed endpoint; off until the flow lands.
     spark.so.mpc_transfer.enabled: 0
     spark.so.use_batched_ancestor_chain: 100

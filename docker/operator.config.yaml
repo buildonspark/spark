@@ -58,6 +58,7 @@ knobs:
     spark.so.log_transfer_query_invocations: 0
     spark.so.log_transfer_query_invocations_slow_ms: 0
     spark.so.shutdown_hodl_invoices: 0
+    spark.so.lightning.receive_sender_allowlist.enabled: 0
     spark.so.mpc_transfer.enabled: 0
     spark.so.use_batched_ancestor_chain: 100
     spark.so.initiate_preimage_swap_v4.enabled: 1

@@ -53,6 +53,8 @@ import (
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/partner"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -1242,6 +1244,35 @@ func (h *LightningHandler) storeUserSignedTransactions(
 }
 
 // GetPreimageShare gets the preimage share for the given payment hash.
+// enforceLightningReceiveSender rejects a REASON_RECEIVE preimage swap whose sender
+// is not on the allowlist. Off by default, so it admits everyone until an operator
+// populates the allowlist and turns the gate on.
+//
+// Gates on the sender from the request rather than the session identity: participant
+// SOs get the prepare payload from the coordinator and have no user session. The key
+// is signature-bound by ValidateTransferPackage, so naming a key you do not hold
+// fails there.
+//
+// The rejection reuses the identity-mismatch response verbatim — same code, same
+// message, no error detail — so the allowlist cannot be enumerated by comparing
+// responses.
+func enforceLightningReceiveSender(ctx context.Context, senderIdentityPubKey keys.Public) error {
+	knobsService := knobs.GetKnobsService(ctx)
+	if knobsService.GetValue(knobs.KnobLightningReceiveSenderAllowlistEnabled, 0) <= 0 {
+		return nil
+	}
+	if knobsService.GetValueTarget(
+		knobs.KnobLightningReceiveAllowedSender, new(senderIdentityPubKey.ToHex()), 0,
+	) > 0 {
+		return nil
+	}
+	logging.GetLoggerFromContext(ctx).Warn(
+		"lightning receive sender not allowlisted",
+		zap.Stringer("identity_public_key", senderIdentityPubKey),
+	)
+	return status.Error(codes.PermissionDenied, "session identity does not match request identity")
+}
+
 func (h *LightningHandler) GetPreimageShare(
 	ctx context.Context,
 	req *pbspark.InitiatePreimageSwapRequest,
@@ -1282,6 +1313,15 @@ func (h *LightningHandler) GetPreimageShare(
 	validateErr := func() error {
 		if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.GetFeeSats() != 0 {
 			return fmt.Errorf("fee is not allowed for receive preimage swap")
+		}
+		if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
+			senderIdentityPubKey, err := keys.ParsePublicKey(inputs.ownerIdentityPublicKey)
+			if err != nil {
+				return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse owner identity public key: %w", err))
+			}
+			if err := enforceLightningReceiveSender(validateCtx, senderIdentityPubKey); err != nil {
+				return err
+			}
 		}
 
 		var err error

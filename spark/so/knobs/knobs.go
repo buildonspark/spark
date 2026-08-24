@@ -318,6 +318,19 @@ const (
 
 	KnobShutdownHodlInvoices = "spark.so.shutdown_hodl_invoices"
 
+	// KnobLightningReceiveSenderAllowlistEnabled turns on the sender allowlist for
+	// REASON_RECEIVE preimage swaps. Default 0 leaves the gate inert, so the
+	// allowlist can be populated before it starts rejecting. Interpreted as binary
+	// (any non-zero value enables) — not a percentage rollout.
+	KnobLightningReceiveSenderAllowlistEnabled = "spark.so.lightning.receive_sender_allowlist.enabled"
+
+	// KnobLightningReceiveAllowedSender allows one sender identity to initiate
+	// REASON_RECEIVE preimage swaps, keyed by identity pubkey hex:
+	// spark.so.lightning.receive_sender_allowlist.sender@<hex> = 1. Only read when
+	// KnobLightningReceiveSenderAllowlistEnabled is on. Set it on every SO's knob
+	// ConfigMap: each SO enforces for itself.
+	KnobLightningReceiveAllowedSender = "spark.so.lightning.receive_sender_allowlist.sender"
+
 	KnobMaxUnusedDepositAddresses = "spark.so.max_unused_deposit_addresses"
 
 	// When enabled, rotate_static_deposit_address creates a new address instead

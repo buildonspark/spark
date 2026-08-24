@@ -233,6 +233,18 @@ func (h *InitiatePreimageSwapFlowHandler) prepareState(ctx context.Context, req 
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE && req.GetFeeSats() != 0 {
 		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("fee is not allowed for receive preimage swap"))
 	}
+	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		// Runs before ValidateTransferPackage verifies the sender signature over this
+		// key, which is safe: the gate only rejects, and a caller who names an
+		// allowlisted key it does not hold fails that signature check below.
+		senderIdentityPubKey, err := keys.ParsePublicKey(inputs.ownerIdentityPublicKey)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse owner identity public key: %w", err))
+		}
+		if err := enforceLightningReceiveSender(ctx, senderIdentityPubKey); err != nil {
+			return nil, err
+		}
+	}
 
 	// Receiver key from the top-level field, matching the legacy participant
 	// (GetPreimageShare) path.
