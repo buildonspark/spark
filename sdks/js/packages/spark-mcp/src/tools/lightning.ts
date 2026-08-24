@@ -9,13 +9,19 @@ import type { SparkWallet } from "@buildonspark/spark-sdk";
 
 type ResolveFn = (mnemonic?: string) => Promise<SparkWallet>;
 
-export async function handleCreateInvoice(
-  amountSats: number,
-  memo?: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleCreateInvoice({
+  amountSats,
+  memo,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  amountSats: number;
+  memo?: string;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const request = await wallet.createLightningInvoice({ amountSats, memo });
@@ -38,13 +44,19 @@ export async function handleCreateInvoice(
   }
 }
 
-export async function handlePayInvoice(
-  invoice: string,
-  maxFeeSats: number,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handlePayInvoice({
+  invoice,
+  maxFeeSats,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  invoice: string;
+  maxFeeSats: number;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const result = await wallet.payLightningInvoice({ invoice, maxFeeSats });
@@ -67,12 +79,17 @@ export async function handlePayInvoice(
   }
 }
 
-export async function handleGetLightningFeeEstimate(
-  invoice: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleGetLightningFeeEstimate({
+  invoice,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  invoice: string;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const feeSats = await wallet.getLightningSendFeeEstimate({

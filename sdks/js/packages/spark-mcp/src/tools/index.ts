@@ -37,6 +37,13 @@ const mnemonicParam = z
     "BIP39 mnemonic for the wallet to use. Omit to use the server default (SPARK_MNEMONIC env var).",
   );
 
+// The SSP is asked for a quote before anything parses this key, so an
+// unconstrained string spends a round trip to learn it was never a key.
+const receiverPubkeyParam = z
+  .string()
+  .regex(/^0[23][0-9a-fA-F]{64}$/, "must be a 33-byte compressed public key")
+  .optional();
+
 const networkParam = z
   .enum(["LOCAL", "REGTEST", "MAINNET"])
   .optional()
@@ -80,7 +87,7 @@ export function registerAllTools(
       output: outputParam,
     },
     ({ network, output }: { network?: string; output?: OutputMode }) =>
-      handleCreateWallet(makeCreateFresh(network), output),
+      handleCreateWallet({ createFresh: makeCreateFresh(network), output }),
   );
 
   // Wallet tools
@@ -100,7 +107,7 @@ export function registerAllTools(
       mnemonic?: string;
       network?: string;
       output?: OutputMode;
-    }) => handleGetBalance(mnemonic, makeResolve(network), output),
+    }) => handleGetBalance({ mnemonic, resolve: makeResolve(network), output }),
   );
   server.tool(
     "spark_get_spark_address",
@@ -118,7 +125,12 @@ export function registerAllTools(
       mnemonic?: string;
       network?: string;
       output?: OutputMode;
-    }) => handleGetSparkAddress(mnemonic, makeResolve(network), output),
+    }) =>
+      handleGetSparkAddress({
+        mnemonic,
+        resolve: makeResolve(network),
+        output,
+      }),
   );
   server.tool(
     "spark_disconnect_wallet",
@@ -139,12 +151,11 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handleDisconnectWallet(
+      handleDisconnectWallet({
         mnemonic,
-        network as "LOCAL" | "REGTEST" | "MAINNET" | undefined,
-        undefined,
+        networkOverride: network as "LOCAL" | "REGTEST" | "MAINNET" | undefined,
         output,
-      ),
+      }),
   );
 
   // Deposit tools
@@ -164,7 +175,12 @@ export function registerAllTools(
       mnemonic?: string;
       network?: string;
       output?: OutputMode;
-    }) => handleGetDepositAddress(mnemonic, makeResolve(network), output),
+    }) =>
+      handleGetDepositAddress({
+        mnemonic,
+        resolve: makeResolve(network),
+        output,
+      }),
   );
   server.tool(
     "spark_claim_deposit",
@@ -186,13 +202,12 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handleClaimDeposit(
+      handleClaimDeposit({
         txid,
         mnemonic,
-        makeResolve(network),
-        undefined,
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
   // Dev-only tools: only registered in LOCAL environments (where bitcoind RPC is available).
   if (isLocal) {
@@ -229,15 +244,13 @@ export function registerAllTools(
         network?: string;
         output?: OutputMode;
       }) =>
-        handleFundAddress(
+        handleFundAddress({
           address,
           amountSats,
           blocksToMine,
-          undefined,
-          undefined,
+          networkOverride: network,
           output,
-          network,
-        ),
+        }),
     );
     server.tool(
       "spark_deposit",
@@ -264,14 +277,13 @@ export function registerAllTools(
         network?: string;
         output?: OutputMode;
       }) =>
-        handleDeposit(
+        handleDeposit({
           amountSats,
           mnemonic,
-          makeResolve(network),
-          undefined,
+          networkOverride: network,
+          resolve: makeResolve(network),
           output,
-          network,
-        ),
+        }),
     );
   }
 
@@ -305,13 +317,13 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handleSendTransfer(
+      handleSendTransfer({
         receiverSparkAddress,
         amountSats,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
   server.tool(
     "spark_send_multi_transfer",
@@ -347,12 +359,12 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handleSendMultiTransfer(
+      handleSendMultiTransfer({
         receivers,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
   server.tool(
     "spark_get_transfer",
@@ -373,7 +385,13 @@ export function registerAllTools(
       mnemonic?: string;
       network?: string;
       output?: OutputMode;
-    }) => handleGetTransfer(id, mnemonic, makeResolve(network), output),
+    }) =>
+      handleGetTransfer({
+        id,
+        mnemonic,
+        resolve: makeResolve(network),
+        output,
+      }),
   );
   server.tool(
     "spark_list_transfers",
@@ -391,7 +409,8 @@ export function registerAllTools(
       mnemonic?: string;
       network?: string;
       output?: OutputMode;
-    }) => handleListTransfers(mnemonic, makeResolve(network), output),
+    }) =>
+      handleListTransfers({ mnemonic, resolve: makeResolve(network), output }),
   );
   // Lightning tools
   server.tool(
@@ -421,13 +440,13 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handleCreateInvoice(
+      handleCreateInvoice({
         amountSats,
         memo,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
   server.tool(
     "spark_pay_invoice",
@@ -456,13 +475,13 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handlePayInvoice(
+      handlePayInvoice({
         invoice,
         maxFeeSats,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
   server.tool(
     "spark_get_lightning_fee_estimate",
@@ -484,12 +503,12 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handleGetLightningFeeEstimate(
+      handleGetLightningFeeEstimate({
         invoice,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
 
   // Quoted receive tools. Both the split and one-shot forms ship: an agent
@@ -516,6 +535,9 @@ export function registerAllTools(
         .describe(
           "Partner JWT to attribute the quote to. Without one the quote comes back feeless and attributionStatus says why.",
         ),
+      receiverIdentityPubkey: receiverPubkeyParam.describe(
+        "Hex identity public key of the wallet to pay. Defaults to this wallet. Naming another quotes a delegated receive: this wallet still attests, so the payee need not be online.",
+      ),
       mnemonic: mnemonicParam,
       network: networkParam,
       output: outputParam,
@@ -524,6 +546,7 @@ export function registerAllTools(
       amountSats,
       amountBasis,
       partnerJwt,
+      receiverIdentityPubkey,
       mnemonic,
       network,
       output,
@@ -531,18 +554,20 @@ export function registerAllTools(
       amountSats: number;
       amountBasis?: string;
       partnerJwt?: string;
+      receiverIdentityPubkey?: string;
       mnemonic?: string;
       network?: string;
       output?: OutputMode;
     }) =>
-      handleLightningReceiveQuote(
+      handleLightningReceiveQuote({
         amountSats,
         amountBasis,
         partnerJwt,
+        receiverIdentityPubkey,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
   server.tool(
     "spark_create_invoice_from_quote",
@@ -564,6 +589,9 @@ export function registerAllTools(
         .optional()
         .describe("The basis the quote was requested with"),
       memo: z.string().optional().describe("Optional payment description"),
+      receiverIdentityPubkey: receiverPubkeyParam.describe(
+        "The same receiver the quote was requested with. The manifest already names the payee, so a mismatch is refused.",
+      ),
       mnemonic: mnemonicParam,
       network: networkParam,
       output: outputParam,
@@ -574,6 +602,7 @@ export function registerAllTools(
       amountSats,
       amountBasis,
       memo,
+      receiverIdentityPubkey,
       mnemonic,
       network,
       output,
@@ -583,20 +612,22 @@ export function registerAllTools(
       amountSats: number;
       amountBasis?: string;
       memo?: string;
+      receiverIdentityPubkey?: string;
       mnemonic?: string;
       network?: string;
       output?: OutputMode;
     }) =>
-      handleCreateInvoiceFromQuote(
+      handleCreateInvoiceFromQuote({
         serializedManifest,
         issuerSignature,
         amountSats,
         amountBasis,
         memo,
+        receiverIdentityPubkey,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
   server.tool(
     "spark_create_quoted_invoice",
@@ -625,6 +656,9 @@ export function registerAllTools(
         .describe(
           "Partner JWT to attribute the quote to. Without one the invoice is feeless.",
         ),
+      receiverIdentityPubkey: receiverPubkeyParam.describe(
+        "Hex identity public key of the wallet to pay. Defaults to this wallet. Naming another quotes a delegated receive: this wallet still attests, so the payee need not be online.",
+      ),
       mnemonic: mnemonicParam,
       network: networkParam,
       output: outputParam,
@@ -634,6 +668,7 @@ export function registerAllTools(
       amountBasis,
       memo,
       partnerJwt,
+      receiverIdentityPubkey,
       mnemonic,
       network,
       output,
@@ -642,19 +677,21 @@ export function registerAllTools(
       amountBasis?: string;
       memo?: string;
       partnerJwt?: string;
+      receiverIdentityPubkey?: string;
       mnemonic?: string;
       network?: string;
       output?: OutputMode;
     }) =>
-      handleCreateQuotedInvoice(
+      handleCreateQuotedInvoice({
         amountSats,
         amountBasis,
         memo,
         partnerJwt,
+        receiverIdentityPubkey,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
 
   // Withdrawal tools
@@ -687,13 +724,13 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handleGetWithdrawalFeeQuote(
+      handleGetWithdrawalFeeQuote({
         amountSats,
         withdrawalAddress,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
   server.tool(
     "spark_withdraw",
@@ -734,14 +771,14 @@ export function registerAllTools(
       network?: string;
       output?: OutputMode;
     }) =>
-      handleWithdraw(
+      handleWithdraw({
         onchainAddress,
         exitSpeed,
         amountSats,
         feeQuoteId,
         mnemonic,
-        makeResolve(network),
+        resolve: makeResolve(network),
         output,
-      ),
+      }),
   );
 }

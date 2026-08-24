@@ -71,20 +71,30 @@ function describeQuote(quote: LightningReceiveQuote) {
   };
 }
 
-export async function handleLightningReceiveQuote(
-  amountSats: number,
-  amountBasis?: string,
-  partnerJwt?: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleLightningReceiveQuote({
+  amountSats,
+  amountBasis,
+  partnerJwt,
+  receiverIdentityPubkey,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  amountSats: number;
+  amountBasis?: string;
+  partnerJwt?: string;
+  receiverIdentityPubkey?: string;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const quote = await wallet.getLightningReceiveQuote({
       amountSats,
       amountBasis: basisOf(amountBasis),
       partnerJwt,
+      receiverIdentityPubkey,
     });
 
     if (output === "raw") return rawResult(quote);
@@ -122,15 +132,23 @@ function quoteFromWire(
   };
 }
 
-async function issueQuotedInvoice(
-  wallet: SparkWallet,
-  quote: LightningReceiveQuote,
-  memo: string | undefined,
-  output: OutputMode,
-): Promise<ToolResult> {
+async function issueQuotedInvoice({
+  wallet,
+  quote,
+  memo,
+  receiverIdentityPubkey,
+  output,
+}: {
+  wallet: SparkWallet;
+  quote: LightningReceiveQuote;
+  memo?: string;
+  receiverIdentityPubkey?: string;
+  output: OutputMode;
+}): Promise<ToolResult> {
   const request = await wallet.createLightningInvoice({
     amountSats: quote.amountSats,
     memo,
+    receiverIdentityPubkey,
     quote,
   });
 
@@ -148,29 +166,41 @@ async function issueQuotedInvoice(
   });
 }
 
-export async function handleCreateInvoiceFromQuote(
-  serializedManifest: string,
-  issuerSignature: string,
-  amountSats: number,
-  amountBasis?: string,
-  memo?: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleCreateInvoiceFromQuote({
+  serializedManifest,
+  issuerSignature,
+  amountSats,
+  amountBasis,
+  memo,
+  receiverIdentityPubkey,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  serializedManifest: string;
+  issuerSignature: string;
+  amountSats: number;
+  amountBasis?: string;
+  memo?: string;
+  receiverIdentityPubkey?: string;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
-    return await issueQuotedInvoice(
+    return await issueQuotedInvoice({
       wallet,
-      quoteFromWire(
+      quote: quoteFromWire(
         serializedManifest,
         issuerSignature,
         amountSats,
         amountBasis,
       ),
       memo,
+      receiverIdentityPubkey,
       output,
-    );
+    });
   } catch (err) {
     return {
       content: [{ type: "text", text: `Error: ${errorMessage(err)}` }],
@@ -179,23 +209,40 @@ export async function handleCreateInvoiceFromQuote(
   }
 }
 
-export async function handleCreateQuotedInvoice(
-  amountSats: number,
-  amountBasis?: string,
-  memo?: string,
-  partnerJwt?: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleCreateQuotedInvoice({
+  amountSats,
+  amountBasis,
+  memo,
+  partnerJwt,
+  receiverIdentityPubkey,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  amountSats: number;
+  amountBasis?: string;
+  memo?: string;
+  partnerJwt?: string;
+  receiverIdentityPubkey?: string;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const quote = await wallet.getLightningReceiveQuote({
       amountSats,
       amountBasis: basisOf(amountBasis),
       partnerJwt,
+      receiverIdentityPubkey,
     });
-    return await issueQuotedInvoice(wallet, quote, memo, output);
+    return await issueQuotedInvoice({
+      wallet,
+      quote,
+      memo,
+      receiverIdentityPubkey,
+      output,
+    });
   } catch (err) {
     return {
       content: [{ type: "text", text: `Error: ${errorMessage(err)}` }],

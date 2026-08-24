@@ -37,12 +37,11 @@ describe("handleDeposit", () => {
   it("rejects on MAINNET network", async () => {
     process.env["BITCOIN_NETWORK"] = "MAINNET";
 
-    const result = await handleDeposit(
-      50_000,
-      undefined,
-      mockResolve,
-      mockFund,
-    );
+    const result = await handleDeposit({
+      amountSats: 50_000,
+      resolve: mockResolve,
+      fundFn: mockFund,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("only works on the LOCAL");
@@ -52,12 +51,11 @@ describe("handleDeposit", () => {
   it("rejects on REGTEST network", async () => {
     process.env["BITCOIN_NETWORK"] = "REGTEST";
 
-    const result = await handleDeposit(
-      50_000,
-      undefined,
-      mockResolve,
-      mockFund,
-    );
+    const result = await handleDeposit({
+      amountSats: 50_000,
+      resolve: mockResolve,
+      fundFn: mockFund,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("only works on the LOCAL");
@@ -67,14 +65,13 @@ describe("handleDeposit", () => {
   it("rejects with MAINNET override on LOCAL default", async () => {
     process.env["BITCOIN_NETWORK"] = "LOCAL";
 
-    const result = await handleDeposit(
-      50_000,
-      undefined,
-      mockResolve,
-      mockFund,
-      "normal",
-      "MAINNET",
-    );
+    const result = await handleDeposit({
+      amountSats: 50_000,
+      networkOverride: "MAINNET",
+      resolve: mockResolve,
+      fundFn: mockFund,
+      output: "normal",
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("LOCAL");
@@ -95,19 +92,21 @@ describe("handleDeposit", () => {
     mockWallet.claimDeposit.mockResolvedValue([{ value: 50_000 }]);
     mockWallet.getBalance.mockResolvedValue({ balance: 50_000n });
 
-    const result = await handleDeposit(
-      50_000,
-      undefined,
-      mockResolve,
-      mockFund,
-    );
+    const result = await handleDeposit({
+      amountSats: 50_000,
+      resolve: mockResolve,
+      fundFn: mockFund,
+    });
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("Deposit complete");
     expect(result.content[0].text).toContain("50,000 sats");
     expect(result.content[0].text).toContain("txid123");
     expect(mockWallet.getSingleUseDepositAddress).toHaveBeenCalled();
-    expect(mockFund).toHaveBeenCalledWith("bcrt1pabc123", 50_000);
+    expect(mockFund).toHaveBeenCalledWith({
+      address: "bcrt1pabc123",
+      amountSats: 50_000,
+    });
     expect(mockWallet.claimDeposit).toHaveBeenCalledWith("txid123");
   });
 
@@ -119,12 +118,11 @@ describe("handleDeposit", () => {
       isError: true,
     });
 
-    const result = await handleDeposit(
-      50_000,
-      undefined,
-      mockResolve,
-      mockFund,
-    );
+    const result = await handleDeposit({
+      amountSats: 50_000,
+      resolve: mockResolve,
+      fundFn: mockFund,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("500");
@@ -135,12 +133,11 @@ describe("handleDeposit", () => {
     process.env["BITCOIN_NETWORK"] = "LOCAL";
     mockResolve.mockRejectedValue(new Error("No wallet specified"));
 
-    const result = await handleDeposit(
-      50_000,
-      undefined,
-      mockResolve,
-      mockFund,
-    );
+    const result = await handleDeposit({
+      amountSats: 50_000,
+      resolve: mockResolve,
+      fundFn: mockFund,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("No wallet specified");
@@ -161,12 +158,11 @@ describe("handleDeposit", () => {
       new Error("Deposit not confirmed"),
     );
 
-    const result = await handleDeposit(
-      50_000,
-      undefined,
-      mockResolve,
-      mockFund,
-    );
+    const result = await handleDeposit({
+      amountSats: 50_000,
+      resolve: mockResolve,
+      fundFn: mockFund,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Deposit not confirmed");
@@ -186,14 +182,15 @@ describe("handleDeposit", () => {
     mockWallet.claimDeposit.mockResolvedValue([{ value: 50_000 }]);
     mockWallet.getBalance.mockResolvedValue({ balance: 50_000n });
 
-    const result = await handleDeposit(
-      undefined,
-      undefined,
-      mockResolve,
-      mockFund,
-    );
+    const result = await handleDeposit({
+      resolve: mockResolve,
+      fundFn: mockFund,
+    });
 
     expect(result.isError).toBeUndefined();
-    expect(mockFund).toHaveBeenCalledWith("bcrt1pabc", 50_000);
+    expect(mockFund).toHaveBeenCalledWith({
+      address: "bcrt1pabc",
+      amountSats: 50_000,
+    });
   });
 });

@@ -34,12 +34,11 @@ describe("handleClaimDeposit", () => {
       .mockResolvedValueOnce({ balance: 50_000n }); // second poll — settled
     mockWallet.claimDeposit.mockResolvedValue([{ value: 50_000 }]);
 
-    const result = await handleClaimDeposit(
-      "txid123",
-      undefined,
-      mockResolve,
-      5_000,
-    );
+    const result = await handleClaimDeposit({
+      txid: "txid123",
+      resolve: mockResolve,
+      settleTimeoutMs: 5_000,
+    });
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("Deposit claimed successfully");
@@ -55,12 +54,11 @@ describe("handleClaimDeposit", () => {
       .mockResolvedValueOnce({ balance: 60_000n }); // first poll — already settled
     mockWallet.claimDeposit.mockResolvedValue([{ value: 50_000 }]);
 
-    const result = await handleClaimDeposit(
-      "txidABC",
-      undefined,
-      mockResolve,
-      5_000,
-    );
+    const result = await handleClaimDeposit({
+      txid: "txidABC",
+      resolve: mockResolve,
+      settleTimeoutMs: 5_000,
+    });
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("60,000 sats");
@@ -72,12 +70,11 @@ describe("handleClaimDeposit", () => {
     mockWallet.claimDeposit.mockResolvedValue([{ value: 50_000 }]);
 
     // Use a very short timeout so the test doesn't take long.
-    const result = await handleClaimDeposit(
-      "txid-timeout",
-      undefined,
-      mockResolve,
-      100, // 100ms timeout — will expire before any poll succeeds
-    );
+    const result = await handleClaimDeposit({
+      txid: "txid-timeout",
+      resolve: mockResolve,
+      settleTimeoutMs: 100, // will expire before any poll succeeds
+    });
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("has not settled yet");
@@ -90,12 +87,11 @@ describe("handleClaimDeposit", () => {
       new Error("Deposit not confirmed"),
     );
 
-    const result = await handleClaimDeposit(
-      "txid-bad",
-      undefined,
-      mockResolve,
-      5_000,
-    );
+    const result = await handleClaimDeposit({
+      txid: "txid-bad",
+      resolve: mockResolve,
+      settleTimeoutMs: 5_000,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Deposit not confirmed");
@@ -104,12 +100,11 @@ describe("handleClaimDeposit", () => {
   it("returns error when wallet resolution fails", async () => {
     mockResolve.mockRejectedValue(new Error("No wallet specified"));
 
-    const result = await handleClaimDeposit(
-      "txid-no-wallet",
-      undefined,
-      mockResolve,
-      5_000,
-    );
+    const result = await handleClaimDeposit({
+      txid: "txid-no-wallet",
+      resolve: mockResolve,
+      settleTimeoutMs: 5_000,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("No wallet specified");
@@ -123,12 +118,11 @@ describe("handleClaimDeposit", () => {
       .mockResolvedValueOnce({ balance: 125_000n }); // second poll — settled
     mockWallet.claimDeposit.mockResolvedValue([{ value: 25_000 }]);
 
-    const result = await handleClaimDeposit(
-      "txid-existing",
-      undefined,
-      mockResolve,
-      5_000,
-    );
+    const result = await handleClaimDeposit({
+      txid: "txid-existing",
+      resolve: mockResolve,
+      settleTimeoutMs: 5_000,
+    });
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("125,000 sats");
@@ -147,7 +141,7 @@ describe("handleGetDepositAddress", () => {
       .fn<ResolveFn>()
       .mockResolvedValue(mockWallet as unknown as SparkWallet);
 
-    const result = await handleGetDepositAddress(undefined, mockResolve);
+    const result = await handleGetDepositAddress({ resolve: mockResolve });
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("bcrt1pabc123");
@@ -159,7 +153,7 @@ describe("handleGetDepositAddress", () => {
       .fn<ResolveFn>()
       .mockRejectedValue(new Error("No wallet specified"));
 
-    const result = await handleGetDepositAddress(undefined, mockResolve);
+    const result = await handleGetDepositAddress({ resolve: mockResolve });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("No wallet specified");

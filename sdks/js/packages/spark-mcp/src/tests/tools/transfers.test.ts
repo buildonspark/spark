@@ -86,24 +86,22 @@ describe("handleSendTransfer", () => {
   it("returns transfer id and status", async () => {
     getBalanceMock.mockResolvedValue({ balance: 5000n });
     transferMock.mockResolvedValue(sampleTransfer);
-    const result = await handleSendTransfer(
-      "sparkl1abc",
-      1000,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleSendTransfer({
+      receiverSparkAddress: "sparkl1abc",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("txn-123");
   });
 
   it("returns insufficient balance error before calling transfer", async () => {
     getBalanceMock.mockResolvedValue({ balance: 500n });
-    const result = await handleSendTransfer(
-      "sparkl1abc",
-      1000,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleSendTransfer({
+      receiverSparkAddress: "sparkl1abc",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("Insufficient balance");
     expect(transferMock).not.toHaveBeenCalled();
@@ -112,12 +110,11 @@ describe("handleSendTransfer", () => {
   it("returns error on transfer failure", async () => {
     getBalanceMock.mockResolvedValue({ balance: 5000n });
     transferMock.mockRejectedValue(new Error("insufficient funds"));
-    const result = await handleSendTransfer(
-      "sparkl1abc",
-      1000,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleSendTransfer({
+      receiverSparkAddress: "sparkl1abc",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("insufficient funds");
   });
@@ -132,11 +129,10 @@ describe("handleSendMultiTransfer", () => {
   it("returns transfer id and receiver count", async () => {
     getBalanceMock.mockResolvedValue({ balance: 5000n });
     transferV2Mock.mockResolvedValue(sampleTransfer);
-    const result = await handleSendMultiTransfer(
+    const result = await handleSendMultiTransfer({
       receivers,
-      undefined,
-      mockResolve,
-    );
+      resolve: mockResolve,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("txn-123");
     expect(result.content[0]?.text).toContain("Receivers: 2");
@@ -144,11 +140,10 @@ describe("handleSendMultiTransfer", () => {
 
   it("returns insufficient balance error when total exceeds balance", async () => {
     getBalanceMock.mockResolvedValue({ balance: 500n });
-    const result = await handleSendMultiTransfer(
+    const result = await handleSendMultiTransfer({
       receivers,
-      undefined,
-      mockResolve,
-    );
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("Insufficient balance");
     expect(transferV2Mock).not.toHaveBeenCalled();
@@ -157,11 +152,10 @@ describe("handleSendMultiTransfer", () => {
   it("returns error on transfer failure", async () => {
     getBalanceMock.mockResolvedValue({ balance: 5000n });
     transferV2Mock.mockRejectedValue(new Error("network timeout"));
-    const result = await handleSendMultiTransfer(
+    const result = await handleSendMultiTransfer({
       receivers,
-      undefined,
-      mockResolve,
-    );
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("network timeout");
   });
@@ -169,12 +163,11 @@ describe("handleSendMultiTransfer", () => {
   it("returns raw JSON when output is raw", async () => {
     getBalanceMock.mockResolvedValue({ balance: 5000n });
     transferV2Mock.mockResolvedValue(sampleTransfer);
-    const result = await handleSendMultiTransfer(
+    const result = await handleSendMultiTransfer({
       receivers,
-      undefined,
-      mockResolve,
-      "raw",
-    );
+      resolve: mockResolve,
+      output: "raw",
+    });
     expect(result.isError).toBeFalsy();
     const parsed = parseJson<{ id: string; status: string }>(
       result.content[0].text,
@@ -186,12 +179,11 @@ describe("handleSendMultiTransfer", () => {
   it("returns verbose output with receiver breakdown", async () => {
     getBalanceMock.mockResolvedValue({ balance: 5000n });
     transferV2Mock.mockResolvedValue(sampleTransfer);
-    const result = await handleSendMultiTransfer(
+    const result = await handleSendMultiTransfer({
       receivers,
-      undefined,
-      mockResolve,
-      "verbose",
-    );
+      resolve: mockResolve,
+      output: "verbose",
+    });
     expect(result.isError).toBeFalsy();
     const text = result.content[0].text;
     expect(text).toContain("Direction: OUTGOING");
@@ -204,14 +196,20 @@ describe("handleSendMultiTransfer", () => {
 describe("handleGetTransfer", () => {
   it("returns transfer details", async () => {
     getTransferMock.mockResolvedValue(sampleTransfer);
-    const result = await handleGetTransfer("txn-123", undefined, mockResolve);
+    const result = await handleGetTransfer({
+      id: "txn-123",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("txn-123");
   });
 
   it("returns error when transfer not found", async () => {
     getTransferMock.mockResolvedValue(undefined);
-    const result = await handleGetTransfer("missing", undefined, mockResolve);
+    const result = await handleGetTransfer({
+      id: "missing",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
   });
 });
@@ -222,14 +220,14 @@ describe("handleListTransfers", () => {
       transfers: [sampleTransfer],
       offset: 0,
     });
-    const result = await handleListTransfers(undefined, mockResolve);
+    const result = await handleListTransfers({ resolve: mockResolve });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("txn-123");
   });
 
   it("returns empty message when no transfers", async () => {
     getTransfersMock.mockResolvedValue({ transfers: [], offset: 0 });
-    const result = await handleListTransfers(undefined, mockResolve);
+    const result = await handleListTransfers({ resolve: mockResolve });
     expect(result.content[0]?.text).toContain("No transfers");
   });
 
@@ -238,7 +236,10 @@ describe("handleListTransfers", () => {
       transfers: [sampleTransfer],
       offset: 0,
     });
-    const result = await handleListTransfers(undefined, mockResolve, "raw");
+    const result = await handleListTransfers({
+      resolve: mockResolve,
+      output: "raw",
+    });
     const parsed = parseJson<
       Array<{ id: string; senderIdentityPublicKey: string }>
     >(result.content[0].text);
@@ -252,7 +253,10 @@ describe("handleListTransfers", () => {
       transfers: [sampleTransfer],
       offset: 0,
     });
-    const result = await handleListTransfers(undefined, mockResolve, "verbose");
+    const result = await handleListTransfers({
+      resolve: mockResolve,
+      output: "verbose",
+    });
     const text = result.content[0].text;
     expect(text).toContain("Direction: OUTGOING");
     expect(text).toContain("Sender: sender-pub-key-abc");
@@ -264,12 +268,11 @@ describe("handleListTransfers", () => {
 describe("output modes for handleGetTransfer", () => {
   it("returns raw JSON", async () => {
     getTransferMock.mockResolvedValue(sampleTransfer);
-    const result = await handleGetTransfer(
-      "txn-123",
-      undefined,
-      mockResolve,
-      "raw",
-    );
+    const result = await handleGetTransfer({
+      id: "txn-123",
+      resolve: mockResolve,
+      output: "raw",
+    });
     const parsed = parseJson<{
       id: string;
       receiverIdentityPublicKey: string;
@@ -280,12 +283,11 @@ describe("output modes for handleGetTransfer", () => {
 
   it("returns verbose output", async () => {
     getTransferMock.mockResolvedValue(sampleTransfer);
-    const result = await handleGetTransfer(
-      "txn-123",
-      undefined,
-      mockResolve,
-      "verbose",
-    );
+    const result = await handleGetTransfer({
+      id: "txn-123",
+      resolve: mockResolve,
+      output: "verbose",
+    });
     const text = result.content[0].text;
     expect(text).toContain("Direction: OUTGOING");
     expect(text).toContain("Sender: sender-pub-key-abc");

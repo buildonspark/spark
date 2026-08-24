@@ -9,10 +9,13 @@ import type { SparkWallet } from "@buildonspark/spark-sdk";
 
 type CreateFreshFn = () => Promise<{ wallet: SparkWallet; mnemonic: string }>;
 
-export async function handleCreateWallet(
-  createFresh: CreateFreshFn = createFreshWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleCreateWallet({
+  createFresh = createFreshWallet,
+  output = "normal",
+}: {
+  createFresh?: CreateFreshFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const { wallet, mnemonic } = await createFresh();
     const sparkAddress = await wallet.getSparkAddress();

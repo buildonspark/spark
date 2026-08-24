@@ -1,7 +1,7 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { handleCreateWallet } from "../../tools/create-wallet.js";
 
-type CreateFreshFn = Parameters<typeof handleCreateWallet>[0];
+type CreateFreshFn = Parameters<typeof handleCreateWallet>[0]["createFresh"];
 
 describe("handleCreateWallet", () => {
   it("returns mnemonic and spark address", async () => {
@@ -17,7 +17,7 @@ describe("handleCreateWallet", () => {
           "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
       });
 
-    const result = await handleCreateWallet(mockCreateFresh);
+    const result = await handleCreateWallet({ createFresh: mockCreateFresh });
 
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("abandon abandon");
@@ -30,7 +30,7 @@ describe("handleCreateWallet", () => {
       .fn<NonNullable<CreateFreshFn>>()
       .mockRejectedValue(new Error("SDK unavailable"));
 
-    const result = await handleCreateWallet(mockCreateFresh);
+    const result = await handleCreateWallet({ createFresh: mockCreateFresh });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("SDK unavailable");

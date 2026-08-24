@@ -140,13 +140,10 @@ describe("handleLightningReceiveQuote", () => {
   it("surfaces the manifest, its fees and the attribution status", async () => {
     getLightningReceiveQuoteMock.mockResolvedValue(quoteResult(1000));
 
-    const result = await handleLightningReceiveQuote(
-      1000,
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleLightningReceiveQuote({
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBeFalsy();
     const body = bodyOf(result);
@@ -162,13 +159,12 @@ describe("handleLightningReceiveQuote", () => {
   it("passes the basis and partner token through to the SDK", async () => {
     getLightningReceiveQuoteMock.mockResolvedValue(quoteResult(1000));
 
-    await handleLightningReceiveQuote(
-      1000,
-      "GROSS",
-      "jwt-token",
-      undefined,
-      mockResolve,
-    );
+    await handleLightningReceiveQuote({
+      amountSats: 1000,
+      amountBasis: "GROSS",
+      partnerJwt: "jwt-token",
+      resolve: mockResolve,
+    });
 
     expect(getLightningReceiveQuoteMock).toHaveBeenCalledWith({
       amountSats: 1000,
@@ -177,16 +173,29 @@ describe("handleLightningReceiveQuote", () => {
     });
   });
 
+  it("passes a third-party payee through to the SDK", async () => {
+    getLightningReceiveQuoteMock.mockResolvedValue(quoteResult(1000));
+    const payee = "03".repeat(33);
+
+    await handleLightningReceiveQuote({
+      amountSats: 1000,
+      receiverIdentityPubkey: payee,
+      resolve: mockResolve,
+      output: "normal",
+    });
+
+    expect(getLightningReceiveQuoteMock.mock.calls[0]?.[0]).toMatchObject({
+      receiverIdentityPubkey: payee,
+    });
+  });
+
   it("reports a quote failure as an error", async () => {
     getLightningReceiveQuoteMock.mockRejectedValue(new Error("knob is off"));
 
-    const result = await handleLightningReceiveQuote(
-      1000,
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleLightningReceiveQuote({
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("knob is off");
@@ -195,15 +204,14 @@ describe("handleLightningReceiveQuote", () => {
 
 describe("handleCreateInvoiceFromQuote", () => {
   it("invoices the echoed bytes rather than a rebuilt manifest", async () => {
-    const result = await handleCreateInvoiceFromQuote(
-      SERIALIZED_MANIFEST,
-      "aabb",
-      1000,
-      undefined,
-      "memo",
-      "seed words",
-      mockResolve,
-    );
+    const result = await handleCreateInvoiceFromQuote({
+      serializedManifest: SERIALIZED_MANIFEST,
+      issuerSignature: "aabb",
+      amountSats: 1000,
+      memo: "memo",
+      mnemonic: "seed words",
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBeFalsy();
     expect(mockResolve).toHaveBeenCalledWith("seed words");
@@ -218,35 +226,46 @@ describe("handleCreateInvoiceFromQuote", () => {
     );
   });
 
+  it("invoices a delegated quote for its named payee", async () => {
+    const payee = "02".repeat(33);
+
+    await handleCreateInvoiceFromQuote({
+      serializedManifest: SERIALIZED_MANIFEST,
+      issuerSignature: "aabb",
+      amountSats: 1000,
+      receiverIdentityPubkey: payee,
+      resolve: mockResolve,
+      output: "normal",
+    });
+
+    expect(createLightningInvoiceMock.mock.calls[0]?.[0]).toMatchObject({
+      receiverIdentityPubkey: payee,
+    });
+  });
+
   it("surfaces a refusal to reuse the same quote", async () => {
     createLightningInvoiceMock.mockRejectedValue(
       new Error("this quote has already been committed; request a new one"),
     );
 
-    const result = await handleCreateInvoiceFromQuote(
-      SERIALIZED_MANIFEST,
-      "aabb",
-      1000,
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleCreateInvoiceFromQuote({
+      serializedManifest: SERIALIZED_MANIFEST,
+      issuerSignature: "aabb",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("already been committed");
   });
 
   it("reports a malformed issuer signature as an error", async () => {
-    const result = await handleCreateInvoiceFromQuote(
-      SERIALIZED_MANIFEST,
-      "zzzz",
-      1000,
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleCreateInvoiceFromQuote({
+      serializedManifest: SERIALIZED_MANIFEST,
+      issuerSignature: "zzzz",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain(
@@ -256,17 +275,14 @@ describe("handleCreateInvoiceFromQuote", () => {
   });
 
   it("reports malformed manifest hex as an error", async () => {
-    const result = await handleCreateInvoiceFromQuote(
+    const result = await handleCreateInvoiceFromQuote({
       // Even length, so the character-class guard is what has to reject it —
       // Buffer.from would silently truncate at the first non-hex byte.
-      `${SERIALIZED_MANIFEST.slice(0, -2)}zz`,
-      "aabb",
-      1000,
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+      serializedManifest: `${SERIALIZED_MANIFEST.slice(0, -2)}zz`,
+      issuerSignature: "aabb",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("not valid hex");
@@ -278,14 +294,12 @@ describe("handleCreateQuotedInvoice", () => {
   it("quotes and invoices in one call", async () => {
     getLightningReceiveQuoteMock.mockResolvedValue(quoteResult(1000));
 
-    const result = await handleCreateQuotedInvoice(
-      1000,
-      undefined,
-      "memo",
-      "jwt-token",
-      undefined,
-      mockResolve,
-    );
+    const result = await handleCreateQuotedInvoice({
+      amountSats: 1000,
+      memo: "memo",
+      partnerJwt: "jwt-token",
+      resolve: mockResolve,
+    });
 
     // memo and partnerJwt are adjacent same-typed optionals, so setting both is
     // what makes a transposition detectable.
@@ -305,17 +319,33 @@ describe("handleCreateQuotedInvoice", () => {
     expect(createLightningInvoiceMock).toHaveBeenCalledTimes(1);
   });
 
+  it("names the same payee on both the quote and the invoice", async () => {
+    getLightningReceiveQuoteMock.mockResolvedValue(quoteResult(1000));
+    const payee = "02".repeat(33);
+
+    await handleCreateQuotedInvoice({
+      amountSats: 1000,
+      receiverIdentityPubkey: payee,
+      resolve: mockResolve,
+      output: "normal",
+    });
+
+    // Two independent forwards; a mismatch signs an attestation the SSP refuses.
+    expect(getLightningReceiveQuoteMock.mock.calls[0]?.[0]).toMatchObject({
+      receiverIdentityPubkey: payee,
+    });
+    expect(createLightningInvoiceMock.mock.calls[0]?.[0]).toMatchObject({
+      receiverIdentityPubkey: payee,
+    });
+  });
+
   it("does not invoice when the quote fails", async () => {
     getLightningReceiveQuoteMock.mockRejectedValue(new Error("quote refused"));
 
-    const result = await handleCreateQuotedInvoice(
-      1000,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleCreateQuotedInvoice({
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBe(true);
     expect(createLightningInvoiceMock).not.toHaveBeenCalled();
@@ -327,13 +357,11 @@ describe("fee-bearing quotes", () => {
     getLightningReceiveQuoteMock.mockResolvedValue(feeBearingQuote());
 
     const body = bodyOf(
-      await handleLightningReceiveQuote(
-        100_000,
-        undefined,
-        "jwt",
-        undefined,
-        mockResolve,
-      ),
+      await handleLightningReceiveQuote({
+        amountSats: 100_000,
+        partnerJwt: "jwt",
+        resolve: mockResolve,
+      }),
     );
 
     expect(body["invoicedSats"]).toBe(102_000);
@@ -350,14 +378,11 @@ describe("fee-bearing quotes", () => {
     getLightningReceiveQuoteMock.mockResolvedValue(feeBearingQuote());
 
     const body = bodyOf(
-      await handleCreateQuotedInvoice(
-        100_000,
-        undefined,
-        "memo",
-        undefined,
-        undefined,
-        mockResolve,
-      ),
+      await handleCreateQuotedInvoice({
+        amountSats: 100_000,
+        memo: "memo",
+        resolve: mockResolve,
+      }),
     );
 
     // The SDK refuses to sign a quote whose amount is not the amount quoted,
@@ -372,28 +397,23 @@ describe("fee-bearing quotes", () => {
 
   it("defaults the basis to NET and honours an explicit GROSS on the invoice call", async () => {
     getLightningReceiveQuoteMock.mockResolvedValue(feeBearingQuote());
-    await handleLightningReceiveQuote(
-      100_000,
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    await handleLightningReceiveQuote({
+      amountSats: 100_000,
+      resolve: mockResolve,
+    });
     expect(getLightningReceiveQuoteMock).toHaveBeenCalledWith({
       amountSats: 100_000,
       amountBasis: "NET",
       partnerJwt: undefined,
     });
 
-    await handleCreateInvoiceFromQuote(
-      SERIALIZED_MANIFEST,
-      "aabb",
-      1000,
-      "GROSS",
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    await handleCreateInvoiceFromQuote({
+      serializedManifest: SERIALIZED_MANIFEST,
+      issuerSignature: "aabb",
+      amountSats: 1000,
+      amountBasis: "GROSS",
+      resolve: mockResolve,
+    });
     const sentQuote = createLightningInvoiceMock.mock.calls[0]?.[0]?.quote as {
       amountBasis: string;
     };
@@ -404,14 +424,12 @@ describe("fee-bearing quotes", () => {
     getLightningReceiveQuoteMock.mockResolvedValue(feeBearingQuote());
 
     const body = bodyOf(
-      await handleLightningReceiveQuote(
-        100_000,
-        undefined,
-        undefined,
-        "seed words",
-        mockResolve,
-        "raw",
-      ),
+      await handleLightningReceiveQuote({
+        amountSats: 100_000,
+        mnemonic: "seed words",
+        resolve: mockResolve,
+        output: "raw",
+      }),
     );
 
     expect(mockResolve).toHaveBeenCalledWith("seed words");

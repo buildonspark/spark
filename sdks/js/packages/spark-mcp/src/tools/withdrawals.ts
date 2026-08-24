@@ -26,13 +26,19 @@ type CoopExitFeeQuote = {
   l1BroadcastFeeSlow?: CurrencyAmount;
 };
 
-export async function handleGetWithdrawalFeeQuote(
-  amountSats: number,
-  withdrawalAddress: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleGetWithdrawalFeeQuote({
+  amountSats,
+  withdrawalAddress,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  amountSats: number;
+  withdrawalAddress: string;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const quote = await wallet.getWithdrawalFeeQuote({
@@ -85,15 +91,23 @@ export async function handleGetWithdrawalFeeQuote(
   }
 }
 
-export async function handleWithdraw(
-  onchainAddress: string,
-  exitSpeed: "FAST" | "MEDIUM" | "SLOW",
-  amountSats?: number,
-  feeQuoteId?: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleWithdraw({
+  onchainAddress,
+  exitSpeed,
+  amountSats,
+  feeQuoteId,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  onchainAddress: string;
+  exitSpeed: "FAST" | "MEDIUM" | "SLOW";
+  amountSats?: number;
+  feeQuoteId?: string;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
 
