@@ -1303,7 +1303,7 @@ func GenerateTransferPackage(
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
-	transferPackage, err := PrepareTransferPackage(
+	transferPackage, err := PrepareUtxoSwapTransferPackage(
 		ctx,
 		config,
 		sparkClient,
