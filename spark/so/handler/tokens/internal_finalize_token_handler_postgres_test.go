@@ -19,25 +19,27 @@ import (
 )
 
 type internalFinalizeTokenPostgresTestSetup struct {
-	handler  *InternalFinalizeTokenHandler
-	ctx      context.Context
-	client   *ent.Client
-	fixtures *entfixtures.Fixtures
+	handler         *InternalFinalizeTokenHandler
+	ctx             context.Context
+	client          *ent.Client
+	committedClient *ent.Client
+	fixtures        *entfixtures.Fixtures
 }
 
 func setUpInternalFinalizeTokenTestHandlerPostgres(t *testing.T) *internalFinalizeTokenPostgresTestSetup {
 	t.Helper()
 
 	config := sparktesting.TestConfig(t)
-	ctx, _ := db.ConnectToTestPostgres(t)
+	ctx, testContext := db.ConnectToTestPostgres(t)
 	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	return &internalFinalizeTokenPostgresTestSetup{
-		handler:  NewInternalFinalizeTokenHandler(config),
-		ctx:      ctx,
-		client:   dbClient,
-		fixtures: entfixtures.New(t, ctx, dbClient),
+		handler:         NewInternalFinalizeTokenHandler(config),
+		ctx:             ctx,
+		client:          dbClient,
+		committedClient: testContext.Client,
+		fixtures:        entfixtures.New(t, ctx, dbClient),
 	}
 }
 
@@ -73,6 +75,168 @@ func TestFinalizeTransferTransactionInternalRejectsNilRevocationSecret(t *testin
 	require.NoError(t, err)
 	require.Equal(t, st.TokenOutputStatusSpentSigned, updatedInput.Status)
 	require.True(t, updatedInput.SpentRevocationSecret.IsZero())
+}
+
+func TestFinalizeTransferTransactionRejectsFreezeAppliedAfterSigning(t *testing.T) {
+	setup := setUpInternalFinalizeTokenTestHandlerPostgres(t)
+
+	owner := keys.GeneratePrivateKey().Public()
+	_, tokenCreate := setup.fixtures.CreateTokenCreateWithOpts(btcnetwork.Regtest, entfixtures.TokenCreateOpts{
+		IsFreezable: true,
+	})
+	_, inputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecsWithOwner(owner, big.NewInt(100)),
+		st.TokenTransactionStatusFinalized,
+	)
+	transfer := setup.fixtures.CreateTransferTransactionWithProto(
+		tokenCreate,
+		inputs,
+		entfixtures.OutputSpecs(big.NewInt(100)),
+		entfixtures.TransferTransactionOpts{
+			OperatorPublicKeys: []keys.Public{setup.handler.config.IdentityPublicKey()},
+			Status:             st.TokenTransactionStatusSigned,
+		},
+	)
+	require.NoError(t, ent.ActivateFreeze(setup.ctx, owner, tokenCreate.ID, []byte("freeze-after-signature"), uint64(time.Now().UnixMilli())))
+
+	err := setup.handler.FinalizeTransferTransactionInternal(setup.ctx, transfer.Hash, []*ent.RecoveredRevocationSecret{{
+		OutputIndex:      0,
+		RevocationSecret: keys.GeneratePrivateKey(),
+	}})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "frozen")
+
+	updated, err := setup.client.TokenTransaction.Get(setup.ctx, transfer.Transaction.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusSigned, updated.Status)
+}
+
+func TestFinalizeTransferTransactionAllowsFreezeAppliedAfterReveal(t *testing.T) {
+	setup := setUpInternalFinalizeTokenTestHandlerPostgres(t)
+
+	owner := keys.GeneratePrivateKey().Public()
+	_, tokenCreate := setup.fixtures.CreateTokenCreateWithOpts(btcnetwork.Regtest, entfixtures.TokenCreateOpts{
+		IsFreezable: true,
+	})
+	revocationSecret := keys.GeneratePrivateKey()
+	inputSpecs := entfixtures.OutputSpecsWithOwner(owner, big.NewInt(100))
+	inputSpecs[0].RevocationCommitment = revocationSecret.Public().Serialize()
+	_, inputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		inputSpecs,
+		st.TokenTransactionStatusFinalized,
+	)
+	transfer := setup.fixtures.CreateTransferTransactionWithProto(
+		tokenCreate,
+		inputs,
+		entfixtures.OutputSpecs(big.NewInt(100)),
+		entfixtures.TransferTransactionOpts{
+			OperatorPublicKeys: []keys.Public{setup.handler.config.IdentityPublicKey()},
+			Status:             st.TokenTransactionStatusSigned,
+		},
+	)
+	revealedTransferTx, err := transfer.Transaction.Update().SetStatus(st.TokenTransactionStatusRevealed).Save(setup.ctx)
+	require.NoError(t, err)
+	transfer.Transaction = revealedTransferTx
+	require.NoError(t, ent.ActivateFreeze(setup.ctx, owner, tokenCreate.ID, []byte("freeze-after-reveal"), uint64(time.Now().UnixMilli())))
+
+	err = setup.handler.FinalizeTransferTransactionInternal(setup.ctx, transfer.Hash, []*ent.RecoveredRevocationSecret{{
+		OutputIndex:      0,
+		RevocationSecret: revocationSecret,
+	}})
+	require.NoError(t, err)
+
+	updated, err := setup.committedClient.TokenTransaction.Get(t.Context(), transfer.Transaction.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusFinalized, updated.Status)
+}
+
+func TestFinalizeTransferTransactionRejectsGlobalPauseAppliedAfterSigning(t *testing.T) {
+	setup := setUpInternalFinalizeTokenTestHandlerPostgres(t)
+
+	owner := keys.GeneratePrivateKey().Public()
+	_, tokenCreate := setup.fixtures.CreateTokenCreateWithOpts(btcnetwork.Regtest, entfixtures.TokenCreateOpts{IsFreezable: true})
+	_, inputs := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecsWithOwner(owner, big.NewInt(100)),
+		st.TokenTransactionStatusFinalized,
+	)
+	transfer := setup.fixtures.CreateTransferTransactionWithProto(
+		tokenCreate,
+		inputs,
+		entfixtures.OutputSpecs(big.NewInt(100)),
+		entfixtures.TransferTransactionOpts{
+			OperatorPublicKeys: []keys.Public{setup.handler.config.IdentityPublicKey()},
+			Status:             st.TokenTransactionStatusSigned,
+		},
+	)
+	require.NoError(t, ent.ActivateGlobalPause(setup.ctx, tokenCreate.ID, []byte("pause-after-signature"), uint64(time.Now().UnixMilli())))
+
+	err := setup.handler.FinalizeTransferTransactionInternal(setup.ctx, transfer.Hash, []*ent.RecoveredRevocationSecret{{
+		OutputIndex:      0,
+		RevocationSecret: keys.GeneratePrivateKey(),
+	}})
+	require.ErrorContains(t, err, "globally paused")
+
+	updated, err := setup.client.TokenTransaction.Get(setup.ctx, transfer.Transaction.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusSigned, updated.Status)
+}
+
+func TestFinalizeMintTransactionRejectsGlobalPauseAppliedAfterSigning(t *testing.T) {
+	setup := setUpInternalFinalizeTokenTestHandlerPostgres(t)
+
+	_, tokenCreate := setup.fixtures.CreateTokenCreateWithOpts(btcnetwork.Regtest, entfixtures.TokenCreateOpts{
+		IsFreezable: true,
+	})
+	tx, _ := setup.fixtures.CreateMintTransaction(
+		tokenCreate,
+		entfixtures.OutputSpecs(big.NewInt(100)),
+		st.TokenTransactionStatusSigned,
+	)
+	require.NoError(t, ent.ActivateGlobalPause(setup.ctx, tokenCreate.ID, []byte("pause-after-signature"), uint64(time.Now().UnixMilli())))
+
+	txLoaded, err := setup.client.TokenTransaction.Query().
+		Where(tokentransaction.IDEQ(tx.ID)).
+		WithMint().
+		WithCreate().
+		WithCreatedOutput().
+		WithSpentOutput().
+		Only(setup.ctx)
+	require.NoError(t, err)
+
+	err = setup.handler.FinalizeMintOrCreateTransaction(setup.ctx, txLoaded)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "globally paused")
+
+	updated, err := setup.client.TokenTransaction.Get(setup.ctx, tx.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusSigned, updated.Status)
+}
+
+func TestFinalizeCreateTransactionRejectsGlobalPauseAppliedAfterSigning(t *testing.T) {
+	setup := setUpInternalFinalizeTokenTestHandlerPostgres(t)
+
+	_, tokenCreate := setup.fixtures.CreateTokenCreateWithOpts(btcnetwork.Regtest, entfixtures.TokenCreateOpts{IsFreezable: true})
+	tx := setup.fixtures.CreateCreateTransaction(tokenCreate, st.TokenTransactionStatusSigned, &entfixtures.TokenTransactionOpts{})
+	require.NoError(t, ent.ActivateGlobalPause(setup.ctx, tokenCreate.ID, []byte("pause-create-after-signature"), uint64(time.Now().UnixMilli())))
+
+	txLoaded, err := setup.client.TokenTransaction.Query().
+		Where(tokentransaction.IDEQ(tx.ID)).
+		WithMint().
+		WithCreate().
+		WithCreatedOutput().
+		WithSpentOutput().
+		Only(setup.ctx)
+	require.NoError(t, err)
+
+	err = setup.handler.FinalizeMintOrCreateTransaction(setup.ctx, txLoaded)
+	require.ErrorContains(t, err, "globally paused")
+
+	updated, err := setup.client.TokenTransaction.Get(setup.ctx, tx.ID)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusSigned, updated.Status)
 }
 
 func TestFinalizeMintOrCreateTransaction(t *testing.T) {

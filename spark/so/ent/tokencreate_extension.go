@@ -3,7 +3,9 @@ package ent
 import (
 	"context"
 	"fmt"
+	"sort"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -37,6 +39,41 @@ func GetTokenCreateByIdentifierForUpdate(ctx context.Context, tokenIdentifier []
 		return nil, err
 	}
 	return db.TokenCreate.Query().Where(tokencreate.TokenIdentifier(tokenIdentifier)).ForUpdate().Only(ctx)
+}
+
+// LockTokenCreatesForFreezeCoordination serializes finalization with freeze and global-pause
+// mutations, which lock the same TokenCreate rows before changing freeze state.
+func LockTokenCreatesForFreezeCoordination(ctx context.Context, tokenCreateIDs []uuid.UUID) error {
+	if len(tokenCreateIDs) == 0 {
+		return nil
+	}
+	db, err := GetDbFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	uniqueIDs := make(map[uuid.UUID]struct{}, len(tokenCreateIDs))
+	for _, tokenCreateID := range tokenCreateIDs {
+		uniqueIDs[tokenCreateID] = struct{}{}
+	}
+	orderedIDs := make([]uuid.UUID, 0, len(uniqueIDs))
+	for tokenCreateID := range uniqueIDs {
+		orderedIDs = append(orderedIDs, tokenCreateID)
+	}
+	sort.Slice(orderedIDs, func(i, j int) bool {
+		return orderedIDs[i].String() < orderedIDs[j].String()
+	})
+	lockedIDs, err := db.TokenCreate.Query().
+		Where(tokencreate.IDIn(orderedIDs...)).
+		Order(Asc(tokencreate.FieldID)).
+		ForUpdate().
+		IDs(ctx)
+	if err != nil {
+		return err
+	}
+	if len(lockedIDs) != len(orderedIDs) {
+		return fmt.Errorf("failed to lock all token creates for freeze coordination: got %d, expected %d", len(lockedIDs), len(orderedIDs))
+	}
+	return nil
 }
 
 // GetTokenMetadataForTokenTransaction extracts token identifiers from a token transaction

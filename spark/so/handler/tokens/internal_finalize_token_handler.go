@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -48,6 +49,24 @@ func (h *InternalFinalizeTokenHandler) FinalizeTransferTransactionInternal(
 	}
 	if len(invalidOutputs) > 0 {
 		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOutputs, tokenTransaction, stderrors.Join(invalidOutputs...))
+	}
+	// A freeze can still stop a signed transfer before revocation secrets are
+	// revealed. Once the transfer is REVEALED, finalization must be allowed to
+	// complete so exposed revocation material cannot leave the transaction stuck.
+	if tokenTransaction.Status == st.TokenTransactionStatusSigned {
+		tokenCreateIDs := make([]uuid.UUID, len(tokenTransaction.Edges.SpentOutput))
+		for i, output := range tokenTransaction.Edges.SpentOutput {
+			tokenCreateIDs[i] = output.TokenCreateID
+		}
+		if err := ent.LockTokenCreatesForFreezeCoordination(ctx, tokenCreateIDs); err != nil {
+			return tokens.FormatErrorWithTransactionEnt("cannot lock token freeze state for finalization", tokenTransaction, err)
+		}
+		if err := validateNoActiveFreezesForOutputs(ctx, tokenTransaction.Edges.SpentOutput); err != nil {
+			return tokens.FormatErrorWithTransactionEnt("cannot finalize frozen token transfer", tokenTransaction, err)
+		}
+		if err := validateAllowanceSpendReservedForSigning(ctx, tokenTransaction); err != nil {
+			return tokens.FormatErrorWithTransactionEnt("cannot finalize transfer with revoked allowance", tokenTransaction, err)
+		}
 	}
 	if len(tokenTransaction.Edges.SpentOutput) != len(revocationSecretsToFinalize) {
 		return tokens.FormatErrorWithTransactionEnt(
@@ -108,6 +127,9 @@ func (h *InternalFinalizeTokenHandler) FinalizeMintOrCreateTransaction(
 			fmt.Sprintf(tokens.ErrInvalidTransactionStatus,
 				tokenTransaction.Status, st.TokenTransactionStatusSigned),
 			tokenTransaction, nil)
+	}
+	if err := validateMintOrCreateTransactionNotPaused(ctx, tokenTransaction); err != nil {
+		return tokens.FormatErrorWithTransactionEnt("cannot finalize paused token transaction", tokenTransaction, err)
 	}
 
 	// Validate all created outputs are in CreatedSigned state
