@@ -49,13 +49,13 @@ describe("handleFundAddress", () => {
       { result: ["blockhash1"], error: null }, // generatetoaddress
     ]);
 
-    const result = await handleFundAddress(
-      "bcrt1qtest",
-      50_000,
-      6,
-      mockFetch,
-      0,
-    );
+    const result = await handleFundAddress({
+      address: "bcrt1qtest",
+      amountSats: 50_000,
+      blocksToMine: 6,
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("abc123txid");
@@ -70,7 +70,11 @@ describe("handleFundAddress", () => {
       { result: ["blockhash1"], error: null },
     ]);
 
-    await handleFundAddress("bcrt1qtest", undefined, undefined, mockFetch, 0);
+    await handleFundAddress({
+      address: "bcrt1qtest",
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     const sendCall = mockFetch.mock.calls[0];
     const body = JSON.parse(sendCall[1]!.body as string) as {
@@ -87,7 +91,11 @@ describe("handleFundAddress", () => {
       { result: ["blockhash1"], error: null },
     ]);
 
-    await handleFundAddress("bcrt1qtest", undefined, undefined, mockFetch, 0);
+    await handleFundAddress({
+      address: "bcrt1qtest",
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     const generateCall = mockFetch.mock.calls[2];
     const body = JSON.parse(generateCall[1]!.body as string) as {
@@ -104,7 +112,13 @@ describe("handleFundAddress", () => {
       { result: ["blockhash1"], error: null },
     ]);
 
-    await handleFundAddress("bcrt1qtest", 10_000, 1, mockFetch, 0);
+    await handleFundAddress({
+      address: "bcrt1qtest",
+      amountSats: 10_000,
+      blocksToMine: 1,
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toBe("http://192.168.49.2:8332");
@@ -118,7 +132,13 @@ describe("handleFundAddress", () => {
       { result: ["blockhash1"], error: null },
     ]);
 
-    await handleFundAddress("bcrt1qtest", 10_000, 1, mockFetch, 0);
+    await handleFundAddress({
+      address: "bcrt1qtest",
+      amountSats: 10_000,
+      blocksToMine: 1,
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toBe("http://custom-host:9332");
@@ -128,7 +148,13 @@ describe("handleFundAddress", () => {
     process.env["BITCOIN_NETWORK"] = "MAINNET";
     const mockFetch = jest.fn<typeof fetch>();
 
-    const result = await handleFundAddress("bc1qtest", 50_000, 6, mockFetch, 0);
+    const result = await handleFundAddress({
+      address: "bc1qtest",
+      amountSats: 50_000,
+      blocksToMine: 6,
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("LOCAL");
@@ -139,13 +165,13 @@ describe("handleFundAddress", () => {
     process.env["BITCOIN_NETWORK"] = "REGTEST";
     const mockFetch = jest.fn<typeof fetch>();
 
-    const result = await handleFundAddress(
-      "bcrt1qtest",
-      50_000,
-      6,
-      mockFetch,
-      0,
-    );
+    const result = await handleFundAddress({
+      address: "bcrt1qtest",
+      amountSats: 50_000,
+      blocksToMine: 6,
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("LOCAL");
@@ -155,15 +181,15 @@ describe("handleFundAddress", () => {
   it("returns error with MAINNET override on LOCAL default", async () => {
     const mockFetch = jest.fn<typeof fetch>();
 
-    const result = await handleFundAddress(
-      "bc1qtest",
-      50_000,
-      6,
-      mockFetch,
-      0,
-      "normal",
-      "MAINNET",
-    );
+    const result = await handleFundAddress({
+      address: "bc1qtest",
+      amountSats: 50_000,
+      blocksToMine: 6,
+      networkOverride: "MAINNET",
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+      output: "normal",
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("LOCAL");
@@ -180,13 +206,13 @@ describe("handleFundAddress", () => {
         }),
     } as MockResponse as Response);
 
-    const result = await handleFundAddress(
-      "bcrt1qtest",
-      50_000,
-      6,
-      mockFetch,
-      0,
-    );
+    const result = await handleFundAddress({
+      address: "bcrt1qtest",
+      amountSats: 50_000,
+      blocksToMine: 6,
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("insufficient funds");
@@ -199,13 +225,13 @@ describe("handleFundAddress", () => {
       json: () => Promise.resolve({}),
     } as unknown as Response);
 
-    const result = await handleFundAddress(
-      "bcrt1qtest",
-      50_000,
-      6,
-      mockFetch,
-      0,
-    );
+    const result = await handleFundAddress({
+      address: "bcrt1qtest",
+      amountSats: 50_000,
+      blocksToMine: 6,
+      fetchFn: mockFetch,
+      chainWatcherDelayMs: 0,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("401");

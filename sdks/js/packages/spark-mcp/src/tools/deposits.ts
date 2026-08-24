@@ -10,11 +10,15 @@ import type { SparkWallet } from "@buildonspark/spark-sdk";
 
 type ResolveFn = (mnemonic?: string) => Promise<SparkWallet>;
 
-export async function handleGetDepositAddress(
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleGetDepositAddress({
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const address = await wallet.getSingleUseDepositAddress();
@@ -35,13 +39,19 @@ export async function handleGetDepositAddress(
   }
 }
 
-export async function handleClaimDeposit(
-  txid: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  settleTimeoutMs: number = 30_000,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleClaimDeposit({
+  txid,
+  mnemonic,
+  settleTimeoutMs = 30_000,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  txid: string;
+  mnemonic?: string;
+  settleTimeoutMs?: number;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
 

@@ -28,7 +28,7 @@ beforeEach(() => {
 describe("handleGetDepositAddress", () => {
   it("returns deposit address", async () => {
     getSingleUseDepositAddressMock.mockResolvedValue("bcrt1qtest");
-    const result = await handleGetDepositAddress(undefined, mockResolve);
+    const result = await handleGetDepositAddress({ resolve: mockResolve });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("bcrt1qtest");
   });
@@ -37,7 +37,7 @@ describe("handleGetDepositAddress", () => {
     getSingleUseDepositAddressMock.mockRejectedValue(
       new Error("network error"),
     );
-    const result = await handleGetDepositAddress(undefined, mockResolve);
+    const result = await handleGetDepositAddress({ resolve: mockResolve });
     expect(result.isError).toBe(true);
   });
 });
@@ -48,12 +48,11 @@ describe("handleClaimDeposit", () => {
       .mockResolvedValueOnce({ balance: 0n }) // prior balance
       .mockResolvedValueOnce({ balance: 50_000n }); // settled
     claimDepositMock.mockResolvedValue([{ value: 50_000 }]);
-    const result = await handleClaimDeposit(
-      "abc123",
-      undefined,
-      mockResolve,
-      5_000,
-    );
+    const result = await handleClaimDeposit({
+      txid: "abc123",
+      resolve: mockResolve,
+      settleTimeoutMs: 5_000,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("50,000");
   });
@@ -61,12 +60,11 @@ describe("handleClaimDeposit", () => {
   it("returns error on failure", async () => {
     getBalanceMock.mockResolvedValue({ balance: 0n });
     claimDepositMock.mockRejectedValue(new Error("already claimed"));
-    const result = await handleClaimDeposit(
-      "abc123",
-      undefined,
-      mockResolve,
-      5_000,
-    );
+    const result = await handleClaimDeposit({
+      txid: "abc123",
+      resolve: mockResolve,
+      settleTimeoutMs: 5_000,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("already claimed");
   });

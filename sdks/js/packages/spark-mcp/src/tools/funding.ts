@@ -45,15 +45,23 @@ async function bitcoinRpc(
   return data.result;
 }
 
-export async function handleFundAddress(
-  address: string,
-  amountSats: number = 50_000,
-  blocksToMine: number = 1,
-  fetchFn: typeof fetch = fetch,
-  chainWatcherDelayMs: number = 3000,
-  output: OutputMode = "normal",
-  networkOverride?: string,
-): Promise<ToolResult> {
+export async function handleFundAddress({
+  address,
+  amountSats = 50_000,
+  blocksToMine = 1,
+  networkOverride,
+  fetchFn = fetch,
+  chainWatcherDelayMs = 3000,
+  output = "normal",
+}: {
+  address: string;
+  amountSats?: number;
+  blocksToMine?: number;
+  networkOverride?: string;
+  fetchFn?: typeof fetch;
+  chainWatcherDelayMs?: number;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   const config = getServerConfig();
   const network = networkOverride ?? config.defaultNetwork;
 

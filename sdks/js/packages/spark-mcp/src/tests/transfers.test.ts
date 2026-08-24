@@ -35,12 +35,11 @@ describe("handleSendTransfer", () => {
   it("returns insufficient balance error when wallet has less than transfer amount", async () => {
     mockWallet.getBalance.mockResolvedValue({ balance: 500n });
 
-    const result = await handleSendTransfer(
-      "sparkl1abc",
-      1000,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleSendTransfer({
+      receiverSparkAddress: "sparkl1abc",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Insufficient balance");
@@ -53,12 +52,11 @@ describe("handleSendTransfer", () => {
   it("returns insufficient balance error when balance is zero", async () => {
     mockWallet.getBalance.mockResolvedValue({ balance: 0n });
 
-    const result = await handleSendTransfer(
-      "sparkl1abc",
-      1000,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleSendTransfer({
+      receiverSparkAddress: "sparkl1abc",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Insufficient balance");
@@ -72,12 +70,11 @@ describe("handleSendTransfer", () => {
       status: "COMPLETED",
     });
 
-    const result = await handleSendTransfer(
-      "sparkl1abc",
-      1000,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleSendTransfer({
+      receiverSparkAddress: "sparkl1abc",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("Transfer sent");
@@ -95,12 +92,11 @@ describe("handleSendTransfer", () => {
       status: "COMPLETED",
     });
 
-    const result = await handleSendTransfer(
-      "sparkl1abc",
-      1000,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleSendTransfer({
+      receiverSparkAddress: "sparkl1abc",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("Transfer sent");
@@ -110,12 +106,11 @@ describe("handleSendTransfer", () => {
     mockWallet.getBalance.mockResolvedValue({ balance: 5000n });
     mockWallet.transfer.mockRejectedValue(new Error("network timeout"));
 
-    const result = await handleSendTransfer(
-      "sparkl1abc",
-      1000,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleSendTransfer({
+      receiverSparkAddress: "sparkl1abc",
+      amountSats: 1000,
+      resolve: mockResolve,
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("network timeout");

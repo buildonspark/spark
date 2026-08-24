@@ -43,7 +43,9 @@ src/
 
 ## Adding or removing a tool
 
-1. Implement a `handle*` function in the appropriate file under `src/tools/`
+1. Implement a `handle*` function in the appropriate file under `src/tools/`. It takes **one options
+   object**, never positional parameters — fields in the tool schema's order, then the injected ones
+   (`resolve`, `output`, and any per-tool stub) last, with their defaults in the destructuring.
 2. Register it in `src/tools/index.ts` via `server.tool(...)`
 3. Add a test in `src/tests/`
 4. Add a row to the tool table in `README.md` (or remove it)
@@ -61,7 +63,7 @@ The server uses one environment variable: `BITCOIN_NETWORK` (`LOCAL` | `REGTEST`
 
 ### Per-call network override
 
-Every tool exposes an optional `network` parameter (`LOCAL` | `REGTEST` | `MAINNET`). The tool registration layer creates a bound resolve function via `makeResolve(network)` that passes the override to `resolveWallet()`. Handler signatures are unchanged — they still accept `ResolveFn = (mnemonic?) => Promise<SparkWallet>`.
+Every tool exposes an optional `network` parameter (`LOCAL` | `REGTEST` | `MAINNET`). The tool registration layer creates a bound resolve function via `makeResolve(network)` that passes the override to `resolveWallet()`, still a `ResolveFn = (mnemonic?) => Promise<SparkWallet>`. Most handlers see the network only as that closure. The three that branch on it themselves — `handleDisconnectWallet`, `handleFundAddress`, `handleDeposit` — take it as an explicit `networkOverride` field and resolve it against the server default.
 
 This lets a single server instance operate on multiple networks per-call.
 
@@ -114,4 +116,4 @@ cd sdks/js/packages/spark-mcp && yarn build
 cd sdks/js/packages/spark-mcp && yarn test
 ```
 
-Tests use dependency injection — `handle*` functions accept an optional `resolve` parameter (defaults to `resolveWallet`). Tests pass a mock resolve function that returns a mock wallet object directly, with no SDK calls.
+Tests use dependency injection — every `handle*` function takes a single options object with an optional `resolve` field (defaults to `resolveWallet`). Tests pass a mock resolve function that returns a mock wallet object directly, with no SDK calls, and name only the fields they exercise.

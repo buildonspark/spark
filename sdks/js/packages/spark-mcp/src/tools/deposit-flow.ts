@@ -17,14 +17,21 @@ type ResolveFn = (mnemonic?: string) => Promise<SparkWallet>;
  * via local bitcoind RPC, claim the deposit, and wait for the balance to settle.
  * Returns the confirmed wallet balance.
  */
-export async function handleDeposit(
-  amountSats: number = 50_000,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  fundFn: typeof handleFundAddress = handleFundAddress,
-  output: OutputMode = "normal",
-  networkOverride?: string,
-): Promise<ToolResult> {
+export async function handleDeposit({
+  amountSats = 50_000,
+  mnemonic,
+  networkOverride,
+  resolve = resolveWallet,
+  fundFn = handleFundAddress,
+  output = "normal",
+}: {
+  amountSats?: number;
+  mnemonic?: string;
+  networkOverride?: string;
+  resolve?: ResolveFn;
+  fundFn?: typeof handleFundAddress;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   const config = getServerConfig();
   const network = networkOverride ?? config.defaultNetwork;
   if (network !== "LOCAL") {
@@ -49,7 +56,7 @@ export async function handleDeposit(
     const address = await wallet.getSingleUseDepositAddress();
 
     // Step 2: Fund the address via local bitcoind RPC
-    const fundResult = await fundFn(address, amountSats);
+    const fundResult = await fundFn({ address, amountSats });
     if (fundResult.isError) {
       return fundResult;
     }

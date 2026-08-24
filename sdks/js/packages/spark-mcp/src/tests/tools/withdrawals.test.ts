@@ -61,12 +61,11 @@ describe("handleGetWithdrawalFeeQuote", () => {
       userFeeSlow: { originalValue: 50, originalUnit: "SATOSHI" },
       l1BroadcastFeeSlow: { originalValue: 50, originalUnit: "SATOSHI" },
     });
-    const result = await handleGetWithdrawalFeeQuote(
-      50000,
-      "bc1q...",
-      undefined,
-      mockResolve,
-    );
+    const result = await handleGetWithdrawalFeeQuote({
+      amountSats: 50000,
+      withdrawalAddress: "bc1q...",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("500");
     expect(result.content[0]?.text).toContain("quote-xyz");
@@ -74,23 +73,21 @@ describe("handleGetWithdrawalFeeQuote", () => {
 
   it("returns error on null quote", async () => {
     getWithdrawalFeeQuoteMock.mockResolvedValue(null);
-    const result = await handleGetWithdrawalFeeQuote(
-      50000,
-      "bc1q...",
-      undefined,
-      mockResolve,
-    );
+    const result = await handleGetWithdrawalFeeQuote({
+      amountSats: 50000,
+      withdrawalAddress: "bc1q...",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
   });
 
   it("returns error on failure", async () => {
     getWithdrawalFeeQuoteMock.mockRejectedValue(new Error("invalid address"));
-    const result = await handleGetWithdrawalFeeQuote(
-      50000,
-      "badaddr",
-      undefined,
-      mockResolve,
-    );
+    const result = await handleGetWithdrawalFeeQuote({
+      amountSats: 50000,
+      withdrawalAddress: "badaddr",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("invalid address");
   });
@@ -114,14 +111,11 @@ describe("handleWithdraw", () => {
       id: "withdraw-123",
       status: "PENDING",
     });
-    const result = await handleWithdraw(
-      "bc1q...",
-      "FAST",
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleWithdraw({
+      onchainAddress: "bc1q...",
+      exitSpeed: "FAST",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("withdraw-123");
     expect(result.content[0]?.text).toContain("PENDING");
@@ -129,14 +123,11 @@ describe("handleWithdraw", () => {
 
   it("returns error when fee quote is unavailable", async () => {
     getWithdrawalFeeQuoteMock.mockResolvedValue(null);
-    const result = await handleWithdraw(
-      "bc1q...",
-      "FAST",
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleWithdraw({
+      onchainAddress: "bc1q...",
+      exitSpeed: "FAST",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("No fee quote available");
     expect(withdrawMock).not.toHaveBeenCalled();
@@ -145,14 +136,11 @@ describe("handleWithdraw", () => {
   it("returns error on failure", async () => {
     getWithdrawalFeeQuoteMock.mockResolvedValue(feeQuote);
     withdrawMock.mockRejectedValue(new Error("insufficient funds"));
-    const result = await handleWithdraw(
-      "bc1q...",
-      "FAST",
-      undefined,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleWithdraw({
+      onchainAddress: "bc1q...",
+      exitSpeed: "FAST",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("insufficient funds");
   });

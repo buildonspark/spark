@@ -11,11 +11,15 @@ import type { SparkWallet } from "@buildonspark/spark-sdk";
 
 type ResolveFn = (mnemonic?: string) => Promise<SparkWallet>;
 
-export async function handleGetBalance(
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleGetBalance({
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const balance = await wallet.getBalance();
@@ -33,11 +37,15 @@ export async function handleGetBalance(
   }
 }
 
-export async function handleGetSparkAddress(
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleGetSparkAddress({
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const addr = await wallet.getSparkAddress();
@@ -56,12 +64,17 @@ type EvictFn = (
   networkOverride?: BitcoinNetwork,
 ) => Promise<boolean>;
 
-export async function handleDisconnectWallet(
-  mnemonic?: string,
-  networkOverride?: BitcoinNetwork,
-  evict: EvictFn = evictWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleDisconnectWallet({
+  mnemonic,
+  networkOverride,
+  evict = evictWallet,
+  output = "normal",
+}: {
+  mnemonic?: string;
+  networkOverride?: BitcoinNetwork;
+  evict?: EvictFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const evicted = await evict(mnemonic, networkOverride);
 

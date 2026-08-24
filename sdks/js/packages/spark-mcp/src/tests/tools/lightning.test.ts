@@ -48,12 +48,11 @@ describe("handleCreateInvoice", () => {
     createLightningInvoiceMock.mockResolvedValue({
       invoice: { encodedInvoice: "lnbc500n1ptest..." },
     });
-    const result = await handleCreateInvoice(
-      500,
-      "Coffee",
-      undefined,
-      mockResolve,
-    );
+    const result = await handleCreateInvoice({
+      amountSats: 500,
+      memo: "Coffee",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("lnbc500n1ptest");
     expect(result.content[0]?.text).toContain("500 sats");
@@ -61,12 +60,10 @@ describe("handleCreateInvoice", () => {
 
   it("returns error on failure", async () => {
     createLightningInvoiceMock.mockRejectedValue(new Error("node offline"));
-    const result = await handleCreateInvoice(
-      100,
-      undefined,
-      undefined,
-      mockResolve,
-    );
+    const result = await handleCreateInvoice({
+      amountSats: 100,
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("node offline");
   });
@@ -77,24 +74,22 @@ describe("handlePayInvoice", () => {
     payLightningInvoiceMock.mockResolvedValue({
       id: "pay-abc",
     });
-    const result = await handlePayInvoice(
-      "lnbc...",
-      10,
-      undefined,
-      mockResolve,
-    );
+    const result = await handlePayInvoice({
+      invoice: "lnbc...",
+      maxFeeSats: 10,
+      resolve: mockResolve,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("pay-abc");
   });
 
   it("returns error on payment failure", async () => {
     payLightningInvoiceMock.mockRejectedValue(new Error("no route"));
-    const result = await handlePayInvoice(
-      "lnbc...",
-      10,
-      undefined,
-      mockResolve,
-    );
+    const result = await handlePayInvoice({
+      invoice: "lnbc...",
+      maxFeeSats: 10,
+      resolve: mockResolve,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("no route");
   });
@@ -103,11 +98,10 @@ describe("handlePayInvoice", () => {
 describe("handleGetLightningFeeEstimate", () => {
   it("returns estimated fee", async () => {
     getLightningSendFeeEstimateMock.mockResolvedValue(3);
-    const result = await handleGetLightningFeeEstimate(
-      "lnbc...",
-      undefined,
-      mockResolve,
-    );
+    const result = await handleGetLightningFeeEstimate({
+      invoice: "lnbc...",
+      resolve: mockResolve,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("3 sats");
   });

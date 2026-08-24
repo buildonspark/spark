@@ -42,6 +42,7 @@ async function main(): Promise<void> {
     "- spark_create_quoted_invoice quotes, signs and invoices in one step. spark_lightning_receive_quote + spark_create_invoice_from_quote is the same flow split, for inspecting a quote or testing that reusing one is refused.",
     "- Pass serializedManifest and issuerSignature back verbatim, exactly as the quote tool returned them. The quote is stateless: the SSP re-verifies its own signature over those exact bytes rather than looking anything up, so a re-encoded manifest is refused.",
     "- Without a partnerJwt a quote is feeless; attributionStatus reports why.",
+    "- receiverIdentityPubkey names a payee other than this wallet. This wallet still attests, so the payee need not be online to be invoiced — it does hold the key that controls the funds once they arrive.",
     "- Settling an invoice is the counterparty's job, not this server's — see spark_create_quoted_invoice's description for how to pay one on a local stack.",
     "",
     "Output modes:",

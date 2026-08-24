@@ -49,13 +49,19 @@ function formatTransferVerbose(t: WalletTransfer): string {
   return lines.join("\n");
 }
 
-export async function handleSendTransfer(
-  receiverSparkAddress: string,
-  amountSats: number,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleSendTransfer({
+  receiverSparkAddress,
+  amountSats,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  receiverSparkAddress: string;
+  amountSats: number;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
 
@@ -107,12 +113,17 @@ export async function handleSendTransfer(
   }
 }
 
-export async function handleSendMultiTransfer(
-  receivers: Array<{ receiverSparkAddress: string; amountSats: number }>,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleSendMultiTransfer({
+  receivers,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  receivers: Array<{ receiverSparkAddress: string; amountSats: number }>;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
 
@@ -171,12 +182,17 @@ export async function handleSendMultiTransfer(
   }
 }
 
-export async function handleGetTransfer(
-  id: string,
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleGetTransfer({
+  id,
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  id: string;
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const transfer = await wallet.getTransfer(id);
@@ -210,11 +226,15 @@ export async function handleGetTransfer(
   }
 }
 
-export async function handleListTransfers(
-  mnemonic?: string,
-  resolve: ResolveFn = resolveWallet,
-  output: OutputMode = "normal",
-): Promise<ToolResult> {
+export async function handleListTransfers({
+  mnemonic,
+  resolve = resolveWallet,
+  output = "normal",
+}: {
+  mnemonic?: string;
+  resolve?: ResolveFn;
+  output?: OutputMode;
+}): Promise<ToolResult> {
   try {
     const wallet = await resolve(mnemonic);
     const { transfers } = await wallet.getTransfers(10, 0);

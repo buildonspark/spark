@@ -35,21 +35,21 @@ beforeEach(() => {
 describe("handleGetBalance", () => {
   it("returns formatted balance", async () => {
     getBalanceMock.mockResolvedValue({ balance: 1250n });
-    const result = await handleGetBalance(undefined, mockResolve);
+    const result = await handleGetBalance({ resolve: mockResolve });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toBe("Balance: 1,250 sats");
   });
 
   it("returns error on SDK failure", async () => {
     getBalanceMock.mockRejectedValue(new Error("network error"));
-    const result = await handleGetBalance(undefined, mockResolve);
+    const result = await handleGetBalance({ resolve: mockResolve });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("network error");
   });
 
   it("returns error when resolve fails (no wallet configured)", async () => {
     mockResolve.mockRejectedValueOnce(new Error("No wallet specified"));
-    const result = await handleGetBalance(undefined, mockResolve);
+    const result = await handleGetBalance({ resolve: mockResolve });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("No wallet specified");
   });
@@ -60,7 +60,7 @@ describe("handleGetSparkAddress", () => {
     getSparkAddressMock.mockResolvedValue(
       "spark1qpzry9x8gf2tvdw0s3jn54khce6mua7lt",
     );
-    const result = await handleGetSparkAddress(undefined, mockResolve);
+    const result = await handleGetSparkAddress({ resolve: mockResolve });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain(
       "spark1qpzry9x8gf2tvdw0s3jn54khce6mua7lt",
@@ -69,7 +69,7 @@ describe("handleGetSparkAddress", () => {
 
   it("returns error on SDK failure", async () => {
     getSparkAddressMock.mockRejectedValue(new Error("disconnected"));
-    const result = await handleGetSparkAddress(undefined, mockResolve);
+    const result = await handleGetSparkAddress({ resolve: mockResolve });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("disconnected");
   });
@@ -78,37 +78,45 @@ describe("handleGetSparkAddress", () => {
 describe("handleDisconnectWallet", () => {
   it("reports wallet disconnected when eviction succeeds", async () => {
     const mockEvict = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
-    const result = await handleDisconnectWallet(
-      "some mnemonic",
-      undefined,
-      mockEvict,
-    );
+    const result = await handleDisconnectWallet({
+      mnemonic: "some mnemonic",
+      evict: mockEvict,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("Wallet disconnected");
     expect(mockEvict).toHaveBeenCalledWith("some mnemonic", undefined);
+  });
+
+  it("evicts the wallet cached under the overridden network", async () => {
+    const mockEvict = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const result = await handleDisconnectWallet({
+      mnemonic: "some mnemonic",
+      networkOverride: "MAINNET",
+      evict: mockEvict,
+    });
+    expect(result.isError).toBeFalsy();
+    expect(mockEvict).toHaveBeenCalledWith("some mnemonic", "MAINNET");
   });
 
   it("reports no cached wallet when eviction returns false", async () => {
     const mockEvict = jest
       .fn<() => Promise<boolean>>()
       .mockResolvedValue(false);
-    const result = await handleDisconnectWallet(
-      "some mnemonic",
-      undefined,
-      mockEvict,
-    );
+    const result = await handleDisconnectWallet({
+      mnemonic: "some mnemonic",
+      evict: mockEvict,
+    });
     expect(result.isError).toBeFalsy();
     expect(result.content[0]?.text).toContain("No cached wallet");
   });
 
   it("returns raw output when requested", async () => {
     const mockEvict = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
-    const result = await handleDisconnectWallet(
-      "some mnemonic",
-      undefined,
-      mockEvict,
-      "raw",
-    );
+    const result = await handleDisconnectWallet({
+      mnemonic: "some mnemonic",
+      evict: mockEvict,
+      output: "raw",
+    });
     const parsed = parseJson<{ evicted: boolean }>(result.content[0].text);
     expect(parsed.evicted).toBe(true);
   });
@@ -117,11 +125,10 @@ describe("handleDisconnectWallet", () => {
     const mockEvict = jest
       .fn<() => Promise<boolean>>()
       .mockRejectedValue(new Error("cleanup failed"));
-    const result = await handleDisconnectWallet(
-      "some mnemonic",
-      undefined,
-      mockEvict,
-    );
+    const result = await handleDisconnectWallet({
+      mnemonic: "some mnemonic",
+      evict: mockEvict,
+    });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("cleanup failed");
   });

@@ -34,7 +34,7 @@ const isLive = !!process.env["BITCOIN_NETWORK"];
   let balanceBeforeSats: number;
 
   it("gets a deposit address", async () => {
-    const result = await handleGetDepositAddress();
+    const result = await handleGetDepositAddress({});
     const text = extractText(result);
     const match = text.match(/Deposit address: (\S+)/);
     expect(match).not.toBeNull();
@@ -43,7 +43,7 @@ const isLive = !!process.env["BITCOIN_NETWORK"];
   }, 15_000);
 
   it("records balance before deposit", async () => {
-    const text = extractText(await handleGetBalance());
+    const text = extractText(await handleGetBalance({}));
     const match = text.match(/([\d,]+) sats/);
     expect(match).not.toBeNull();
     balanceBeforeSats = parseInt(match![1].replace(/,/g, ""), 10);
@@ -52,7 +52,11 @@ const isLive = !!process.env["BITCOIN_NETWORK"];
 
   it("funds the deposit address with 50,000 sats", async () => {
     expect(depositAddress).toBeDefined();
-    const result = await handleFundAddress(depositAddress, 50_000, 1);
+    const result = await handleFundAddress({
+      address: depositAddress,
+      amountSats: 50_000,
+      blocksToMine: 1,
+    });
     const text = extractText(result);
     const match = text.match(/Transaction ID: (\S+)/);
     expect(match).not.toBeNull();
@@ -62,7 +66,7 @@ const isLive = !!process.env["BITCOIN_NETWORK"];
 
   it("claims the deposit", async () => {
     expect(txid).toBeDefined();
-    const result = await handleClaimDeposit(txid);
+    const result = await handleClaimDeposit({ txid });
     const text = extractText(result);
     console.log(`  claim result: ${text}`);
     expect(text).toContain("claimed");
@@ -72,7 +76,7 @@ const isLive = !!process.env["BITCOIN_NETWORK"];
     const deadline = Date.now() + 90_000;
     let balanceAfterSats = 0;
     while (Date.now() < deadline) {
-      const text = extractText(await handleGetBalance());
+      const text = extractText(await handleGetBalance({}));
       const match = text.match(/([\d,]+) sats/);
       if (match) {
         balanceAfterSats = parseInt(match[1].replace(/,/g, ""), 10);
