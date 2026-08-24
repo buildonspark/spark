@@ -698,17 +698,13 @@ func (h *BaseTransferHandler) createTransferV3(
 		}
 	}
 
-	// Validate bitcoin transactions per-receiver group (refund outputs must pay
-	// to the correct receiver). UtxoSwap dispatches to its own validator, same
-	// split the legacy createTransfer makes: validateAndConstructBitcoinTransactions
-	// has no UtxoSwap case (utxo swaps don't require direct refund txs), but the
-	// legacy path's validateUtxoSwapLeaves still output-validates direct refund
-	// txs when the sender supplies them — every submitted tx gets FROST-signed,
-	// so an unvalidated output would let the sender redirect the receiver's
-	// direct unilateral-exit path to itself.
+	// Validate bitcoin transactions per-receiver group. UtxoSwap dispatches to
+	// its own reconstruction validator because direct refunds are optional for
+	// that wire contract. Every transaction that is present is nevertheless
+	// reconstructed and compared in full before it can be FROST-signed.
 	for _, g := range groupsByReceiver {
 		if transferType == st.TransferTypeUtxoSwap {
-			if err := validateUtxoSwapLeafRefundTxsV3(g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, requireDirectTx); err != nil {
+			if err := validateUtxoSwapLeafRefundTxsV3(ctx, g.leaves, g.cpfpMap, g.directMap, g.directCpfpMap, g.receiverPubKey, requireDirectTx); err != nil {
 				return nil, nil, fmt.Errorf("unable to validate utxo swap refund txs for receiver %s: %w", g.receiverPubKey, err)
 			}
 			continue
@@ -974,20 +970,20 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(
 	receiverIdentityPublicKey keys.Public,
 	requireDirectTx bool,
 ) error {
+	if err := validateUtxoSwapLeafRefundTxsV3(
+		ctx,
+		leaves,
+		leafCpfpRefundMap,
+		leafDirectRefundMap,
+		leafDirectFromCpfpRefundMap,
+		receiverIdentityPublicKey,
+		requireDirectTx,
+	); err != nil {
+		return err
+	}
+
 	for _, leaf := range leaves {
-		directRefundTx := leafDirectRefundMap[leaf.ID.String()]
-		intermediateDirectFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leaf.ID.String()]
-
-		rawRefundTx, exist := leafCpfpRefundMap[leaf.ID.String()]
-		if !exist {
-			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
-		}
-
-		err := validateSendLeafRefundTxs(leaf, rawRefundTx, directRefundTx, intermediateDirectFromCpfpRefundTx, receiverIdentityPublicKey, 1, requireDirectTx)
-		if err != nil {
-			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
-		}
-		err = h.LeafAvailableToTransfer(ctx, leaf, transfer)
+		err := h.LeafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
@@ -995,14 +991,17 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(
 	return nil
 }
 
-// validateUtxoSwapLeafRefundTxsV3 is the v3 (consensus-path) counterpart of
-// validateUtxoSwapLeaves' refund-tx validation: cpfp refund txs are required,
-// direct/direct-from-cpfp refund txs are optional for utxo swaps
-// (requireDirectTx=false on the legacy wire contract) but MUST be
-// output-validated when present, since every submitted tx is FROST-signed.
-// LeafAvailableToTransfer is intentionally not repeated here — createTransferV3
-// runs it via validateTransferLeaves after the transfer row exists.
+// validateUtxoSwapLeafRefundTxsV3 is shared by the legacy and consensus/V3
+// UTXO-swap creation paths. CPFP refunds are required. Direct and
+// direct-from-CPFP refunds are optional when requireDirectTx is false, but they
+// must be supplied as a pair and every supplied transaction is reconstructed
+// and compared in full before FROST signing.
+//
+// LeafAvailableToTransfer is deliberately outside this helper: the legacy
+// caller checks it immediately afterwards, while createTransferV3 checks it in
+// validateTransferLeaves after the transfer row exists.
 func validateUtxoSwapLeafRefundTxsV3(
+	ctx context.Context,
 	leaves []*ent.TreeNode,
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
@@ -1016,8 +1015,58 @@ func validateUtxoSwapLeafRefundTxsV3(
 		if !exist {
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leafID)
 		}
-		if err := validateSendLeafRefundTxs(leaf, rawRefundTx, leafDirectRefundMap[leafID], leafDirectFromCpfpRefundMap[leafID], receiverIdentityPubKey, 1, requireDirectTx); err != nil {
-			return fmt.Errorf("unable to validate refund txs for utxo swap leaf %s: %w", leafID, err)
+
+		directRefundTx := leafDirectRefundMap[leafID]
+		directFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leafID]
+		hasDirectRefundTx := len(directRefundTx) > 0
+		hasDirectFromCpfpRefundTx := len(directFromCpfpRefundTx) > 0
+		if hasDirectRefundTx != hasDirectFromCpfpRefundTx {
+			return fmt.Errorf("both direct refund txs are required when either direct refund tx is provided for utxo swap leaf %s", leafID)
+		}
+		if requireDirectTx && len(leaf.DirectTx) > 0 && !hasDirectRefundTx {
+			return fmt.Errorf("DirectNodeTxSignature is required for utxo swap leaf %s. Please upgrade to the latest SDK version", leafID)
+		}
+
+		cpfpTimelock, err := bitcointransaction.GetCpfpTimelockFromLeaf(leaf)
+		if err != nil {
+			return fmt.Errorf("unable to get CPFP timelock for utxo swap leaf %s: %w", leafID, err)
+		}
+		networkString := leaf.Network.String()
+		if err := bitcointransaction.VerifyTransactionWithDatabaseTimelock(
+			ctx,
+			rawRefundTx,
+			leaf,
+			bitcointransaction.TxTypeRefundCPFP,
+			receiverIdentityPubKey,
+			networkString,
+			cpfpTimelock,
+		); err != nil {
+			return fmt.Errorf("unable to validate CPFP refund tx for utxo swap leaf %s: %w", leafID, err)
+		}
+
+		if hasDirectRefundTx {
+			if err := bitcointransaction.VerifyTransactionWithDatabaseTimelock(
+				ctx,
+				directRefundTx,
+				leaf,
+				bitcointransaction.TxTypeRefundDirect,
+				receiverIdentityPubKey,
+				networkString,
+				cpfpTimelock,
+			); err != nil {
+				return fmt.Errorf("unable to validate direct refund tx for utxo swap leaf %s: %w", leafID, err)
+			}
+			if err := bitcointransaction.VerifyTransactionWithDatabaseTimelock(
+				ctx,
+				directFromCpfpRefundTx,
+				leaf,
+				bitcointransaction.TxTypeRefundDirectFromCPFP,
+				receiverIdentityPubKey,
+				networkString,
+				cpfpTimelock,
+			); err != nil {
+				return fmt.Errorf("unable to validate direct from CPFP refund tx for utxo swap leaf %s: %w", leafID, err)
+			}
 		}
 	}
 	return nil
@@ -1787,7 +1836,9 @@ func validateSingleLeafRefundTxs(
 		transferType == st.TransferTypeSwap ||
 		transferType == st.TransferTypeCounterSwap ||
 		transferType == st.TransferTypePrimarySwapV3 ||
-		transferType == st.TransferTypeCounterSwapV3
+		transferType == st.TransferTypeCounterSwapV3 ||
+		transferType == st.TransferTypePreimageSwap ||
+		transferType == st.TransferTypeUtxoSwap
 	requireDirectFromCpfpRefund := transferType == st.TransferTypeTransfer || transferType == st.TransferTypeCooperativeExit
 
 	if validateDirectRefunds {

@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	"github.com/stretchr/testify/assert"
@@ -383,9 +384,129 @@ func createSigningJobForLeafWithDest(t *testing.T, rng io.Reader, leaf *ent.Tree
 	return job
 }
 
+// createSwapClaimJobForLeaf builds a claim signing job shaped like a real
+// swap-type claim (preimage swap, utxo swap): CPFP, direct, and
+// direct-from-CPFP refund txs that all pay the leaf owner and carry
+// canonically-decremented timelocks. directFromCpfpSequence overrides the
+// direct-from-CPFP refund's input sequence so a test can inject a poisoned
+// value; pass 0 to use the canonical decremented timelock (CPFP successor +
+// DirectTimelockOffset).
+func createSwapClaimJobForLeaf(t *testing.T, rng io.Reader, leaf *ent.TreeNode, dest keys.Public, directFromCpfpSequence uint32) *pb.LeafRefundTxSigningJob {
+	rawRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	require.NoError(t, err)
+	require.NotEmpty(t, rawRefundTx.TxIn)
+
+	currentTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
+	expectedCpfpTimelock := currentTimelock - 100       // spark.TimeLockInterval is 100
+	expectedDirectTimelock := expectedCpfpTimelock + 50 // spark.DirectTimelockOffset is 50
+
+	if directFromCpfpSequence == 0 {
+		directFromCpfpSequence = expectedDirectTimelock
+	}
+
+	cpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, dest, expectedCpfpTimelock, false)
+	directTxBytes := createRefundTxBytes(t, leaf.DirectTx, dest, expectedDirectTimelock, true)
+	directFromCpfpTxBytes := createRefundTxBytes(t, leaf.RawTx, dest, directFromCpfpSequence, true)
+
+	return &pb.LeafRefundTxSigningJob{
+		LeafId: "test-leaf-id",
+		RefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       dest.Serialize(),
+			RawTx:                  cpfpTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		DirectRefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       dest.Serialize(),
+			RawTx:                  directTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+		DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
+			SigningPublicKey:       dest.Serialize(),
+			RawTx:                  directFromCpfpTxBytes,
+			SigningNonceCommitment: createTestSigningCommitment(rng),
+		},
+	}
+}
+
+// TestValidateReceivedRefundTransactions_PreimageSwap_Success proves the fix
+// does not reject legitimate Lightning preimage-swap claims: a claim carrying
+// canonically-decremented refund txs still validates once PREIMAGE_SWAP is a
+// recognized claim type.
+func TestValidateReceivedRefundTransactions_PreimageSwap_Success(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{0xA1})
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+	job := createSwapClaimJobForLeaf(t, rng, leaf, ownerPubKey, 0)
+
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypePreimageSwap, nil, nil)
+	require.NoError(t, err)
+}
+
+// TestValidateReceivedRefundTransactions_PreimageSwap_RejectsZeroDelayDirectFromCpfp
+// is the regression test for the preimage-swap refund validation bug. A claim
+// whose direct-from-CPFP refund carries sequence 0x40000000 (BIP68 relative
+// timelock bits zero, i.e. spendable as soon as its parent confirms) must be
+// rejected before FROST signing. Before the fix, PREIMAGE_SWAP was omitted
+// from both the claim-path validation gate (isSupportedTransferType) and
+// validateSingleLeafRefundTxs' direct-refund set (validateDirectRefunds), so
+// this poisoned tx was signed and stored as the leaf's DirectFromCpfpRefundTx.
+//
+// Tested at this level for the same reason as the other
+// validateReceivedRefundTransactions cases above: the security-relevant
+// outcome (the SOs producing a valid FROST signature over the poisoned refund
+// tx) is only observable at the public claim boundary through a full multi-SO
+// signing flow. That belongs in a multi-SO grpc_test; this narrow unit test
+// pins the validation contract the boundary depends on.
+func TestValidateReceivedRefundTransactions_PreimageSwap_RejectsZeroDelayDirectFromCpfp(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{0xA2})
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+	job := createSwapClaimJobForLeaf(t, rng, leaf, ownerPubKey, 0x40000000)
+
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypePreimageSwap, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match expected timelock")
+}
+
+// TestValidateReceivedRefundTransactions_UtxoSwap_Success proves the fix does
+// not reject legitimate static-deposit (UTXO_SWAP) claims: a claim carrying
+// canonically-decremented refund txs still validates once UTXO_SWAP is a
+// recognized claim type.
+func TestValidateReceivedRefundTransactions_UtxoSwap_Success(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{0xB1})
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+	job := createSwapClaimJobForLeaf(t, rng, leaf, ownerPubKey, 0)
+
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeUtxoSwap, nil, nil)
+	require.NoError(t, err)
+}
+
+// TestValidateReceivedRefundTransactions_UtxoSwap_RejectsZeroDelayDirectFromCpfp
+// covers the same validation gap for UTXO_SWAP as the PREIMAGE_SWAP regression
+// above. A static-deposit swap is claimed by the depositing user (the
+// receiver), so an attacker-controlled claimant could inject a zero-delay
+// (sequence 0x40000000) direct-from-CPFP refund. It must be rejected before
+// signing. See the PREIMAGE_SWAP case for why this is tested at the validator
+// level rather than the public claim boundary.
+func TestValidateReceivedRefundTransactions_UtxoSwap_RejectsZeroDelayDirectFromCpfp(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{0xB2})
+	ctx, _ := db.NewTestSQLiteContext(t)
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+	job := createSwapClaimJobForLeaf(t, rng, leaf, ownerPubKey, 0x40000000)
+
+	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeUtxoSwap, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match expected timelock")
+}
+
 func TestValidateReceivedRefundTransactions_Transfer_Success(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-	ctx, _ := db.ConnectToTestPostgres(t)
+	ctx, _ := db.NewTestSQLiteContext(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, false /* isSwap */)
@@ -396,7 +517,7 @@ func TestValidateReceivedRefundTransactions_Transfer_Success(t *testing.T) {
 
 func TestValidateReceivedRefundTransactions_Swap_Success(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{2})
-	ctx, _ := db.ConnectToTestPostgres(t)
+	ctx, _ := db.NewTestSQLiteContext(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 	job := createValidSigningJobForLeaf(t, rng, leaf, true /* isSwap */)
@@ -413,7 +534,7 @@ func TestValidateReceivedRefundTransactions_Swap_Success(t *testing.T) {
 // Only the explicit equality against leaf.OwnerSigningPubkey catches it.
 func TestValidateReceivedRefundTransactions_RejectsNonCanonicalDestination(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{99})
-	ctx, _ := db.ConnectToTestPostgres(t)
+	ctx, _ := db.NewTestSQLiteContext(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 
@@ -425,31 +546,44 @@ func TestValidateReceivedRefundTransactions_RejectsNonCanonicalDestination(t *te
 	assert.Contains(t, err.Error(), "does not match expected owner signing pubkey")
 }
 
-func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{3})
-	ctx, _ := db.ConnectToTestPostgres(t)
-	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+// TestValidateReceivedRefundTransactions_RetryRevalidatesStoredTransactions
+// proves idempotent retries do not turn persisted bytes into an authorization
+// oracle. A prior Prepare can leave the submitted transactions on the node;
+// replaying those exact bytes must still enforce owner, structure, and
+// timelock validation before the SO signs again.
+func TestValidateReceivedRefundTransactions_RetryRevalidatesStoredTransactions(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
 
-	// Create a job where RawTx matches the existing RawRefundTx in the leaf
-	// This simulates a retry scenario
-	job := &pb.LeafRefundTxSigningJob{
-		LeafId: "test-leaf-id",
-		RefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerPubKey.Serialize(),
-			RawTx:                  leaf.RawRefundTx, // Same as leaf.RawRefundTx
-			SigningNonceCommitment: createTestSigningCommitment(rng),
-		},
+	testCases := []struct {
+		transferType st.TransferType
+		seed         byte
+	}{
+		{transferType: st.TransferTypePreimageSwap, seed: 0xC1},
+		{transferType: st.TransferTypeUtxoSwap, seed: 0xC2},
 	}
+	for _, tc := range testCases {
+		t.Run(string(tc.transferType), func(t *testing.T) {
+			rng := rand.NewChaCha8([32]byte{tc.seed})
+			ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
+			previousRefundTx := bytes.Clone(leaf.RawRefundTx)
 
-	// When bytes.Equal(job.RefundTxSigningJob.RawTx, leaf.RawRefundTx) is true,
-	// validation should be skipped and return nil
-	err := validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeTransfer /* isSwap */, nil, nil)
-	require.NoError(t, err)
+			validJob := createSwapClaimJobForLeaf(t, rng, leaf, ownerPubKey, 0)
+			leaf.RawRefundTx = bytes.Clone(validJob.GetRefundTxSigningJob().GetRawTx())
+			leaf.DirectRefundTx = bytes.Clone(validJob.GetDirectRefundTxSigningJob().GetRawTx())
+			leaf.DirectFromCpfpRefundTx = bytes.Clone(validJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx())
+			require.NoError(t, validateReceivedRefundTransactions(ctx, validJob, leaf, tc.transferType, nil, previousRefundTx))
 
-	// Also works for swap
-	err = validateReceivedRefundTransactions(ctx, job, leaf, st.TransferTypeSwap /* isSwap */, nil, nil)
-	require.NoError(t, err)
+			leaf.RawRefundTx = bytes.Clone(previousRefundTx)
+			poisonedJob := createSwapClaimJobForLeaf(t, rng, leaf, ownerPubKey, spark.ZeroSequence)
+			leaf.RawRefundTx = bytes.Clone(poisonedJob.GetRefundTxSigningJob().GetRawTx())
+			leaf.DirectRefundTx = bytes.Clone(poisonedJob.GetDirectRefundTxSigningJob().GetRawTx())
+			leaf.DirectFromCpfpRefundTx = bytes.Clone(poisonedJob.GetDirectFromCpfpRefundTxSigningJob().GetRawTx())
+
+			err := validateReceivedRefundTransactions(ctx, poisonedJob, leaf, tc.transferType, nil, previousRefundTx)
+			require.ErrorContains(t, err, "does not match expected timelock")
+		})
+	}
 }
 
 // TestValidateReceivedRefundTransactions_PoisonedNodeRefundTx_AnchoredOnPreviousRefundTx
@@ -467,7 +601,7 @@ func TestValidateReceivedRefundTransactions_RetrySkipsValidation(t *testing.T) {
 // test. Public-boundary coverage belongs in a multi-SO grpc_test.
 func TestValidateReceivedRefundTransactions_PoisonedNodeRefundTx_AnchoredOnPreviousRefundTx(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{42})
-	ctx, _ := db.ConnectToTestPostgres(t)
+	ctx, _ := db.NewTestSQLiteContext(t)
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf := createTestTreeNodeForValidation(t, rng, ownerPubKey)
 
