@@ -261,6 +261,31 @@ func validateTokenNotGloballyPaused(ctx context.Context, tokenCreateID uuid.UUID
 	return nil
 }
 
+func validateMintOrCreateTransactionNotPaused(ctx context.Context, tokenTransactionEnt *ent.TokenTransaction) error {
+	switch txType := tokenTransactionEnt.InferTokenTransactionTypeEnt(); txType {
+	case utils.TokenTransactionTypeMint:
+		if len(tokenTransactionEnt.Edges.CreatedOutput) == 0 {
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no created outputs found when attempting to validate mint transaction pause state"))
+		}
+		tokenCreateID := tokenTransactionEnt.Edges.CreatedOutput[0].TokenCreateID
+		if err := ent.LockTokenCreatesForFreezeCoordination(ctx, []uuid.UUID{tokenCreateID}); err != nil {
+			return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to lock token create for pause validation: %w", err))
+		}
+		return validateTokenNotGloballyPaused(ctx, tokenCreateID)
+	case utils.TokenTransactionTypeCreate:
+		tokenCreate, err := tokenTransactionEnt.Edges.CreateOrErr()
+		if err != nil {
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("token create edge not loaded when attempting to validate create transaction pause state: %w", err))
+		}
+		if err := ent.LockTokenCreatesForFreezeCoordination(ctx, []uuid.UUID{tokenCreate.ID}); err != nil {
+			return sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to lock token create for pause validation: %w", err))
+		}
+		return validateTokenNotGloballyPaused(ctx, tokenCreate.ID)
+	default:
+		return nil
+	}
+}
+
 func validateQueryTokenTransactionsRequest(req *tokenpb.QueryTokenTransactionsRequest) error {
 	if req == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("request is required"))

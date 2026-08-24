@@ -1057,6 +1057,8 @@ func FetchAndLockTokenTransactionOutputsForFinalizeByHash(ctx context.Context, t
 				tokenoutput.FieldID,
 				tokenoutput.FieldStatus,
 				tokenoutput.FieldSpentTransactionInputVout,
+				tokenoutput.FieldOwnerPublicKey,
+				tokenoutput.FieldTokenCreateID,
 			)
 			q.ForUpdate()
 		}).
