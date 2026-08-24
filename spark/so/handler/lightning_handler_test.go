@@ -3216,6 +3216,43 @@ func TestInitiatePreimageSwapPackageOnly(t *testing.T) {
 		require.ErrorContains(t, err, "hodl invoices are currently disabled")
 	})
 
+	t.Run("2PC prepareState enforces the receive sender allowlist per SO", func(t *testing.T) {
+		allowlistCtx := func(t *testing.T, allowed keys.Public) context.Context {
+			t.Helper()
+			ctx, _ := db.NewTestSQLiteContext(t)
+			return knobs.InjectKnobsService(ctx, knobs.NewFixedKnobs(map[string]float64{
+				knobs.KnobLightningReceiveSenderAllowlistEnabled:                1,
+				knobs.KnobLightningReceiveAllowedSender + "@" + allowed.ToHex(): 1,
+			}))
+		}
+		newReceiveRequest := func() *pb.InitiatePreimageSwapRequest {
+			req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+			req.Reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+			return req
+		}
+		flowHandler := NewInitiatePreimageSwapFlowHandler(config)
+
+		t.Run("rejects a sender that is not allowlisted", func(t *testing.T) {
+			otherPrivKey := keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{9}))
+			_, err := flowHandler.prepareState(allowlistCtx(t, otherPrivKey.Public()), newReceiveRequest(), nil)
+			require.ErrorContains(t, err, "session identity does not match request identity")
+		})
+
+		t.Run("admits an allowlisted sender", func(t *testing.T) {
+			// Falls through the gate into the refund validation the receive path runs
+			// on the package, which this bare signing job has nothing for.
+			_, err := flowHandler.prepareState(allowlistCtx(t, ownerPrivKey.Public()), newReceiveRequest(), nil)
+			require.ErrorContains(t, err, "signing commitments is nil")
+		})
+
+		t.Run("leaves sends alone", func(t *testing.T) {
+			otherPrivKey := keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{9}))
+			req := newSendRequest([]*pb.UserSignedTxSigningJob{{LeafId: uuid.NewString()}}, 100, 0)
+			_, err := flowHandler.prepareState(allowlistCtx(t, otherPrivKey.Public()), req, nil)
+			require.ErrorContains(t, err, "leaves but only")
+		})
+	})
+
 	t.Run("send rejects unavailable leaves before package work", func(t *testing.T) {
 		ctx, _ := db.NewTestSQLiteContext(t)
 		tx, err := ent.GetDbFromContext(ctx)

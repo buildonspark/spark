@@ -378,6 +378,10 @@ func (h *InitiatePreimageSwapV4FlowHandler) prepareStateV4(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
+	// v4 is REASON_RECEIVE-only, checked above, so this needs no reason branch.
+	if err := enforceLightningReceiveSender(ctx, parsed.senderIDPK); err != nil {
+		return nil, err
+	}
 	attestor, err := keys.ParsePublicKey(req.GetAttestorIdentityPublicKey())
 	if err != nil {
 		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse attestor identity public key: %w", err))
