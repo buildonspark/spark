@@ -259,7 +259,7 @@ func CreateTransferPackageV3(
 
 		groupPkg, err := signRefundsForLeaves(
 			ctx, signerClient, group.leaves, commitmentsByLeafID,
-			group.receiver, keys.Public{},
+			group.receiver, keys.Public{}, false,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign refunds for receiver group: %w", err)
@@ -321,6 +321,7 @@ func signRefundsForLeaves(
 	commitmentsByLeafID map[string][]*pb.RequestedSigningCommitments,
 	receiverIdentityPubKey keys.Public,
 	adaptorPublicKey keys.Public,
+	directRefundsMustBePaired bool,
 ) (*refundSigningResult, error) {
 	// Split commitments by refund type
 	cpfpCommitments := make([]*pb.RequestedSigningCommitments, len(leaves))
@@ -330,11 +331,14 @@ func signRefundsForLeaves(
 	var directCommitments []*pb.RequestedSigningCommitments
 	for i, leaf := range leaves {
 		cpfpCommitments[i] = commitmentsByLeafID[leaf.Leaf.GetId()][0]
-		if len(leaf.Leaf.GetDirectFromCpfpRefundTx()) > 0 {
+		hasDirectRefund := len(leaf.Leaf.GetDirectRefundTx()) > 0
+		hasDirectFromCpfpRefund := len(leaf.Leaf.GetDirectFromCpfpRefundTx()) > 0
+		includeDirectRefunds := !directRefundsMustBePaired || (hasDirectRefund && hasDirectFromCpfpRefund)
+		if includeDirectRefunds && hasDirectFromCpfpRefund {
 			leavesWithDirectFromCpfp = append(leavesWithDirectFromCpfp, leaf)
 			directFromCpfpCommitments = append(directFromCpfpCommitments, commitmentsByLeafID[leaf.Leaf.GetId()][2])
 		}
-		if len(leaf.Leaf.GetDirectRefundTx()) > 0 {
+		if includeDirectRefunds && hasDirectRefund {
 			leavesWithDirectTx = append(leavesWithDirectTx, leaf)
 			directCommitments = append(directCommitments, commitmentsByLeafID[leaf.Leaf.GetId()][1])
 		}
@@ -414,6 +418,35 @@ func PrepareTransferPackage(
 	receiverIdentityPubKey keys.Public,
 	adaptorPublicKey keys.Public,
 ) (*pb.TransferPackage, error) {
+	return prepareTransferPackage(ctx, config, client, transferID, keyTweakInputMap, leaves, receiverIdentityPubKey, adaptorPublicKey, false)
+}
+
+// PrepareUtxoSwapTransferPackage keeps optional direct refunds paired, as
+// required by the UTXO-swap wire contract.
+func PrepareUtxoSwapTransferPackage(
+	ctx context.Context,
+	config *TestWalletConfig,
+	client pb.SparkServiceClient,
+	transferID uuid.UUID,
+	keyTweakInputMap map[string][]*pb.SendLeafKeyTweak,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubKey keys.Public,
+	adaptorPublicKey keys.Public,
+) (*pb.TransferPackage, error) {
+	return prepareTransferPackage(ctx, config, client, transferID, keyTweakInputMap, leaves, receiverIdentityPubKey, adaptorPublicKey, true)
+}
+
+func prepareTransferPackage(
+	ctx context.Context,
+	config *TestWalletConfig,
+	client pb.SparkServiceClient,
+	transferID uuid.UUID,
+	keyTweakInputMap map[string][]*pb.SendLeafKeyTweak,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubKey keys.Public,
+	adaptorPublicKey keys.Public,
+	directRefundsMustBePaired bool,
+) (*pb.TransferPackage, error) {
 	// Fetch signing commitments: 3 per leaf (for CPFP, Direct, DirectFromCpfp)
 	const maxRefundTxsPerLeaf = 3
 	nodes := make([]string, len(leaves))
@@ -437,7 +470,7 @@ func PrepareTransferPackage(
 	defer signerConn.Close()
 	signerClient := pbfrost.NewFrostServiceClient(signerConn)
 
-	signed, err := signRefundsForLeaves(ctx, signerClient, leaves, commitmentsByLeafID, receiverIdentityPubKey, adaptorPublicKey)
+	signed, err := signRefundsForLeaves(ctx, signerClient, leaves, commitmentsByLeafID, receiverIdentityPubKey, adaptorPublicKey, directRefundsMustBePaired)
 	if err != nil {
 		return nil, err
 	}
