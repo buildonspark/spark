@@ -278,9 +278,11 @@ describe("quoted manifest amount validation", () => {
       ],
       [fee(SSP, 2_000, FeeRole.FEE_ROLE_LS)],
     );
+    // No attestor is passed, so it defaults to the receiver: on a self-receive
+    // the payee IS the signer, which is the case this has always covered.
     expect(() =>
       validate(debits, 100_000, ReceiveQuoteAmountBasis.NET),
-    ).toThrow(/debits the receiving wallet/);
+    ).toThrow(/debits the attesting wallet/);
   });
 
   it("refuses an unrecognized basis rather than treating it as gross", () => {

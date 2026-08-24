@@ -58,6 +58,16 @@ class MockSparkTokenPrimitives extends SparkTokenPrimitivesBase {
     throw new Error("not used in this test");
   }
 
+  async quoteEnvelopeDigest(): Promise<Uint8Array> {
+    await Promise.resolve();
+    throw new Error("not used in this test");
+  }
+
+  async receiveAttestorTarget(): Promise<Uint8Array> {
+    await Promise.resolve();
+    throw new Error("not used in this test");
+  }
+
   async buildBroadcastTransactionRequest(
     _request: BroadcastBuildRequestBindingParams,
   ): Promise<Uint8Array> {

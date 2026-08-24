@@ -870,7 +870,7 @@ async function runCLI() {
   refundandbroadcaststaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund and broadcast a static deposit
   gettransfers [limit] [offset]                                       - Get a list of transfers
   createinvoice <amount> <memo> <includeSparkAddress> <includeSparkInvoice> [receiverIdentityPubkey] [descriptionHash] - Create a new lightning invoice (includeSparkAddress and includeSparkInvoice are mutually exclusive)
-  createquotedinvoice <amount> [memo|_] [NET|GROSS] [descriptionHash|_] [partnerJwt] - Quote a lightning receive, sign the manifest and issue the invoice in one step; prints JSON. Pass _ to skip memo or descriptionHash, and only ever one of the two. Without a partnerJwt the quote comes back feeless. GROSS needs an SSP schema exposing amount_basis (rc)
+  createquotedinvoice <amount> [memo|_] [NET|GROSS] [receiverIdentityPubkey|_] [descriptionHash|_] [partnerJwt] - Quote a lightning receive, sign the manifest and issue the invoice in one step; prints JSON. Pass _ to skip memo, receiverIdentityPubkey or descriptionHash. Naming a receiver quotes a delegated receive: this wallet still attests, so the payee need not be online. Without a partnerJwt the quote comes back feeless. GROSS needs an SSP schema exposing amount_basis (rc)
   createhodlinvoice <amount> <paymentHash> <memo> <includeSparkAddress> <includeSparkInvoice> [receiverIdentityPubkey] [descriptionHash] - Create a HODL lightning invoice with payment hash (includeSparkAddress and includeSparkInvoice are mutually exclusive)
   payinvoice <invoice> <maxFeeSats> <preferSpark> [amountSatsToSend]  - Pay a lightning invoice
   createsparkinvoice <asset("btc" | tokenIdentifier)> [amount] [memo] [senderPublicKey] [expiryTime] - Create a spark payment request. Amount is optional. Use _ for empty optional fields eg createsparkinvoice btc _ memo _ _
@@ -1724,15 +1724,18 @@ async function runCLI() {
           const { manifestFeeSats, manifestGrossSats } =
             await import("@buildonspark/spark-sdk");
           const quotedAmountSats = parseInt(args[0]);
+          const receiverIdentityPubkey = args[3] === "_" ? undefined : args[3];
           const quote = await wallet.getLightningReceiveQuote({
             amountSats: quotedAmountSats,
             amountBasis: basis as ReceiveQuoteAmountBasis | undefined,
-            partnerJwt: args[4],
+            partnerJwt: args[5],
+            receiverIdentityPubkey,
           });
           const quotedInvoice = await wallet.createLightningInvoice({
             amountSats: quotedAmountSats,
             memo: args[1] === "_" ? undefined : args[1],
-            descriptionHash: args[3] === "_" ? undefined : args[3],
+            receiverIdentityPubkey,
+            descriptionHash: args[4] === "_" ? undefined : args[4],
             quote,
           });
           console.log(

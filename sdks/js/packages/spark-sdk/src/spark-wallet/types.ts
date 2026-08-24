@@ -44,6 +44,12 @@ export type GetLightningReceiveQuoteParams = {
    * reporting why in `attributionStatus`; a rejected token is never an error.
    */
   partnerJwt?: string;
+  /**
+   * Who the quote pays. Defaults to this wallet. Naming another key quotes a
+   * delegated receive: this wallet still attests, so the payee never has to be
+   * online or hold a signing key.
+   */
+  receiverIdentityPubkey?: string;
 };
 
 /**

@@ -7,6 +7,8 @@ import {
   hash_transfer_manifest,
   type InitOutput,
   prepare_token_invoice,
+  quote_envelope_digest,
+  receive_attestor_target,
 } from "./wasm/wasm-browser.js";
 import type {
   BroadcastBuildRequestBindingParams,
@@ -74,6 +76,22 @@ class SparkTokenPrimitivesBrowser extends SparkTokenPrimitivesBase {
   async hashTransferManifest(transferManifestBytes: Uint8Array) {
     await this.init();
     return hash_transfer_manifest(transferManifestBytes);
+  }
+
+  async quoteEnvelopeDigest(
+    network: number,
+    manifestHash: Uint8Array,
+    reason: number,
+    role: number,
+    target: Uint8Array,
+  ) {
+    await this.init();
+    return quote_envelope_digest(network, manifestHash, reason, role, target);
+  }
+
+  async receiveAttestorTarget(paymentHash: Uint8Array) {
+    await this.init();
+    return receive_attestor_target(paymentHash);
   }
 
   async buildBroadcastTransactionRequest(

@@ -1,9 +1,15 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import type { TransferManifest } from "../proto/spark.js";
+import { TransferManifest } from "../proto/spark.js";
 import {
   hashSerializedTransferManifest,
   hashTransferManifest,
 } from "./manifest-hashing.js";
+import {
+  QuoteReason,
+  QuoteRole,
+  quoteEnvelopeDigest,
+  receiveAttestorTarget,
+} from "./quote-envelope.js";
 
 /**
  * The sender's identity-key ECDSA signature over `manifest_hash`.
@@ -52,6 +58,72 @@ export async function signSerializedTransferManifest(
   return signer.signMessageWithIdentityKey(
     await hashSerializedTransferManifest(manifestBytes),
   );
+}
+
+/**
+ * The attestor's identity-key signature over the receive quote envelope.
+ *
+ * The attestor is whoever owns the invoice's preimage share, which need not be the
+ * wallet being paid — a delegated receive names a third-party receiver and attests on
+ * its behalf. Binding the payment hash is what stops one attestation from covering a
+ * different invoice of the same gross from the same attestor.
+ */
+export async function signQuoteAsAttestor({
+  manifestBytes,
+  paymentHash,
+  signer,
+}: {
+  manifestBytes: Uint8Array;
+  paymentHash: Uint8Array;
+  signer: ManifestSigner;
+}): Promise<Uint8Array> {
+  const manifestHash = await hashSerializedTransferManifest(manifestBytes);
+  const target = await receiveAttestorTarget(paymentHash);
+  const digest = await quoteEnvelopeDigest({
+    // From the bytes being signed, like the verifier on both sides, so a
+    // caller cannot produce an envelope naming a network the manifest denies.
+    network: TransferManifest.decode(manifestBytes).network,
+    manifestHash,
+    reason: QuoteReason.RECEIVE,
+    role: QuoteRole.ATTESTOR,
+    target,
+  });
+
+  return signer.signMessageWithIdentityKey(digest);
+}
+
+/** Verifies what the operators verify: the envelope, under the attestor role. */
+export async function verifyQuoteAttestation({
+  manifestBytes,
+  paymentHash,
+  signature,
+  attestorIdentityPublicKey,
+}: {
+  manifestBytes: Uint8Array;
+  paymentHash: Uint8Array;
+  signature: Uint8Array;
+  attestorIdentityPublicKey: Uint8Array;
+}): Promise<boolean> {
+  const manifestHash = await hashSerializedTransferManifest(manifestBytes);
+  const target = await receiveAttestorTarget(paymentHash);
+  const digest = await quoteEnvelopeDigest({
+    network: TransferManifest.decode(manifestBytes).network,
+    manifestHash,
+    reason: QuoteReason.RECEIVE,
+    role: QuoteRole.ATTESTOR,
+    target,
+  });
+
+  secp256k1.ProjectivePoint.fromHex(attestorIdentityPublicKey);
+  try {
+    const compact = secp256k1.Signature.fromDER(signature).toCompactRawBytes();
+    return secp256k1.verify(compact, digest, attestorIdentityPublicKey, {
+      format: "compact",
+      lowS: true,
+    });
+  } catch {
+    return false;
+  }
 }
 
 export async function verifyTransferManifestSignature(

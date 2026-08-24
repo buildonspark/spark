@@ -164,6 +164,38 @@ class SparkTokenPrimitivesModule(reactContext: ReactApplicationContext) : ReactC
     }
 
     @ReactMethod
+    fun quoteEnvelopeDigest(params: ReadableMap, promise: Promise) {
+        try {
+            val manifestHash = params.getArray("manifestHash")?.toByteArray()
+                ?: throw Exception("Invalid manifestHash format")
+            val target = params.getArray("target")?.toByteArray()
+                ?: throw Exception("Invalid target format")
+            val result = uniffi.spark_token_primitives.quoteEnvelopeDigest(
+                params.getInt("network").toUInt(),
+                manifestHash,
+                params.getInt("reason").toUInt(),
+                params.getInt("role").toUInt(),
+                target,
+            )
+            promise.resolve(result.toWritableArray())
+        } catch (e: Exception) {
+            promise.reject("ERROR_QUOTE_ENVELOPE_DIGEST", e)
+        }
+    }
+
+    @ReactMethod
+    fun receiveAttestorTarget(params: ReadableMap, promise: Promise) {
+        try {
+            val paymentHash = params.getArray("paymentHash")?.toByteArray()
+                ?: throw Exception("Invalid paymentHash format")
+            val result = uniffi.spark_token_primitives.receiveAttestorTarget(paymentHash)
+            promise.resolve(result.toWritableArray())
+        } catch (e: Exception) {
+            promise.reject("ERROR_RECEIVE_ATTESTOR_TARGET", e)
+        }
+    }
+
+    @ReactMethod
     fun buildBroadcastTransactionRequest(params: ReadableMap, promise: Promise) {
         try {
             val identityPublicKey = params.getArray("identityPublicKey")?.toByteArray()

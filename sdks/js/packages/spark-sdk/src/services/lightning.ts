@@ -40,6 +40,9 @@ export type CreateLightningInvoiceParams = {
   memo?: string;
   receiverIdentityPubkey?: string;
   descriptionHash?: string;
+  /** The operators read the share's owner as the attestor, so a delegated receive
+   * must leave it with the wallet that signed rather than the payee. */
+  retainPreimageShareOwnership?: boolean;
 };
 
 export type CreateLightningInvoiceWithPreimageParams = {
@@ -81,6 +84,7 @@ export class LightningService {
     memo,
     receiverIdentityPubkey,
     descriptionHash,
+    retainPreimageShareOwnership,
   }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
     const crypto = getCrypto();
     const randBytes = crypto.getRandomValues(new Uint8Array(32));
@@ -95,6 +99,7 @@ export class LightningService {
       preimage,
       receiverIdentityPubkey,
       descriptionHash,
+      retainPreimageShareOwnership,
     });
   }
 
@@ -105,6 +110,7 @@ export class LightningService {
     preimage,
     receiverIdentityPubkey,
     descriptionHash,
+    retainPreimageShareOwnership,
   }: CreateLightningInvoiceWithPreimageParams): Promise<LightningReceiveRequest> {
     const paymentHash = sha256(preimage);
     const invoice = await invoiceCreator(
@@ -158,9 +164,10 @@ export class LightningService {
     const invoiceString = invoice.invoice.encodedInvoice;
     const threshold = this.config.getThreshold();
 
-    const userIdentityPublicKey = receiverIdentityPubkey
-      ? hexToBytes(receiverIdentityPubkey)
-      : await this.config.signer.getIdentityPublicKey();
+    const userIdentityPublicKey =
+      receiverIdentityPubkey && !retainPreimageShareOwnership
+        ? hexToBytes(receiverIdentityPubkey)
+        : await this.config.signer.getIdentityPublicKey();
 
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),

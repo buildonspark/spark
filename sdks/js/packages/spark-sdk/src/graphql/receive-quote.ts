@@ -36,15 +36,16 @@ interface LightningReceiveQuoteOutput {
 export interface CommittedQuoteInput {
   serializedManifest: string;
   issuerSignature: string;
-  /** The receiver's identity-key signature over the manifest hash, hex. */
-  manifestSignature: string;
+  /** The attestor's signature over the receive quote envelope, hex. The attestor
+   * owns the invoice's preimage share and need not be the wallet being paid. */
+  attestorSignature: string;
 }
 
 /** The snake_case shapes as they appear on the wire. */
 export interface CommittedQuoteInputWire {
   serialized_manifest: string;
   issuer_signature: string;
-  manifest_signature: string;
+  attestor_signature: string;
 }
 
 export interface LightningReceiveQuoteOutputWire {
@@ -61,7 +62,7 @@ export const CommittedQuoteInputToJson = (
   return {
     serialized_manifest: obj.serializedManifest,
     issuer_signature: obj.issuerSignature,
-    manifest_signature: obj.manifestSignature,
+    attestor_signature: obj.attestorSignature,
   };
 };
 
