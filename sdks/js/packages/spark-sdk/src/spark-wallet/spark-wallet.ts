@@ -161,7 +161,7 @@ import {
 } from "../utils/htlc-transactions.js";
 import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import { parseCompressedPublicKeyHex } from "../utils/keys.js";
-import { signSerializedTransferManifest } from "../utils/manifest-signing.js";
+import { signQuoteAsAttestor } from "../utils/manifest-signing.js";
 import {
   ATTRIBUTED_STATUS,
   manifestFeeSats,
@@ -3924,6 +3924,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     amountSats,
     amountBasis = ReceiveQuoteAmountBasis.NET,
     partnerJwt,
+    receiverIdentityPubkey,
   }: GetLightningReceiveQuoteParams): Promise<LightningReceiveQuote> {
     const sspClient = this.getSspClient();
 
@@ -3940,6 +3941,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       network: this.toBitcoinNetwork(),
       amountBasis,
       partnerJwt,
+      receiverIdentityPubkey,
     });
 
     if (!quote) {
@@ -3986,12 +3988,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private async signReceiveQuote({
     quote,
     amountSats,
+    paymentHash,
     receiverIdentityPubkey,
     includeSparkAddress,
     includeSparkInvoice,
   }: {
     quote: LightningReceiveQuote;
     amountSats: number;
+    paymentHash: Uint8Array;
     receiverIdentityPubkey?: string;
     includeSparkAddress: boolean;
     includeSparkInvoice: boolean;
@@ -4014,23 +4018,16 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const manifestBytes = hexToBytes(serializedManifest);
     const manifest = TransferManifest.decode(manifestBytes);
 
+    // Naming a receiver permits these to differ, it does not establish it —
+    // a caller naming its own key is an ordinary self-receive. The share's
+    // owner attests either way, so the checks below compare keys, not presence.
     const identityPublicKey = await this.config.signer.getIdentityPublicKey();
-    if (
-      receiverIdentityPubkey &&
-      receiverIdentityPubkey.toLowerCase() !==
-        bytesToHex(identityPublicKey).toLowerCase()
-    ) {
-      // The SSP quotes for the authenticated caller, so only that wallet holds
-      // the key the counterparty attestation is verified against.
-      throw new SparkValidationError(
-        "A quote cannot be signed for a receiver other than this wallet",
-        {
-          field: "receiverIdentityPubkey",
-          value: receiverIdentityPubkey,
-          expected: bytesToHex(identityPublicKey),
-        },
-      );
-    }
+    const payeeIdentityPublicKey = receiverIdentityPubkey
+      ? parseCompressedPublicKeyHex(
+          receiverIdentityPubkey,
+          "receiverIdentityPubkey",
+        )
+      : identityPublicKey;
 
     if (
       manifestFeeSats(manifest) > 0 &&
@@ -4088,19 +4085,21 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       manifest,
       amountSats,
       basis: amountBasis,
-      receiverIdentityPublicKey: identityPublicKey,
+      receiverIdentityPublicKey: payeeIdentityPublicKey,
+      attestorIdentityPublicKey: identityPublicKey,
     });
 
-    const signature = await signSerializedTransferManifest(
+    const signature = await signQuoteAsAttestor({
       manifestBytes,
-      this.config.signer,
-    );
+      paymentHash,
+      signer: this.config.signer,
+    });
 
     return {
       committedQuote: {
         serializedManifest,
         issuerSignature,
-        manifestSignature: bytesToHex(signature),
+        attestorSignature: bytesToHex(signature),
       },
       invoicedSats: manifestGrossSats(manifest),
     };
@@ -4156,6 +4155,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       invoiceCreator: requestLightningInvoice,
       receiverIdentityPubkey,
       descriptionHash,
+      retainPreimageShareOwnership: quote !== undefined,
     });
 
     return invoice;
@@ -4253,6 +4253,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       ? await this.signReceiveQuote({
           quote,
           amountSats,
+          paymentHash: hexToBytes(paymentHashHex),
           receiverIdentityPubkey,
           includeSparkAddress,
           includeSparkInvoice,

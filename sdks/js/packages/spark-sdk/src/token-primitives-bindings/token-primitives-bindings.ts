@@ -17,6 +17,14 @@ export abstract class SparkTokenPrimitivesBase {
   abstract hashTransferManifest(
     transferManifestBytes: Uint8Array,
   ): Promise<Uint8Array>;
+  abstract quoteEnvelopeDigest(
+    network: number,
+    manifestHash: Uint8Array,
+    reason: number,
+    role: number,
+    target: Uint8Array,
+  ): Promise<Uint8Array>;
+  abstract receiveAttestorTarget(paymentHash: Uint8Array): Promise<Uint8Array>;
   abstract buildBroadcastTransactionRequest(
     request: BroadcastBuildRequestBindingParams,
   ): Promise<Uint8Array>;

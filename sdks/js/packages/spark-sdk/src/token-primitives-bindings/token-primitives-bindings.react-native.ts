@@ -26,6 +26,8 @@ type SparkTokenPrimitivesNativeModule = {
   ): Promise<NativePartialTransferBuildResult>;
   hashPartialTokenTransaction(params: unknown): Promise<number[]>;
   hashTransferManifest(params: unknown): Promise<number[]>;
+  quoteEnvelopeDigest(params: unknown): Promise<number[]>;
+  receiveAttestorTarget(params: unknown): Promise<number[]>;
   buildBroadcastTransactionRequest(params: unknown): Promise<number[]>;
   prepareTokenInvoice(params: unknown): Promise<NativePreparedTokenInvoice>;
   finalizeTokenInvoice(params: unknown): Promise<string>;
@@ -103,6 +105,30 @@ class SparkTokenPrimitivesReactNative extends SparkTokenPrimitivesBase {
   ): Promise<Uint8Array> {
     const result = await getModule().hashTransferManifest({
       transferManifestBytes: toNumberArray(transferManifestBytes),
+    });
+    return toUint8Array(result);
+  }
+
+  async quoteEnvelopeDigest(
+    network: number,
+    manifestHash: Uint8Array,
+    reason: number,
+    role: number,
+    target: Uint8Array,
+  ): Promise<Uint8Array> {
+    const result = await getModule().quoteEnvelopeDigest({
+      network,
+      manifestHash: toNumberArray(manifestHash),
+      reason,
+      role,
+      target: toNumberArray(target),
+    });
+    return toUint8Array(result);
+  }
+
+  async receiveAttestorTarget(paymentHash: Uint8Array): Promise<Uint8Array> {
+    const result = await getModule().receiveAttestorTarget({
+      paymentHash: toNumberArray(paymentHash),
     });
     return toUint8Array(result);
   }

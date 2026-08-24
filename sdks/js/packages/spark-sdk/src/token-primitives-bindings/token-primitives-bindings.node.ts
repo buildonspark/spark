@@ -5,6 +5,8 @@ import {
   hash_partial_token_transaction,
   hash_transfer_manifest,
   prepare_token_invoice,
+  quote_envelope_digest,
+  receive_attestor_target,
 } from "./wasm/wasm-nodejs.js";
 import type {
   BroadcastBuildRequestBindingParams,
@@ -40,6 +42,26 @@ class SparkTokenPrimitivesNodeJS extends SparkTokenPrimitivesBase {
   hashTransferManifest(transferManifestBytes: Uint8Array): Promise<Uint8Array> {
     return new Promise((resolve) => {
       resolve(hash_transfer_manifest(transferManifestBytes));
+    });
+  }
+
+  quoteEnvelopeDigest(
+    network: number,
+    manifestHash: Uint8Array,
+    reason: number,
+    role: number,
+    target: Uint8Array,
+  ): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      resolve(
+        quote_envelope_digest(network, manifestHash, reason, role, target),
+      );
+    });
+  }
+
+  receiveAttestorTarget(paymentHash: Uint8Array): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      resolve(receive_attestor_target(paymentHash));
     });
   }
 

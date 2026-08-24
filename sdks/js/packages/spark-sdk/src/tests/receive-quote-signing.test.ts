@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { bytesToHex } from "@noble/curves/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import {
   FeeRole,
   FeeSource,
@@ -13,7 +13,10 @@ import { SparkWallet } from "../spark-wallet/spark-wallet.js";
 import type { LightningReceiveQuote } from "../spark-wallet/types.js";
 import { setSparkTokenPrimitivesOnce } from "../token-primitives-bindings/token-primitives-bindings.js";
 import { SparkTokenPrimitives } from "../token-primitives-bindings/token-primitives-bindings.node.js";
-import { verifyTransferManifestSignature } from "../utils/manifest-signing.js";
+import {
+  verifyQuoteAttestation,
+  verifyTransferManifestSignature,
+} from "../utils/manifest-signing.js";
 import { Network as WalletNetwork } from "../utils/network.js";
 import { ReceiveQuoteAmountBasis } from "../utils/receive-quote.js";
 
@@ -27,6 +30,8 @@ const RECEIVER_PRIVATE_KEY = new Uint8Array(32).fill(7);
 const RECEIVER = secp256k1.getPublicKey(RECEIVER_PRIVATE_KEY, true);
 const SSP = secp256k1.getPublicKey(new Uint8Array(32).fill(1), true);
 const STRANGER = secp256k1.getPublicKey(new Uint8Array(32).fill(9), true);
+const PAYMENT_HASH = new Uint8Array(32).fill(3);
+const OTHER_PAYMENT_HASH = new Uint8Array(32).fill(4);
 
 const sats = (value: number) => ({
   amount: { $case: "sats" as const, sats: value },
@@ -106,11 +111,12 @@ function walletWithSigner() {
     signReceiveQuote: (params: {
       quote: LightningReceiveQuote;
       amountSats: number;
+      paymentHash: Uint8Array;
       receiverIdentityPubkey?: string;
       includeSparkAddress: boolean;
       includeSparkInvoice: boolean;
     }) => Promise<{
-      committedQuote: { serializedManifest: string; manifestSignature: string };
+      committedQuote: { serializedManifest: string; attestorSignature: string };
       invoicedSats: number;
     }>;
   };
@@ -158,6 +164,7 @@ const sign = (
   wallet.signReceiveQuote({
     quote,
     amountSats: 100_000,
+    paymentHash: PAYMENT_HASH,
     includeSparkAddress: false,
     includeSparkInvoice: false,
     ...overrides,
@@ -172,7 +179,7 @@ describe("signing a receive quote", () => {
     expect(invoicedSats).toBe(102_000);
   });
 
-  it("echoes the quoted bytes and signs their hash with the identity key", async () => {
+  it("echoes the quoted bytes and attests over the envelope", async () => {
     const { wallet } = walletWithSigner();
     const quote = quoteFor(FEE_BEARING);
 
@@ -180,12 +187,29 @@ describe("signing a receive quote", () => {
 
     expect(committedQuote.serializedManifest).toBe(quote.serializedManifest);
     expect(
+      await verifyQuoteAttestation({
+        manifestBytes: TransferManifest.encode(FEE_BEARING).finish(),
+        paymentHash: PAYMENT_HASH,
+        signature: hexToBytes(committedQuote.attestorSignature),
+        attestorIdentityPublicKey: RECEIVER,
+      }),
+    ).toBe(true);
+  });
+
+  it("no longer signs the bare manifest hash", async () => {
+    const { wallet } = walletWithSigner();
+
+    const { committedQuote } = await sign(wallet, quoteFor(FEE_BEARING));
+
+    // The role and payment-hash binding are exactly what a bare-hash verifier
+    // cannot see, so an operator on the old scheme must reject this.
+    expect(
       await verifyTransferManifestSignature(
         FEE_BEARING,
-        Uint8Array.from(Buffer.from(committedQuote.manifestSignature, "hex")),
+        hexToBytes(committedQuote.attestorSignature),
         RECEIVER,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("validates the serialized bytes rather than the decoded field beside them", async () => {
@@ -206,11 +230,6 @@ describe("signing a receive quote", () => {
       "an amount the quote was not issued for",
       { amountSats: 99_999 },
       /different amount/,
-    ],
-    [
-      "a receiver other than this wallet",
-      { receiverIdentityPubkey: bytesToHex(STRANGER) },
-      /other than this wallet/,
     ],
     [
       "a fee-bearing quote with a Spark fallback",
@@ -234,6 +253,125 @@ describe("signing a receive quote", () => {
     });
 
     expect(invoicedSats).toBe(100_000);
+  });
+
+  it("signs for a receiver other than this wallet", async () => {
+    const { wallet } = walletWithSigner();
+
+    const delegated = manifestOf([edge(STRANGER, 100_000)]);
+
+    const { committedQuote } = await sign(wallet, quoteFor(delegated), {
+      receiverIdentityPubkey: bytesToHex(STRANGER),
+    });
+
+    expect(committedQuote.attestorSignature).toMatch(/^[0-9a-f]+$/);
+  });
+
+  it("attests with this wallet's key, not the payee's", async () => {
+    const { wallet } = walletWithSigner();
+    const delegated = manifestOf([edge(STRANGER, 100_000)]);
+    const manifestBytes = TransferManifest.encode(delegated).finish();
+
+    const { committedQuote } = await sign(wallet, quoteFor(delegated), {
+      receiverIdentityPubkey: bytesToHex(STRANGER),
+    });
+
+    await expect(
+      verifyQuoteAttestation({
+        manifestBytes,
+        paymentHash: PAYMENT_HASH,
+        signature: hexToBytes(committedQuote.attestorSignature),
+        attestorIdentityPublicKey: RECEIVER,
+      }),
+    ).resolves.toBe(true);
+  });
+
+  it("refuses a delegated manifest that debits the attesting wallet", async () => {
+    const { wallet } = walletWithSigner();
+
+    // The payee is the stranger, so a payee-keyed guard sees nothing wrong with
+    // an edge whose sender is this wallet — the debit it exists to refuse.
+    const debitsAttestor = manifestOf(
+      [
+        edge(STRANGER, 100_000),
+        {
+          senderIdentityPublicKey: RECEIVER,
+          receiverIdentityPublicKey: SSP,
+          amount: sats(50_000),
+        },
+      ],
+      [
+        {
+          source: FeeSource.FEE_SOURCE_PARTNER_MARKUP,
+          role: FeeRole.FEE_ROLE_LS,
+          amount: sats(50_000),
+          receiverIdentityPublicKey: SSP,
+        },
+      ],
+    );
+
+    await expect(
+      sign(wallet, quoteFor(debitsAttestor), {
+        receiverIdentityPubkey: bytesToHex(STRANGER),
+      }),
+    ).rejects.toThrow(/debits the attesting wallet/);
+  });
+
+  it("refuses a delegated manifest that debits the payee", async () => {
+    const { wallet } = walletWithSigner();
+
+    // The payee signs nothing and is never online, so it is the party least
+    // able to catch a debit misdirected onto it.
+    const debitsPayee = manifestOf(
+      [
+        edge(STRANGER, 100_000),
+        {
+          senderIdentityPublicKey: STRANGER,
+          receiverIdentityPublicKey: SSP,
+          amount: sats(50_000),
+        },
+      ],
+      [
+        {
+          source: FeeSource.FEE_SOURCE_PARTNER_MARKUP,
+          role: FeeRole.FEE_ROLE_LS,
+          amount: sats(50_000),
+          receiverIdentityPublicKey: SSP,
+        },
+      ],
+    );
+
+    await expect(
+      sign(wallet, quoteFor(debitsPayee), {
+        receiverIdentityPubkey: bytesToHex(STRANGER),
+      }),
+    ).rejects.toThrow(/debits the receiving wallet/);
+  });
+
+  it("refuses a payee that is not a public key", async () => {
+    const { wallet } = walletWithSigner();
+
+    await expect(
+      sign(wallet, quoteFor(FEELESS), { receiverIdentityPubkey: "aa" }),
+    ).rejects.toThrow();
+  });
+
+  it("binds the attestation to one payment hash", async () => {
+    const { wallet } = walletWithSigner();
+    const manifestBytes = TransferManifest.encode(FEELESS).finish();
+
+    const { committedQuote } = await sign(wallet, quoteFor(FEELESS));
+
+    // The whole point of the target: without it one attestation would cover any
+    // invoice of the same gross from the same attestor.
+    await expect(
+      verifyQuoteAttestation({
+        manifestBytes,
+        paymentHash: OTHER_PAYMENT_HASH,
+        signature: hexToBytes(committedQuote.attestorSignature),
+        attestorIdentityPublicKey: RECEIVER,
+      }),
+    ).resolves.toBe(false);
   });
 
   it("names includeSparkInvoice when that is the conflicting flag", async () => {

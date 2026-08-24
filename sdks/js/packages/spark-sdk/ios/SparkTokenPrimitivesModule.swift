@@ -198,6 +198,47 @@ class SparkTokenPrimitivesModule: NSObject, RCTBridgeModule {
         }
     }
 
+    @objc(quoteEnvelopeDigest:resolve:reject:)
+    func rn_quoteEnvelopeDigest(_ params: [String: Any],
+                                resolve: @escaping RCTPromiseResolveBlock,
+                                reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            guard let manifestHashArray = params["manifestHash"] as? [Any],
+                  let manifestHash = arrayToData(manifestHashArray),
+                  let targetArray = params["target"] as? [Any],
+                  let target = arrayToData(targetArray),
+                  let network = params["network"] as? UInt32,
+                  let reason = params["reason"] as? UInt32,
+                  let role = params["role"] as? UInt32 else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid quoteEnvelopeDigest params"])
+            }
+            let result = try quoteEnvelopeDigest(network: network,
+                                                 manifestHash: manifestHash,
+                                                 reason: reason,
+                                                 role: role,
+                                                 target: target)
+            resolve(dataToArray(result))
+        } catch {
+            reject("ERROR_QUOTE_ENVELOPE_DIGEST", error.localizedDescription, error)
+        }
+    }
+
+    @objc(receiveAttestorTarget:resolve:reject:)
+    func rn_receiveAttestorTarget(_ params: [String: Any],
+                                  resolve: @escaping RCTPromiseResolveBlock,
+                                  reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            guard let bytesArray = params["paymentHash"] as? [Any],
+                  let bytes = arrayToData(bytesArray) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid paymentHash format"])
+            }
+            let result = try receiveAttestorTarget(paymentHash: bytes)
+            resolve(dataToArray(result))
+        } catch {
+            reject("ERROR_RECEIVE_ATTESTOR_TARGET", error.localizedDescription, error)
+        }
+    }
+
     @objc(buildBroadcastTransactionRequest:resolve:reject:)
     func rn_buildBroadcastTransactionRequest(_ params: [String: Any],
                                              resolve: @escaping RCTPromiseResolveBlock,

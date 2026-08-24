@@ -438,23 +438,31 @@ export default class SspClient {
     network,
     amountBasis,
     partnerJwt,
+    receiverIdentityPubkey,
   }: {
     amountSats: number;
     network: BitcoinNetwork;
     amountBasis?: ReceiveQuoteAmountBasis;
     partnerJwt?: string;
+    receiverIdentityPubkey?: string;
   }): Promise<LightningReceiveQuoteOutput | null> {
     // NET is the server-side default, so omitting the field keeps the request
     // valid against schemas that predate amount_basis.
     const sendsBasis =
       amountBasis !== undefined && amountBasis !== ReceiveQuoteAmountBasis.NET;
+    // Likewise the caller is the default receiver, so a self-receive stays valid
+    // against schemas that predate the field.
+    const sendsReceiver = receiverIdentityPubkey !== undefined;
     const run = () =>
       this.executeRawQuery({
-        queryPayload: lightningReceiveQuoteDocument(sendsBasis),
+        queryPayload: lightningReceiveQuoteDocument(sendsBasis, sendsReceiver),
         variables: {
           network: network,
           amount_sats: amountSats,
           ...(sendsBasis ? { amount_basis: amountBasis } : {}),
+          ...(sendsReceiver
+            ? { receiver_identity_pubkey: receiverIdentityPubkey }
+            : {}),
         },
         constructObject: (response: {
           lightning_receive_quote: LightningReceiveQuoteOutputWire;

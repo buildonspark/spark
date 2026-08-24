@@ -131,20 +131,31 @@ export function manifestNetSatsFor(
 function assertEdgesAreFeeBacked(
   manifest: TransferManifest,
   receiverIdentityPublicKey: Uint8Array,
+  attestorIdentityPublicKey: Uint8Array,
 ): void {
   const receiverHex = bytesToHex(receiverIdentityPublicKey);
+  const attestorHex = bytesToHex(attestorIdentityPublicKey);
 
   for (const [i, edge] of manifest.edges.entries()) {
-    // Never countersign a manifest that says this wallet paid. The gate is
-    // otherwise blind to senders, so a debit misdirected onto the receiver
-    // would be attested by the very signature that states their consent.
-    if (bytesToHex(edge.senderIdentityPublicKey) === receiverHex) {
+    // Never countersign a manifest that debits either party this signature
+    // speaks for. The gate is otherwise blind to senders, so a misdirected
+    // debit would be attested by the very signature stating their consent —
+    // and under delegation the payee signs nothing and is never online to
+    // object, so it is the party least able to catch one.
+    const senderHex = bytesToHex(edge.senderIdentityPublicKey);
+    const debited =
+      senderHex === attestorHex
+        ? "attesting"
+        : senderHex === receiverHex
+          ? "receiving"
+          : null;
+    if (debited) {
       throw new SparkValidationError(
-        `Quoted manifest edges[${i}] debits the receiving wallet`,
+        `Quoted manifest edges[${i}] debits the ${debited} wallet`,
         {
           field: `edges[${i}].senderIdentityPublicKey`,
-          value: receiverHex,
-          expected: "a sender other than the receiving wallet",
+          value: senderHex,
+          expected: `a sender other than the ${debited} wallet`,
         },
       );
     }
@@ -188,16 +199,23 @@ export function validateQuotedManifestAmounts({
   amountSats,
   basis,
   receiverIdentityPublicKey,
+  attestorIdentityPublicKey,
 }: {
   manifest: TransferManifest;
   amountSats: number;
   basis: ReceiveQuoteAmountBasis;
   receiverIdentityPublicKey: Uint8Array;
+  /** Defaults to the receiver, which is who signs unless the receive is delegated. */
+  attestorIdentityPublicKey?: Uint8Array;
 }): void {
   const net = manifestNetSatsFor(manifest, receiverIdentityPublicKey);
   const gross = manifestGrossSats(manifest);
   const fees = manifestFeeSats(manifest);
-  assertEdgesAreFeeBacked(manifest, receiverIdentityPublicKey);
+  assertEdgesAreFeeBacked(
+    manifest,
+    receiverIdentityPublicKey,
+    attestorIdentityPublicKey ?? receiverIdentityPublicKey,
+  );
 
   // Covers the fees that the edge sweep cannot see: a fee whose payee holds no
   // edge is declared but unfunded, and would otherwise read as fee-bearing to

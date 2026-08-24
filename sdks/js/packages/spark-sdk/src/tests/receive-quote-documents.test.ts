@@ -31,6 +31,19 @@ describe("conditionally built receive documents", () => {
     expect(lightningReceiveQuoteDocument(false)).not.toContain("amount_basis");
   });
 
+  it("names the receiver only when one is given", () => {
+    const withReceiver = lightningReceiveQuoteDocument(false, true);
+    expect(withReceiver).toContain("$receiver_identity_pubkey: PublicKey!");
+    expect(withReceiver).toContain(
+      "receiver_identity_pubkey: $receiver_identity_pubkey",
+    );
+
+    // A self-receive must stay valid against a schema predating the field.
+    expect(lightningReceiveQuoteDocument(false)).not.toContain(
+      "receiver_identity_pubkey",
+    );
+  });
+
   it("keeps the fields both forms always need", () => {
     for (const document of [
       requestLightningReceiveDocument(true),
@@ -97,14 +110,14 @@ describe("variables sent alongside the built documents", () => {
       committedQuote: {
         serializedManifest: "aa",
         issuerSignature: "bb",
-        manifestSignature: "cc",
+        attestorSignature: "cc",
       },
     });
 
     expect(calls[0]?.["committed_quote"]).toEqual({
       serialized_manifest: "aa",
       issuer_signature: "bb",
-      manifest_signature: "cc",
+      attestor_signature: "cc",
     });
   });
 
