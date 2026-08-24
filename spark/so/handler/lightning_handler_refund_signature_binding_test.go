@@ -5,7 +5,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/sighash"
@@ -58,14 +57,14 @@ func makeRefundSigningJob(leafID string, rawTx []byte) *pbspark.UserSignedTxSign
 	}
 }
 
-func mutateRefundSequence(t *testing.T, rawTx []byte) []byte {
+func mutateRefundOutputValue(t *testing.T, rawTx []byte) []byte {
 	t.Helper()
 
 	refundTx, err := common.TxFromRawTxBytes(rawTx)
 	require.NoError(t, err)
-	require.NotEmpty(t, refundTx.TxIn)
-	require.NotZero(t, refundTx.TxIn[0].Sequence)
-	refundTx.TxIn[0].Sequence--
+	require.NotEmpty(t, refundTx.TxOut)
+	require.Greater(t, refundTx.TxOut[0].Value, int64(1))
+	refundTx.TxOut[0].Value--
 
 	mutated, err := common.SerializeTx(refundTx)
 	require.NoError(t, err)
@@ -165,7 +164,7 @@ func TestValidateGetPreimageRequestBindsRefundSignatureSharesToSubmittedTxBytes(
 			)
 			require.NoError(t, err)
 
-			mutatedRawTx := mutateRefundSequence(t, originalRawTx)
+			mutatedRawTx := mutateRefundOutputValue(t, originalRawTx)
 			mutatedJob := makeRefundSigningJob(leaf.node.ID.String(), mutatedRawTx)
 			cpfpTransactions, directTransactions, directFromCpfpTransactions = tt.assign(mutatedJob)
 
@@ -203,14 +202,9 @@ func TestValidateGetPreimageRequestRejectsSignatureShareValidationFailure(t *tes
 	paymentHash := bytes.Repeat([]byte{0x22}, 32)
 
 	originalRawTx := makeClientCpfpTx(t, leaf, destinationPubKey)
-	refundTx, err := common.TxFromRawTxBytes(originalRawTx)
-	require.NoError(t, err)
-	require.NotEmpty(t, refundTx.TxIn)
-	refundTx.TxIn[0].Sequence = wire.MaxTxInSequenceNum
-	mutatedRawTx, err := common.SerializeTx(refundTx)
-	require.NoError(t, err)
+	mutatedRawTx := mutateRefundOutputValue(t, originalRawTx)
 
-	err = lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+	err := lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
 		ctx,
 		&trackingFrostServiceClientConnection{
 			client: &messageCheckingFrostServiceClient{

@@ -468,6 +468,21 @@ func (f *defaultFrostServiceClientConnection) Close() {
 	_ = f.conn.Close()
 }
 
+// validateLightningRefundExpectedSequence binds a client-provided preimage-swap
+// refund to the next canonical step in the leaf's exit ladder. Keep this in the
+// shared P2TR refund validator so both the V3 and V4 receive paths enforce the
+// same sequence before asking FROST to validate or sign anything.
+func validateLightningRefundExpectedSequence(transactionType string, tx *wire.MsgTx, node *ent.TreeNode, txType bitcointransaction.TxType) error {
+	cpfpTimelock, err := bitcointransaction.GetCpfpTimelockFromLeaf(node)
+	if err != nil {
+		return sparkerrors.InternalDataInconsistency(fmt.Errorf("unable to get current CPFP refund timelock for %s refund tx, tree_node id: %s: %w", transactionType, node.ID, err))
+	}
+	if _, err := bitcointransaction.ValidateSequence(cpfpTimelock, txType, tx.TxIn[0].Sequence); err != nil {
+		return wrapLeafValidationError(err, fmt.Sprintf("%s refund tx input 0 sequence does not match the expected exit ladder", transactionType), node.ID)
+	}
+	return nil
+}
+
 func (h *LightningHandler) validateGetPreimageRequest(
 	ctx context.Context,
 	paymentHash []byte,
@@ -763,6 +778,9 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if len(cpfpRefundTx.TxIn) != 1 {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx should have exactly 1 input, got %d for tree_node id: %s", len(cpfpRefundTx.TxIn), nodeID))
 		}
+		if err := validateLightningRefundExpectedSequence("cpfp", cpfpRefundTx, node, bitcointransaction.TxTypeRefundCPFP); err != nil {
+			return err
+		}
 		expectedCpfpOutpoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
 		if cpfpRefundTx.TxIn[0].PreviousOutPoint != expectedCpfpOutpoint {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx must spend from cpfp tx for tree_node id: %s", nodeID))
@@ -840,6 +858,9 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if len(directRefundTx.TxIn) != 1 {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx should have exactly 1 input, got %d for tree_node id: %s", len(directRefundTx.TxIn), nodeID))
 		}
+		if err := validateLightningRefundExpectedSequence("direct", directRefundTx, node, bitcointransaction.TxTypeRefundDirect); err != nil {
+			return err
+		}
 		expectedDirectOutpoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
 		if directRefundTx.TxIn[0].PreviousOutPoint != expectedDirectOutpoint {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx must spend from direct tx for tree_node id: %s", nodeID))
@@ -915,6 +936,9 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 
 		if len(directFromCpfpRefundTx.TxIn) != 1 {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp refund tx should have exactly 1 input, got %d for tree_node id: %s", len(directFromCpfpRefundTx.TxIn), nodeID))
+		}
+		if err := validateLightningRefundExpectedSequence("direct from cpfp", directFromCpfpRefundTx, node, bitcointransaction.TxTypeRefundDirectFromCPFP); err != nil {
+			return err
 		}
 		expectedDirectFromCpfpOutpoint := wire.OutPoint{Hash: cpfpTx.TxHash(), Index: 0}
 		if directFromCpfpRefundTx.TxIn[0].PreviousOutPoint != expectedDirectFromCpfpOutpoint {

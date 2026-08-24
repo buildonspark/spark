@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/btcnetwork"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -55,9 +56,9 @@ func (m *mockFrostServiceClientConnection) StartFrostServiceClient(*LightningHan
 func (m *mockFrostServiceClientConnection) Close() {
 }
 
-// createParentAndRefundTx creates a parent transaction and a refund transaction that properly
-// references the parent tx's hash. This is required for outpoint validation.
-func createParentAndRefundTx(t *testing.T, outputScript []byte, value int64) (parentTxBytes []byte, refundTxBytes []byte) {
+// createParentAndRefundTx creates a parent, its persisted current refund, and
+// the next canonical refund submitted by the client.
+func createParentAndRefundTx(t *testing.T, outputScript []byte, value int64) (parentTxBytes []byte, currentRefundTxBytes []byte, refundTxBytes []byte) {
 	t.Helper()
 
 	// Create parent tx (this will be stored as node.RawTx)
@@ -71,18 +72,27 @@ func createParentAndRefundTx(t *testing.T, outputScript []byte, value int64) (pa
 	parentTxBytes, err := common.SerializeTx(parentTx)
 	require.NoError(t, err)
 
-	// Create refund tx that references the parent tx
+	currentRefundTx := wire.NewMsgTx(2)
+	currentRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		Sequence:         spark.ZeroSequence | spark.InitialTimeLock,
+	})
+	currentRefundTx.AddTxOut(&wire.TxOut{Value: value, PkScript: outputScript})
+	currentRefundTxBytes, err = common.SerializeTx(currentRefundTx)
+	require.NoError(t, err)
+
+	// Create the next refund tx that references the parent tx.
 	refundTx := wire.NewMsgTx(2)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
-		Sequence:         wire.MaxTxInSequenceNum,
+		Sequence:         spark.ZeroSequence | (spark.InitialTimeLock - spark.TimeLockInterval),
 	})
 	refundTx.AddTxOut(&wire.TxOut{Value: value, PkScript: outputScript})
 
 	refundTxBytes, err = common.SerializeTx(refundTx)
 	require.NoError(t, err)
 
-	return parentTxBytes, refundTxBytes
+	return parentTxBytes, currentRefundTxBytes, refundTxBytes
 }
 
 // createParentAndRefundTxWithOutputs creates a parent transaction with a single
@@ -94,7 +104,7 @@ func createParentAndRefundTxWithOutputs(
 	parentScript []byte,
 	parentValue int64,
 	refundOuts []*wire.TxOut,
-) (parentTxBytes []byte, refundTxBytes []byte) {
+) (parentTxBytes []byte, currentRefundTxBytes []byte, refundTxBytes []byte) {
 	t.Helper()
 
 	parentTx := wire.NewMsgTx(2)
@@ -106,11 +116,19 @@ func createParentAndRefundTxWithOutputs(
 
 	parentTxBytes, err := common.SerializeTx(parentTx)
 	require.NoError(t, err)
+	currentRefundTx := wire.NewMsgTx(2)
+	currentRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		Sequence:         spark.ZeroSequence | spark.InitialTimeLock,
+	})
+	currentRefundTx.AddTxOut(&wire.TxOut{Value: parentValue, PkScript: parentScript})
+	currentRefundTxBytes, err = common.SerializeTx(currentRefundTx)
+	require.NoError(t, err)
 
 	refundTx := wire.NewMsgTx(2)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
-		Sequence:         wire.MaxTxInSequenceNum,
+		Sequence:         spark.ZeroSequence | (spark.InitialTimeLock - spark.TimeLockInterval),
 	})
 	for _, out := range refundOuts {
 		refundTx.AddTxOut(out)
@@ -119,7 +137,7 @@ func createParentAndRefundTxWithOutputs(
 	refundTxBytes, err = common.SerializeTx(refundTx)
 	require.NoError(t, err)
 
-	return parentTxBytes, refundTxBytes
+	return parentTxBytes, currentRefundTxBytes, refundTxBytes
 }
 
 func createParentAndRefundTxWithExtraOutput(
@@ -128,7 +146,7 @@ func createParentAndRefundTxWithExtraOutput(
 	extraScript []byte,
 	destinationValue int64,
 	extraValue int64,
-) (parentTxBytes []byte, refundTxBytes []byte) {
+) (parentTxBytes []byte, currentRefundTxBytes []byte, refundTxBytes []byte) {
 	t.Helper()
 	return createParentAndRefundTxWithOutputs(t, destinationScript, destinationValue+extraValue, []*wire.TxOut{
 		{Value: destinationValue, PkScript: destinationScript},
@@ -1715,7 +1733,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 
 		// Create parent tx (stored in node.RawTx) and refund tx (sent by client)
 		// with proper outpoint reference
-		parentTx, refundTx := createParentAndRefundTx(t, correctScript, 1000)
+		parentTx, currentRefundTx, refundTx := createParentAndRefundTx(t, correctScript, 1000)
 
 		_, err = tx.TreeNode.Create().
 			SetTree(tree).
@@ -1727,6 +1745,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 			SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetRawTx(parentTx).
+			SetRawRefundTx(currentRefundTx).
 			SetVout(0).
 			SetSigningKeyshare(keyshare).
 			Save(authenticatedCtx)
@@ -1811,7 +1830,7 @@ func TestValidateGetPreimageRequestRejectsDuplicateCpfpLeafBeforeAmountAggregati
 	destinationPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	destinationScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
 	require.NoError(t, err)
-	parentTx, refundTx := createParentAndRefundTx(t, destinationScript, 1000)
+	parentTx, currentRefundTx, refundTx := createParentAndRefundTx(t, destinationScript, 1000)
 
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -1845,6 +1864,7 @@ func TestValidateGetPreimageRequestRejectsDuplicateCpfpLeafBeforeAmountAggregati
 		SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 		SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 		SetRawTx(parentTx).
+		SetRawRefundTx(currentRefundTx).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
 		Save(ctx)
@@ -1932,7 +1952,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 
 	// Create parent tx (stored in node.RawTx) and refund tx (sent by client)
 	// with proper outpoint reference - both have 500 sats
-	parentTx, refundTx := createParentAndRefundTx(t, correctScript, 500)
+	parentTx, currentRefundTx, refundTx := createParentAndRefundTx(t, correctScript, 500)
 
 	_, err = tx.TreeNode.Create().
 		SetTree(tree).
@@ -1944,6 +1964,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 		SetOwnerIdentityPubkey(validPubKey).
 		SetOwnerSigningPubkey(validPubKey).
 		SetRawTx(parentTx).
+		SetRawRefundTx(currentRefundTx).
 		SetDirectTx(parentTx). // Set direct_tx field which is required for direct transaction validation
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
@@ -2033,7 +2054,7 @@ func TestValidateGetPreimageRequestRejectsExtraValueOutput(t *testing.T) {
 	attackerScript, err := common.P2TRScriptFromPubKey(attackerPubKey)
 	require.NoError(t, err)
 
-	parentTx, refundTx := createParentAndRefundTxWithExtraOutput(t, destinationScript, attackerScript, 500, 500)
+	parentTx, currentRefundTx, refundTx := createParentAndRefundTxWithExtraOutput(t, destinationScript, attackerScript, 500, 500)
 
 	_, err = tx.TreeNode.Create().
 		SetTree(tree).
@@ -2045,6 +2066,7 @@ func TestValidateGetPreimageRequestRejectsExtraValueOutput(t *testing.T) {
 		SetOwnerIdentityPubkey(destinationPubKey).
 		SetOwnerSigningPubkey(destinationPubKey).
 		SetRawTx(parentTx).
+		SetRawRefundTx(currentRefundTx).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
 		Save(ctx)
@@ -2189,7 +2211,10 @@ func TestValidateGetPreimageRequestOutputShapes(t *testing.T) {
 			nodeID := uuid.New()
 			// Setting both raw_tx (CPFP source) and direct_tx to parentTx lets the
 			// same refund satisfy the outpoint check on every path.
-			parentTx, refundTx := createParentAndRefundTxWithOutputs(t, destinationScript, 1000, tc.refundOuts)
+			parentTx, currentRefundTx, refundTx := createParentAndRefundTxWithOutputs(t, destinationScript, 1000, tc.refundOuts)
+			if tc.target != "cpfp" {
+				refundTx = refundWithSequence(t, refundTx, spark.ZeroSequence|(spark.InitialTimeLock-spark.TimeLockInterval+spark.DirectTimelockOffset))
+			}
 
 			_, err := tx.TreeNode.Create().
 				SetTree(tree).
@@ -2201,6 +2226,7 @@ func TestValidateGetPreimageRequestOutputShapes(t *testing.T) {
 				SetOwnerIdentityPubkey(destinationPubKey).
 				SetOwnerSigningPubkey(destinationPubKey).
 				SetRawTx(parentTx).
+				SetRawRefundTx(currentRefundTx).
 				SetDirectTx(parentTx).
 				SetVout(0).
 				SetSigningKeyshare(keyshare).
@@ -2313,7 +2339,8 @@ func TestValidateGetPreimageRequestRejectsExtraValueOutputDirectPaths(t *testing
 	// The refund spends from parentTx; setting both raw_tx (CPFP source) and
 	// direct_tx to parentTx lets the same refund satisfy the outpoint check on
 	// both the direct and direct-from-cpfp paths.
-	parentTx, refundTx := createParentAndRefundTxWithExtraOutput(t, destinationScript, attackerScript, 500, 500)
+	parentTx, currentRefundTx, refundTx := createParentAndRefundTxWithExtraOutput(t, destinationScript, attackerScript, 500, 500)
+	refundTx = refundWithSequence(t, refundTx, spark.ZeroSequence|(spark.InitialTimeLock-spark.TimeLockInterval+spark.DirectTimelockOffset))
 
 	_, err = tx.TreeNode.Create().
 		SetTree(tree).
@@ -2325,6 +2352,7 @@ func TestValidateGetPreimageRequestRejectsExtraValueOutputDirectPaths(t *testing
 		SetOwnerIdentityPubkey(destinationPubKey).
 		SetOwnerSigningPubkey(destinationPubKey).
 		SetRawTx(parentTx).
+		SetRawRefundTx(currentRefundTx).
 		SetDirectTx(parentTx).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
@@ -2431,7 +2459,7 @@ func TestValidateGetPreimageRequestAllowsUnspecifiedInvoiceAmount(t *testing.T) 
 	outputScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
 	require.NoError(t, err)
 
-	parentTx, refundTx := createParentAndRefundTx(t, outputScript, 1000)
+	parentTx, currentRefundTx, refundTx := createParentAndRefundTx(t, outputScript, 1000)
 	_, err = tx.TreeNode.Create().
 		SetTree(tree).
 		SetNetwork(tree.Network).
@@ -2442,6 +2470,7 @@ func TestValidateGetPreimageRequestAllowsUnspecifiedInvoiceAmount(t *testing.T) 
 		SetOwnerIdentityPubkey(destinationPubKey).
 		SetOwnerSigningPubkey(destinationPubKey).
 		SetRawTx(parentTx).
+		SetRawRefundTx(currentRefundTx).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
 		Save(ctx)
@@ -2522,7 +2551,7 @@ func TestValidateGetPreimageRequestRejectsNegativeRefundOutput(t *testing.T) {
 	outputScript, err := common.P2TRScriptFromPubKey(validPubKey)
 	require.NoError(t, err)
 
-	parentTx, refundTx := createParentAndRefundTx(t, outputScript, 1000)
+	parentTx, currentRefundTx, refundTx := createParentAndRefundTx(t, outputScript, 1000)
 	refundMsgTx, err := common.TxFromRawTxBytes(refundTx)
 	require.NoError(t, err)
 	refundMsgTx.TxOut[0].Value = -1
@@ -2539,6 +2568,7 @@ func TestValidateGetPreimageRequestRejectsNegativeRefundOutput(t *testing.T) {
 		SetOwnerIdentityPubkey(validPubKey).
 		SetOwnerSigningPubkey(validPubKey).
 		SetRawTx(parentTx).
+		SetRawRefundTx(currentRefundTx).
 		SetDirectTx(parentTx).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
@@ -2622,7 +2652,7 @@ func TestValidateGetPreimageRequestRejectsExtraRefundInputs(t *testing.T) {
 	outputScript, err := common.P2TRScriptFromPubKey(destinationPubKey)
 	require.NoError(t, err)
 
-	createParentAndRefundTxWithPrevIndex := func(prevIndex uint32) ([]byte, []byte) {
+	createParentAndRefundTxWithPrevIndex := func(prevIndex uint32) ([]byte, []byte, []byte) {
 		t.Helper()
 		parentTx := wire.NewMsgTx(2)
 		parentTx.AddTxIn(&wire.TxIn{
@@ -2633,20 +2663,31 @@ func TestValidateGetPreimageRequestRejectsExtraRefundInputs(t *testing.T) {
 		parentTxBytes, err := common.SerializeTx(parentTx)
 		require.NoError(t, err)
 
+		currentRefundTx := wire.NewMsgTx(2)
+		currentRefundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+			Sequence:         spark.ZeroSequence | spark.InitialTimeLock,
+		})
+		currentRefundTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: outputScript})
+		currentRefundTxBytes, err := common.SerializeTx(currentRefundTx)
+		require.NoError(t, err)
+
 		refundTx := wire.NewMsgTx(2)
 		refundTx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
-			Sequence:         wire.MaxTxInSequenceNum,
+			Sequence:         spark.ZeroSequence | (spark.InitialTimeLock - spark.TimeLockInterval),
 		})
 		refundTx.AddTxOut(&wire.TxOut{Value: 1000, PkScript: outputScript})
 		refundTxBytes, err := common.SerializeTx(refundTx)
 		require.NoError(t, err)
-		return parentTxBytes, refundTxBytes
+		return parentTxBytes, currentRefundTxBytes, refundTxBytes
 	}
 
-	cpfpParentTx, cpfpRefundTx := createParentAndRefundTxWithPrevIndex(0)
-	directParentTx, directRefundTx := createParentAndRefundTxWithPrevIndex(1)
+	cpfpParentTx, currentRefundTx, cpfpRefundTx := createParentAndRefundTxWithPrevIndex(0)
+	directParentTx, _, directRefundTx := createParentAndRefundTxWithPrevIndex(1)
+	directRefundTx = refundWithSequence(t, directRefundTx, spark.ZeroSequence|(spark.InitialTimeLock-spark.TimeLockInterval+spark.DirectTimelockOffset))
 	directFromCpfpRefundTx := cpfpRefundTx
+	directFromCpfpRefundTx = refundWithSequence(t, directFromCpfpRefundTx, spark.ZeroSequence|(spark.InitialTimeLock-spark.TimeLockInterval+spark.DirectTimelockOffset))
 
 	_, err = tx.TreeNode.Create().
 		SetTree(tree).
@@ -2658,6 +2699,7 @@ func TestValidateGetPreimageRequestRejectsExtraRefundInputs(t *testing.T) {
 		SetOwnerIdentityPubkey(destinationPubKey).
 		SetOwnerSigningPubkey(destinationPubKey).
 		SetRawTx(cpfpParentTx).
+		SetRawRefundTx(currentRefundTx).
 		SetDirectTx(directParentTx).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
@@ -2793,7 +2835,7 @@ func TestValidateGetPreimageRequestRespectsFrostValidationConcurrencyLimit(t *te
 
 	for i := range numTransactions {
 		nodeID := uuid.New()
-		parentTx, refundTx := createParentAndRefundTx(t, outputScript, 1000+int64(i))
+		parentTx, currentRefundTx, refundTx := createParentAndRefundTx(t, outputScript, 1000+int64(i))
 
 		_, err = tx.TreeNode.Create().
 			SetTree(tree).
@@ -2805,6 +2847,7 @@ func TestValidateGetPreimageRequestRespectsFrostValidationConcurrencyLimit(t *te
 			SetOwnerIdentityPubkey(destinationPubKey).
 			SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetRawTx(parentTx).
+			SetRawRefundTx(currentRefundTx).
 			SetVout(0).
 			SetSigningKeyshare(keyshare).
 			Save(ctx)
@@ -3446,7 +3489,7 @@ func TestValidateGetPreimageRequestRoutesEachLeafToItsOwnReceiver(t *testing.T) 
 		t.Helper()
 		receiverScript, err := common.P2TRScriptFromPubKey(receiver)
 		require.NoError(t, err)
-		parentTx, refundTx := createParentAndRefundTxWithOutputs(t, ownerScript, 1000, []*wire.TxOut{{Value: 500, PkScript: receiverScript}})
+		parentTx, currentRefundTx, refundTx := createParentAndRefundTxWithOutputs(t, ownerScript, 1000, []*wire.TxOut{{Value: 500, PkScript: receiverScript}})
 
 		nodeID := uuid.New()
 		_, err = tx.TreeNode.Create().
@@ -3459,6 +3502,7 @@ func TestValidateGetPreimageRequestRoutesEachLeafToItsOwnReceiver(t *testing.T) 
 			SetOwnerIdentityPubkey(ownerPubKey).
 			SetOwnerSigningPubkey(ownerPubKey).
 			SetRawTx(parentTx).
+			SetRawRefundTx(currentRefundTx).
 			SetDirectTx(parentTx).
 			SetVout(0).
 			SetSigningKeyshare(keyshare).
@@ -3578,6 +3622,7 @@ func TestValidateGetPreimageRequestRoutesEachLeafToItsOwnReceiver(t *testing.T) 
 		// the case discriminates rather than merely rejecting for some reason.
 		t.Run(path.name+" refunds resolve their own leaf's receiver", func(t *testing.T) {
 			toAlice, toCounterparty := newLeafPaying(t, alice), newLeafPaying(t, counterparty)
+			toCounterparty.RawTx = refundWithSequence(t, toCounterparty.GetRawTx(), spark.ZeroSequence|(spark.InitialTimeLock-spark.TimeLockInterval+spark.DirectTimelockOffset))
 			direct, directFromCpfp := path.place(toCounterparty)
 
 			err := validate([]*pb.UserSignedTxSigningJob{toAlice}, direct, directFromCpfp, mustPerLeaf(t, map[string]keys.Public{
@@ -3592,6 +3637,7 @@ func TestValidateGetPreimageRequestRoutesEachLeafToItsOwnReceiver(t *testing.T) 
 
 		t.Run(path.name+" refuses a leaf missing from the map", func(t *testing.T) {
 			toAlice, toBob := newLeafPaying(t, alice), newLeafPaying(t, bob)
+			toBob.RawTx = refundWithSequence(t, toBob.GetRawTx(), spark.ZeroSequence|(spark.InitialTimeLock-spark.TimeLockInterval+spark.DirectTimelockOffset))
 			direct, directFromCpfp := path.place(toBob)
 
 			err := validate([]*pb.UserSignedTxSigningJob{toAlice}, direct, directFromCpfp, mustPerLeaf(t, map[string]keys.Public{
