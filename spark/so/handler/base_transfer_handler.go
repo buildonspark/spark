@@ -2499,17 +2499,25 @@ func verifySenderKeyTweakProofsMatch(keyTweakMap map[string]validatedKeyTweak, s
 	if keyTweakMap == nil || senderKeyTweakProofs == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("key tweak map and sender key tweak proofs must not be nil"))
 	}
-	if len(keyTweakMap) != len(senderKeyTweakProofs) {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof count mismatch: expected %d, got %d", len(keyTweakMap), len(senderKeyTweakProofs)))
+	parsedProofs, err := parseSecretProofMapKeys(senderKeyTweakProofs)
+	if err != nil {
+		return err
+	}
+	if len(keyTweakMap) != len(parsedProofs) {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof count mismatch: expected %d, got %d", len(keyTweakMap), len(parsedProofs)))
 	}
 
-	for leafID, leafTweak := range keyTweakMap {
+	for rawLeafID, leafTweak := range keyTweakMap {
 		if leafTweak.Proto().GetSecretShareTweak() == nil {
-			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", leafID))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", rawLeafID))
 		}
-		proof, ok := senderKeyTweakProofs[leafID]
+		leafID, err := uuid.Parse(rawLeafID)
+		if err != nil {
+			return fmt.Errorf("unable to parse key tweak leaf id %s as a uuid: %w", rawLeafID, err)
+		}
+		proof, ok := parsedProofs[leafID]
 		if !ok {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof missing for leaf %s", leafID))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof missing for leaf %s", rawLeafID))
 		}
 		if proof == nil {
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sender key tweak proof value is nil for leaf %s", leafID))
@@ -2528,8 +2536,16 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 	if err != nil {
 		return fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
-	if len(senderKeyTweakProofs) != len(transferLeaves) {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof count mismatch: expected %d, got %d", len(transferLeaves), len(senderKeyTweakProofs)))
+	// The coordinator derives this map from its own stored protos, whose leaf_id
+	// spelling is the client's verbatim one and can differ from the spelling
+	// this SO stored; compare parsed UUIDs on both sides so the same leaf always
+	// matches.
+	parsedProofs, err := parseSecretProofMapKeys(senderKeyTweakProofs)
+	if err != nil {
+		return fmt.Errorf("unable to parse sender key tweak proofs: %w", err)
+	}
+	if len(parsedProofs) != len(transferLeaves) {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender key tweak proof count mismatch: expected %d, got %d", len(transferLeaves), len(parsedProofs)))
 	}
 
 	for _, leaf := range transferLeaves {
@@ -2542,7 +2558,11 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("secret share tweak missing for leaf %s", keyTweakProto.GetLeafId()))
 		}
 
-		keyTweakProof, ok := senderKeyTweakProofs[keyTweakProto.GetLeafId()]
+		leafID, err := uuid.Parse(keyTweakProto.GetLeafId())
+		if err != nil {
+			return fmt.Errorf("stored key tweak for transfer %s has an unparseable leaf id: %w", transfer.ID, err)
+		}
+		keyTweakProof, ok := parsedProofs[leafID]
 		if !ok {
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("key tweak proof not found for leaf: %s", keyTweakProto.GetLeafId()))
 		}

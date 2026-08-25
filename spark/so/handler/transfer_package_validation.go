@@ -281,6 +281,10 @@ func (h *BaseTransferHandler) decryptOwnKeyTweaks(
 			return nil, fmt.Errorf("unable to parse key tweaks leaf_id as a uuid %s: %w", leafTweak.GetLeafId(), err)
 		}
 		leafID := parsedLeafID.String()
+		// Do not rewrite the embedded leaf_id: this proto is persisted verbatim
+		// on TransferLeaf and read back at settle time, and operators on older
+		// builds match that spelling exactly. Spelling-insensitivity belongs to
+		// the UUID-typed comparisons, not the stored bytes.
 		if _, exists := leafTweaksMap[leafID]; exists {
 			return nil, fmt.Errorf("duplicate leaf id in encrypted key tweaks: %s", leafID)
 		}
@@ -435,6 +439,27 @@ func (h *BaseTransferHandler) coordinatorSenderKeyTweakProofs(ctx context.Contex
 		proofs[leafID] = &pbspark.SecretProof{Proofs: leafTweak.GetSecretShareTweak().GetProofs()}
 	}
 	return proofs, nil
+}
+
+// parseSecretProofMapKeys rekeys a sender key-tweak-proof map by parsed leaf
+// UUID. Coordinators derive these maps from their own stored protos, whose
+// leaf_id spelling is the client's verbatim one, so the same transfer's proofs
+// can be keyed differently on different SOs; comparing parsed UUIDs makes the
+// spelling irrelevant. Entries that collapse onto one leaf with different
+// values fail closed.
+func parseSecretProofMapKeys(proofs map[string]*pbspark.SecretProof) (map[uuid.UUID]*pbspark.SecretProof, error) {
+	parsed := make(map[uuid.UUID]*pbspark.SecretProof, len(proofs))
+	for rawKey, proof := range proofs {
+		leafID, err := uuid.Parse(rawKey)
+		if err != nil {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse leaf id %s as a uuid: %w", rawKey, err))
+		}
+		if existing, ok := parsed[leafID]; ok && !proto.Equal(existing, proof) {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("conflicting sender key tweak proofs for leaf %s", leafID))
+		}
+		parsed[leafID] = proof
+	}
+	return parsed, nil
 }
 
 // transferPackageLeafIDs carries just the leaf IDs of a TransferPackage's

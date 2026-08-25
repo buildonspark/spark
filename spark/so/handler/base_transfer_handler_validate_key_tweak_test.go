@@ -4,6 +4,7 @@ package handler
 
 import (
 	"math/rand/v2"
+	"strings"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -689,4 +690,175 @@ func TestValidateTransferPackage_RejectsTypedSignatureWithEmptyBytes(t *testing.
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid typed signature")
+}
+
+// buildKeyTweakPackageForLeafSpellings mirrors buildKeyTweakPackageForLeaves but
+// lets the test control the verbatim leaf_id spelling inside the encrypted
+// tweaks, to exercise UUID-spelling normalization. The returned proof map stays
+// keyed by canonical leaf ID.
+func buildKeyTweakPackageForLeafSpellings(
+	t *testing.T,
+	cfg *so.Config,
+	rng *rand.ChaCha8,
+	leafSpellings map[string]uuid.UUID,
+) (map[string][]byte, map[string]*pb.SecretProof) {
+	t.Helper()
+
+	var leafTweaks []*pb.SendLeafKeyTweak
+	proofs := make(map[string]*pb.SecretProof, len(leafSpellings))
+	for spelling, leafID := range leafSpellings {
+		secretShare, pubkeySharesTweak := createValidSecretShares(cfg, rng)
+		publicKey, err := eciesgo.NewPublicKeyFromBytes(cfg.IdentityPublicKey().Serialize())
+		require.NoError(t, err)
+		secretCipher, err := eciesgo.Encrypt(publicKey, secretShare.GetSecretShare())
+		require.NoError(t, err)
+
+		leafTweaks = append(leafTweaks, &pb.SendLeafKeyTweak{
+			LeafId:            spelling,
+			SecretShareTweak:  secretShare,
+			PubkeySharesTweak: pubkeySharesTweak,
+			SecretCipher:      secretCipher,
+			Sig:               &pb.SendLeafKeyTweak_Signature{Signature: []byte("mock_signature_for_testing")},
+		})
+		proofs[leafID.String()] = &pb.SecretProof{Proofs: secretShare.GetProofs()}
+	}
+
+	publicKey, err := eciesgo.NewPublicKeyFromBytes(cfg.IdentityPublicKey().Serialize())
+	require.NoError(t, err)
+
+	leafTweaksProto := &pb.SendLeafKeyTweaks{LeavesToSend: leafTweaks}
+	data, err := proto.Marshal(leafTweaksProto)
+	require.NoError(t, err)
+	encrypted, err := eciesgo.Encrypt(publicKey, data)
+	require.NoError(t, err)
+
+	return map[string][]byte{cfg.Identifier: encrypted}, proofs
+}
+
+// TestValidateTransferPackage_PreservesStoredLeafIDSpelling verifies that a
+// package whose leaf IDs use a non-canonical UUID spelling (uppercase) is
+// validated by UUID equality, and that the tweak proto kept for persistence
+// passes the client's verbatim spelling through: rewriting it would break
+// settle-time interop with operators on older builds, which match the stored
+// spelling exactly.
+func TestValidateTransferPackage_PreservesStoredLeafIDSpelling(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{47})
+
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+
+	leaf := uuid.New()
+	upperLeafID := strings.ToUpper(leaf.String())
+
+	keyTweakPackage, _ := buildKeyTweakPackageForLeafSpellings(t, cfg, rng, map[string]uuid.UUID{upperLeafID: leaf})
+
+	pkg := &pb.TransferPackage{
+		LeavesToSend: []*pb.UserSignedTxSigningJob{
+			{LeafId: upperLeafID, RawTx: createTestTxBytes(t, 1000)},
+		},
+		KeyTweakPackage: keyTweakPackage,
+	}
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	tweaksMap, err := h.ValidateTransferPackage(
+		t.Context(),
+		transferID,
+		pkg,
+		senderPrivKey.Public(),
+		false,
+		asCoordinator(),
+	)
+
+	require.NoError(t, err)
+	require.Len(t, tweaksMap, 1)
+	require.Contains(t, tweaksMap, leaf.String())
+	assert.Equal(t, upperLeafID, tweaksMap[leaf.String()].Proto().GetLeafId())
+}
+
+// TestVerifySenderKeyTweakProofsMatch_CaseVariantProofKeys verifies that the
+// coordinator-fanned proofs match this SO's decrypted tweaks even when the
+// proof map is keyed by a different UUID spelling of the same leaves.
+func TestVerifySenderKeyTweakProofsMatch_CaseVariantProofKeys(t *testing.T) {
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{48})
+
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transferID := uuid.New()
+
+	leaf1 := uuid.New()
+	leaf2 := uuid.New()
+
+	keyTweakPackage, proofs := buildKeyTweakPackageForLeaves(t, cfg, rng, []uuid.UUID{leaf1, leaf2})
+
+	pkg := &pb.TransferPackage{
+		LeavesToSend: []*pb.UserSignedTxSigningJob{
+			{LeafId: leaf1.String(), RawTx: createTestTxBytes(t, 1000)},
+			{LeafId: leaf2.String(), RawTx: createTestTxBytes(t, 2000)},
+		},
+		KeyTweakPackage: keyTweakPackage,
+	}
+	signTransferPackage(t, pkg, transferID, senderPrivKey)
+
+	h := NewBaseTransferHandler(cfg)
+	tweaksMap, err := h.ValidateTransferPackage(
+		t.Context(),
+		transferID,
+		pkg,
+		senderPrivKey.Public(),
+		false,
+		asCoordinator(),
+	)
+	require.NoError(t, err)
+
+	upperProofs := make(map[string]*pb.SecretProof, len(proofs))
+	for leafID, proof := range proofs {
+		upperProofs[strings.ToUpper(leafID)] = proof
+	}
+	require.NoError(t, verifySenderKeyTweakProofsMatch(tweaksMap, upperProofs))
+}
+
+func TestParseSecretProofMapKeys(t *testing.T) {
+	leaf := uuid.New()
+	other := uuid.New()
+
+	t.Run("case variants of one leaf collapse", func(t *testing.T) {
+		proof := &pb.SecretProof{Proofs: [][]byte{[]byte("proof")}}
+		parsed, err := parseSecretProofMapKeys(map[string]*pb.SecretProof{
+			leaf.String():                  proof,
+			strings.ToUpper(leaf.String()): proof,
+		})
+		require.NoError(t, err)
+		require.Len(t, parsed, 1)
+		assert.Same(t, proof, parsed[leaf])
+	})
+
+	t.Run("conflicting duplicates fail closed", func(t *testing.T) {
+		_, err := parseSecretProofMapKeys(map[string]*pb.SecretProof{
+			leaf.String():                  {Proofs: [][]byte{[]byte("proof-a")}},
+			strings.ToUpper(leaf.String()): {Proofs: [][]byte{[]byte("proof-b")}},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "conflicting sender key tweak proofs")
+	})
+
+	t.Run("unparseable key fails closed", func(t *testing.T) {
+		_, err := parseSecretProofMapKeys(map[string]*pb.SecretProof{
+			"not-a-uuid": {Proofs: [][]byte{[]byte("proof")}},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to parse leaf id")
+	})
+
+	t.Run("distinct leaves keep their entries", func(t *testing.T) {
+		parsed, err := parseSecretProofMapKeys(map[string]*pb.SecretProof{
+			strings.ToUpper(leaf.String()):  {Proofs: [][]byte{[]byte("proof-1")}},
+			strings.ToUpper(other.String()): {Proofs: [][]byte{[]byte("proof-2")}},
+		})
+		require.NoError(t, err)
+		require.Len(t, parsed, 2)
+		assert.Contains(t, parsed, leaf)
+		assert.Contains(t, parsed, other)
+	})
 }
