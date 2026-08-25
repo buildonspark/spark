@@ -10,7 +10,7 @@ The app surfaces additional targets based on what is available locally:
 
 - `DEV` appears when private config files exist under `sdks/js/private/config`
 - `LOCAL` appears when the app is served from localhost and a local ingress
-  host can be resolved
+  host can be resolved, or when `VITE_SPARK_TARGET=LOCAL` is set explicitly
 - otherwise the app assumes `PROD`
 
 ## Local Kubernetes mode
@@ -30,6 +30,9 @@ browser traffic to the local Kubernetes ingress:
 - `http://mempool.minikube.local/api` via `/spark-electrs`
 - `http://app.minikube.local` via `/spark-ssp`
 - `http://<local ingress host>:8332` via `/bitcoin-rpc`
+
+Setting `VITE_SPARK_TARGET=LOCAL` without an ingress host instead uses the
+localhost service ports for Docker Compose and dev-CLI environments.
 
 You can explicitly override the detected host before starting the app with:
 

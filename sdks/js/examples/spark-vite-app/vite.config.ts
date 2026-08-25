@@ -29,7 +29,9 @@ export default defineConfig(({ mode }) => {
   const configOverride = getConfigOverride(env["CONFIG_FILE"]);
   const privateConfigs = getPrivateConfigs();
   const localIngressHost = resolveLocalIngressHost(env);
-  const hasLocalConfig = Boolean(localIngressHost);
+  const hasLocalConfig =
+    Boolean(localIngressHost) ||
+    env["VITE_SPARK_TARGET"]?.toUpperCase() === "LOCAL";
   const operatorProxyEntries = Array.from(
     { length: getLocalOperatorCount(env, configOverride) },
     (_, index) => {
