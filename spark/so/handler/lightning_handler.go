@@ -1606,18 +1606,10 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pbspark
 	}
 
 	if req.GetReason() == pbspark.InitiatePreimageSwapRequest_REASON_RECEIVE {
-		// We are not building the refund maps for receive preimage swap for now, the transactions are created from SSP.
-		// TODO: we still need to build the refund transaction from the SSP here to validate.
-		// NOTE: until then, the transfer_package refund bytes returned here replace the
-		// req.Transfer refund txs (which ARE output-shape validated in
-		// validateGetPreimageRequest) without any validation of their outputs. These are
-		// HTLC-shaped txs built by the SSP, so the destination/output checks applied to
-		// req.Transfer cannot be reused as-is; reconstruct-and-compare (as done below for
-		// REASON_SEND) is the intended fix. That reconstruction must also apply
-		// ValidateRenewalTimelockFloor as the REASON_SEND path below does: a
-		// floor-timelock SSP leaf initiates fine today, and the user's claim of it is
-		// then permanently rejected by the claim-time floor after their LN payment
-		// settled.
+		// Receive refund txs are built by the SSP; the SO returns the transfer-package
+		// bytes rather than reconstructing them here. TODO: reconstruct and compare
+		// these the way the REASON_SEND path below does, applying
+		// ValidateRenewalTimelockFloor for parity with the claim path.
 		return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, nil
 	}
 

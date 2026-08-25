@@ -64,11 +64,10 @@ var (
 // agree, and every per-sub-user list (commitment vectors, sealed blobs, signing contributions) aligns one-to-one
 // with the package's participant positions.
 //
-// Like Package, an MpcSubmission does not guarantee that the cryptography makes sense: the authorization signature is
-// not verified, sealed shares are not decrypted, and no authorized fact is checked against operator state. Those are
-// operator-side verification, layered on top of this parse. Coverage of the sealed-share map against the cluster's
-// operator set is also deferred there (cluster configuration is out of scope here, mirroring
-// parseOperatorCommitments).
+// Like Package, an MpcSubmission asserts structure only. The cryptography — authorization-signature verification,
+// sealed-share decryption, checking authorized facts against operator state, and covering the sealed-share map against
+// the cluster's operator set — is performed operator-side, layered on top of this parse (cluster configuration is out
+// of scope here, mirroring parseOperatorCommitments).
 type MpcSubmission struct {
 	transferID  uuid.UUID
 	senderIDPub keys.Public
@@ -252,8 +251,7 @@ func (c SubUserSigningContribution) PartialSignature() []byte {
 // each signing-job list must be identical, and every per-sub-user list — commitment vectors, sealed blobs, signing
 // contributions — must align one-to-one with the positions list, so downstream verification can index by leaf id and
 // position without re-checking existence. Sealed blobs are opaque here (the per-leaf split lives inside the
-// ciphertext), so per-leaf sealed coverage is deliberately NOT established at parse time: it is verified after
-// unsealing, by the operator that can decrypt its own entry.
+// ciphertext); per-leaf sealed coverage is established after unsealing, by the operator that can decrypt its own entry.
 func ParseMpcSubmission(req *spark.StartTransferMpcRequest) (*MpcSubmission, error) {
 	transferID, err := uuid.Parse(req.GetTransferId())
 	if err != nil {

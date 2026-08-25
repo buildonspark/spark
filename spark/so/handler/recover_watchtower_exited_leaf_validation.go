@@ -101,9 +101,9 @@ func resolveRecoverableOutput(ctx context.Context, db *ent.Client, leaf *ent.Tre
 // outpoint and still holds it unspent. One indexed lookup: a txid is unique.
 //
 // node_confirmation_height is set when *either* of a node's transactions
-// confirms, so a node whose raw tx confirmed passes it too, and its direct tx can
-// never confirm. Left unguarded: recovery records no outpoint, so a caller who
-// names the wrong transaction of a renewal chain just calls again.
+// confirms, so a node whose raw tx confirmed passes it too even though its direct
+// tx can never confirm. Recovery records no outpoint, so naming the wrong
+// transaction of a renewal chain is a no-op the caller simply retries.
 func findRecoverySourceNode(ctx context.Context, db *ent.Client, leaf *ent.TreeNode, outPoint wire.OutPoint) (*ent.TreeNode, error) {
 	treeID, err := leaf.QueryTree().OnlyID(ctx)
 	if err != nil {
