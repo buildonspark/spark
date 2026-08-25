@@ -663,10 +663,9 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse identity public key: %w", err))
 	}
 
-	// Non-SSP callers may only read static deposit addresses for a wallet they
-	// have access to; the SSP-internal endpoint passes isSSP=true to bypass this.
-	// Gated behind a knob (default off) so the public endpoint behaves as before
-	// until the SSP has switched to the internal endpoint; flip the knob on after.
+	// Non-SSP reads of static deposit addresses are filtered to wallets the caller
+	// has read access to, behind a rollout knob; the SSP-internal endpoint
+	// (isSSP=true) is exempt.
 	knobService := knobs.GetKnobsService(ctx)
 	if !isSSP && knobService != nil && knobService.RolloutRandom(knobs.KnobStaticDepositAddressPrivacyEnabled, 0) {
 		hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, idPubKey)

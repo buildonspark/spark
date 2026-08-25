@@ -110,14 +110,10 @@ func validatePreimageSwapDecisionAgainstPrepare(preparedTransferID string, prepa
 		if preparedIsSendPackage && len(d.GetLeafSignatures()) == 0 {
 			return fmt.Errorf("commit for SEND+package preimage swap %s carries no leaf signatures", preparedTransferID)
 		}
-		// NOTE: RECEIVE commit-payload completeness (a non-HODL receive must settle
-		// key tweaks; only HODL receives may commit empty and settle later via
-		// ProvidePreimage) is deliberately NOT enforced here. This fence is a pure
-		// function of the prepare op, which does not carry HODL-ness — that lives on
-		// the transfer/preimage_request rows — so the fence cannot tell a legitimate
-		// HODL empty commit from a non-HODL one. That completeness check belongs in
-		// applyInitiatePreimageSwapCommit, where the transfer state is loaded;
-		// tracked as a follow-up. (SEND has no such ambiguity, hence the bind above.)
+		// Receive commit-payload completeness is checked in
+		// applyInitiatePreimageSwapCommit, where the transfer state (including
+		// whether the receive is HODL) is loaded; this fence validates only the
+		// prepare op. SEND carries no such ambiguity, hence the bind above.
 	case *pbinternal.InitiatePreimageSwapRollbackRequest:
 		if !sameTransferID(d.GetTransferId(), preparedTransferID) {
 			return fmt.Errorf("rollback transfer id %s does not match the prepared transfer id %s", d.GetTransferId(), preparedTransferID)

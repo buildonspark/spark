@@ -709,10 +709,9 @@ func (h *BaseTransferHandler) createTransferV3(
 			}
 			continue
 		}
-		// Preimage-swap refunds are validated against each leaf's own destination on the lightning
-		// path before Prepare, and validateTransferLeaves still requires the cpfp refund to
-		// decrement its timelock. The direct and direct-from-cpfp sequences stay unvalidated, as
-		// they are on v3: their destinations are checked, but nothing enforces the exit ladder.
+		// Preimage-swap refunds are validated on the lightning path before Prepare,
+		// and validateTransferLeaves requires the cpfp refund to decrement its
+		// timelock.
 		if transferType == st.TransferTypePreimageSwap {
 			continue
 		}

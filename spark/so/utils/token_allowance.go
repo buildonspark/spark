@@ -140,8 +140,8 @@ func HashRevokeTokenAllowancePayload(payload *tokenpb.RevokeTokenAllowancePayloa
 
 // ValidateRevokeTokenAllowancePayload enforces the policy invariants a revocation must satisfy
 // before an SO tombstones a grant. Only the version needs checking: every other revoke field is
-// bound either by the stored allowance or by the statement hash. It does not verify the owner
-// signature; callers do that separately against the hash from HashRevokeTokenAllowancePayload.
+// bound either by the stored allowance or by the statement hash. The owner signature is verified
+// separately by callers against the hash from HashRevokeTokenAllowancePayload.
 func ValidateRevokeTokenAllowancePayload(payload *tokenpb.RevokeTokenAllowancePayload) error {
 	if payload == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("revoke token allowance payload cannot be nil"))
@@ -153,8 +153,8 @@ func ValidateRevokeTokenAllowancePayload(payload *tokenpb.RevokeTokenAllowancePa
 }
 
 // ValidateTokenAllowancePayload enforces the policy invariants an allowance must satisfy before
-// an SO installs it. It does not verify the owner signature; callers do that separately against
-// the hash from HashCreateTokenAllowancePayload.
+// an SO installs it. The owner signature is verified separately by callers against the hash from
+// HashCreateTokenAllowancePayload.
 func ValidateTokenAllowancePayload(payload *tokenpb.TokenAllowancePayload, supportedNetworks []btcnetwork.Network) error {
 	if payload == nil {
 		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token allowance payload cannot be nil"))

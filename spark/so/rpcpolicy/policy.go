@@ -37,17 +37,15 @@ const (
 	// authn interceptor does not require a session token (so the "Basic …" credential passes through); the credential
 	// itself is verified downstream by partner.BasicAuthInterceptor against partner_keys.basic_auth_secret_hash.
 	//
-	// IMPORTANT: BasicAuthInterceptor is on the UNARY chain only. A *streaming* AuthPartnerBasic method would skip
-	// session auth yet never have its Basic credential verified.
+	// BasicAuthInterceptor runs on the unary chain, so AuthPartnerBasic applies to unary methods only.
 	AuthPartnerBasic
 	// AuthOperatorBrontide means the caller is another SO, authenticated at the transport layer: the Noise_XK handshake
 	// proves possession of an identity private key belonging to the operator set. No session token is involved, and the
 	// authz interceptor admits the call on the strength of the resolved brontide.PeerOperator.
 	//
-	// IMPORTANT: for now this only holds for calls that arrive on the internal listener. The same services are still
-	// registered on the public listener, where InternalOnly's IP gate is the only check. Once every peer client dials
-	// brontide and these services come off the public listener, the IP fallback (and InternalOnly on these methods) can
-	// go. The readiness signal is internal_authz_decisions_total{path="vpc-ip"} dropping to zero for these methods.
+	// These methods are also registered on the public listener, where the InternalOnly IP gate applies until every peer
+	// client dials brontide and the services come off the public listener; the IP fallback and InternalOnly can go then.
+	// Track readiness via internal_authz_decisions_total{path="vpc-ip"} dropping to zero for these methods.
 	AuthOperatorBrontide
 )
 

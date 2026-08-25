@@ -18,8 +18,8 @@ var (
 	ErrMpcSealedLeafSetMismatch = fmt.Errorf("sealed sub-shares do not cover exactly the package's leaves")
 )
 
-// UnsealShares decrypts the sealed sub-share blobs addressed to one operator and enforces the sealed contract the
-// parser deferred (the per-leaf split lives inside the ciphertext, readable only by its operator): each decrypted
+// UnsealShares decrypts the sealed sub-share blobs addressed to one operator and enforces the sealed-share contract
+// (the per-leaf split lives inside the ciphertext, readable only by its operator): each decrypted
 // payload must name this submission's transfer id — the replay guard that holds even if resharing material is ever
 // reused across transfers — and must cover exactly the package's leaf set. Returns each leaf's sub-share bytes by
 // participant position, the shape CombineMpcLeafTweak consumes. Failures name the participant position, since a
