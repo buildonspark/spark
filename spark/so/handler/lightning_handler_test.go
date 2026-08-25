@@ -82,7 +82,7 @@ func createParentAndRefundTx(t *testing.T, outputScript []byte, value int64) (pa
 	require.NoError(t, err)
 
 	// Create the next refund tx that references the parent tx.
-	refundTx := wire.NewMsgTx(2)
+	refundTx := wire.NewMsgTx(3)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
 		Sequence:         spark.ZeroSequence | (spark.InitialTimeLock - spark.TimeLockInterval),
@@ -125,7 +125,7 @@ func createParentAndRefundTxWithOutputs(
 	currentRefundTxBytes, err = common.SerializeTx(currentRefundTx)
 	require.NoError(t, err)
 
-	refundTx := wire.NewMsgTx(2)
+	refundTx := wire.NewMsgTx(3)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
 		Sequence:         spark.ZeroSequence | (spark.InitialTimeLock - spark.TimeLockInterval),
@@ -2672,7 +2672,7 @@ func TestValidateGetPreimageRequestRejectsExtraRefundInputs(t *testing.T) {
 		currentRefundTxBytes, err := common.SerializeTx(currentRefundTx)
 		require.NoError(t, err)
 
-		refundTx := wire.NewMsgTx(2)
+		refundTx := wire.NewMsgTx(3)
 		refundTx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
 			Sequence:         spark.ZeroSequence | (spark.InitialTimeLock - spark.TimeLockInterval),
@@ -2783,6 +2783,165 @@ func TestValidateGetPreimageRequestRejectsExtraRefundInputs(t *testing.T) {
 			)
 
 			require.ErrorContains(t, err, tt.expectedErr)
+			code, reason := sparkerrors.CodeAndReasonFrom(err)
+			require.Equal(t, codes.InvalidArgument, code)
+			require.Equal(t, "MALFORMED_FIELD", reason)
+		})
+	}
+}
+
+func TestValidateGetPreimageRequestRejectsLockedRefundTransactions(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{6})
+	ctx, _ := db.ConnectToTestPostgres(t)
+
+	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	lightningHandler := NewLightningHandler(config)
+
+	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	paymentHashBytes := sha256.Sum256([]byte("locked lightning refund tx"))
+	paymentHash := paymentHashBytes[:]
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(validPubKey).
+		SetStatus(st.TreeStatusAvailable).
+		SetNetwork(btcnetwork.Mainnet).
+		SetBaseTxid(st.NewRandomTxIDForTesting(t)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusInUse).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
+		SetPublicShares(map[string]keys.Public{"operator1": validPubKey}).
+		SetPublicKey(validPubKey).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	nodeID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440006")
+	outputScript, err := common.P2TRScriptFromPubKey(validPubKey)
+	require.NoError(t, err)
+
+	cpfpParentTx, currentRefundTx, cpfpRefundTx := createParentAndRefundTx(t, outputScript, 1000)
+	directParentTx, _, directRefundTx := createParentAndRefundTx(t, outputScript, 1000)
+
+	_, err = tx.TreeNode.Create().
+		SetTree(tree).
+		SetNetwork(tree.Network).
+		SetID(nodeID).
+		SetValue(1000).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(validPubKey).
+		SetOwnerSigningPubkey(validPubKey).
+		SetRawTx(cpfpParentTx).
+		SetRawRefundTx(currentRefundTx).
+		SetDirectTx(directParentTx).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	withLockTime := func(rawTx []byte) []byte {
+		msgTx, err := common.TxFromRawTxBytes(rawTx)
+		require.NoError(t, err)
+		msgTx.LockTime = 1
+		lockedRawTx, err := common.SerializeTx(msgTx)
+		require.NoError(t, err)
+		return lockedRawTx
+	}
+	withVersion := func(rawTx []byte, version int32) []byte {
+		msgTx, err := common.TxFromRawTxBytes(rawTx)
+		require.NoError(t, err)
+		msgTx.Version = version
+		versionedRawTx, err := common.SerializeTx(msgTx)
+		require.NoError(t, err)
+		return versionedRawTx
+	}
+
+	signingJob := func(rawTx []byte) *pb.UserSignedTxSigningJob {
+		return &pb.UserSignedTxSigningJob{
+			LeafId: nodeID.String(),
+			SigningCommitments: &pb.SigningCommitments{
+				SigningCommitments: map[string]*pbcommon.SigningCommitment{
+					"test": {
+						Hiding:  []byte("test_hiding"),
+						Binding: []byte("test_binding"),
+					},
+				},
+			},
+			SigningNonceCommitment: &pbcommon.SigningCommitment{
+				Hiding:  []byte("test_nonce_hiding"),
+				Binding: []byte("test_nonce_binding"),
+			},
+			UserSignature: []byte("test_signature"),
+			RawTx:         rawTx,
+		}
+	}
+
+	testCases := []struct {
+		name                       string
+		cpfpTransactions           []*pb.UserSignedTxSigningJob
+		directTransactions         []*pb.UserSignedTxSigningJob
+		directFromCpfpTransactions []*pb.UserSignedTxSigningJob
+		expectedError              string
+	}{
+		{
+			name:             "cpfp",
+			cpfpTransactions: []*pb.UserSignedTxSigningJob{signingJob(withLockTime(cpfpRefundTx))},
+			expectedError:    "cpfp refund tx locktime must be 0",
+		},
+		{
+			name:               "direct",
+			directTransactions: []*pb.UserSignedTxSigningJob{signingJob(withLockTime(directRefundTx))},
+			expectedError:      "direct refund tx locktime must be 0",
+		},
+		{
+			name:                       "direct from cpfp",
+			directFromCpfpTransactions: []*pb.UserSignedTxSigningJob{signingJob(withLockTime(cpfpRefundTx))},
+			expectedError:              "direct from cpfp refund tx locktime must be 0",
+		},
+		{
+			name:             "cpfp version 2",
+			cpfpTransactions: []*pb.UserSignedTxSigningJob{signingJob(withVersion(cpfpRefundTx, 2))},
+			expectedError:    "cpfp refund tx version validation failed",
+		},
+		{
+			name:               "direct version 2",
+			directTransactions: []*pb.UserSignedTxSigningJob{signingJob(withVersion(directRefundTx, 2))},
+			expectedError:      "direct refund tx version validation failed",
+		},
+		{
+			name:                       "direct from cpfp version 2",
+			directFromCpfpTransactions: []*pb.UserSignedTxSigningJob{signingJob(withVersion(cpfpRefundTx, 2))},
+			expectedError:              "direct from cpfp refund tx version validation failed",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err = lightningHandler.validateGetPreimageRequestWithFrostServiceClientFactory(
+				ctx,
+				&mockFrostServiceClientConnection{},
+				paymentHash,
+				testCase.cpfpTransactions,
+				testCase.directTransactions,
+				testCase.directFromCpfpTransactions,
+				1000,
+				validPubKey,
+				singleLeafDestination(validPubKey),
+				0,
+				pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+				false,
+			)
+
+			require.ErrorContains(t, err, testCase.expectedError)
 			code, reason := sparkerrors.CodeAndReasonFrom(err)
 			require.Equal(t, codes.InvalidArgument, code)
 			require.Equal(t, "MALFORMED_FIELD", reason)

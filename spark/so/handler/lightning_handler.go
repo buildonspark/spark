@@ -483,6 +483,21 @@ func validateLightningRefundExpectedSequence(transactionType string, tx *wire.Ms
 	return nil
 }
 
+// validateLightningRefundParsedTxShape enforces the canonical Spark refund transaction
+// shape on client-supplied lightning refund transactions before they are FROST co-signed.
+// These fields are committed in the taproot sighash, so a non-canonical version or a
+// non-zero locktime would otherwise be signed verbatim and change when/how the resulting
+// refund can confirm on L1.
+func validateLightningRefundParsedTxShape(transactionType string, tx *wire.MsgTx, leafID uuid.UUID) error {
+	if tx.Version != 3 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("%s refund tx version validation failed for tree_node id: %s: transaction version must be 3, got v%d", transactionType, leafID, tx.Version))
+	}
+	if tx.LockTime != 0 {
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("%s refund tx locktime must be 0 for tree_node id: %s, got %d", transactionType, leafID, tx.LockTime))
+	}
+	return nil
+}
+
 func (h *LightningHandler) validateGetPreimageRequest(
 	ctx context.Context,
 	paymentHash []byte,
@@ -771,8 +786,8 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get cpfp refund tx for cpfpTransaction, tree_node id: %s: %w", nodeID, err))
 		}
 
-		if err := common.ValidateBitcoinTxVersion(cpfpRefundTx); err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
+		if err := validateLightningRefundParsedTxShape("cpfp", cpfpRefundTx, nodeID); err != nil {
+			return err
 		}
 
 		if len(cpfpRefundTx.TxIn) != 1 {
@@ -851,8 +866,8 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct refund tx for directTransaction, tree_node id: %s: %w", nodeID, err))
 		}
 
-		if err := common.ValidateBitcoinTxVersion(directRefundTx); err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
+		if err := validateLightningRefundParsedTxShape("direct", directRefundTx, nodeID); err != nil {
+			return err
 		}
 
 		if len(directRefundTx.TxIn) != 1 {
@@ -930,8 +945,8 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to get direct from cpfp refund tx for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err))
 		}
 
-		if err := common.ValidateBitcoinTxVersion(directFromCpfpRefundTx); err != nil {
-			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("direct from cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err))
+		if err := validateLightningRefundParsedTxShape("direct from cpfp", directFromCpfpRefundTx, nodeID); err != nil {
+			return err
 		}
 
 		if len(directFromCpfpRefundTx.TxIn) != 1 {
