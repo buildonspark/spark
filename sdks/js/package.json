@@ -54,5 +54,8 @@
     "ts-prune": "^0.10.3",
     "turbo": "^2.4.4"
   },
-  "packageManager": "yarn@4.13.0"
+  "packageManager": "yarn@4.13.0",
+  "dependencies": {
+    "@react-native-community/cli": "19.1.2"
+  }
 }
