@@ -9,6 +9,7 @@ import {
 } from "@jest/globals";
 import { type WalletConfigService } from "../services/config.js";
 import { type ConnectionManager } from "../services/connection/connection.js";
+import { SparkValidationError } from "../errors/index.js";
 import { SparkWallet } from "../spark-wallet/spark-wallet.js";
 
 type InitWalletInternals = {
@@ -109,5 +110,62 @@ describe("SparkWallet initialization", () => {
     expect(internalWallet.leafManager.swapService).toBe(
       internalWallet.swapService,
     );
+  });
+});
+
+describe("SparkWallet seed and mnemonic resolution", () => {
+  type SeedResolverInternals = {
+    resolveSeedAndMnemonic: (
+      mnemonicOrSeed?: string,
+      accountNumber?: number,
+    ) => Promise<{ seed: Uint8Array; mnemonic: string | undefined }>;
+  };
+
+  const resolveSeedAndMnemonic = (wallet: SparkWallet) =>
+    wallet as unknown as SeedResolverInternals;
+
+  it("rejects mnemonic-shaped strings that fail BIP-39 checksum validation", async () => {
+    // Twelve valid wordlist words with an invalid checksum.
+    const invalidMnemonic = Array(12).fill("abandon").join(" ");
+    const wallet = new InitServiceRefreshTestWallet({
+      createClients: jest.fn(async () => {}),
+    });
+
+    await expect(
+      resolveSeedAndMnemonic(wallet).resolveSeedAndMnemonic(invalidMnemonic),
+    ).rejects.toBeInstanceOf(SparkValidationError);
+    await expect(
+      resolveSeedAndMnemonic(wallet).resolveSeedAndMnemonic(invalidMnemonic),
+    ).rejects.toThrow(/checksum/i);
+  });
+
+  it("still resolves hex seed strings", async () => {
+    const wallet = new InitServiceRefreshTestWallet({
+      createClients: jest.fn(async () => {}),
+    });
+
+    const { seed, mnemonic } = await resolveSeedAndMnemonic(
+      wallet,
+    ).resolveSeedAndMnemonic("deadbeef".repeat(8));
+
+    expect(mnemonic).toBeUndefined();
+    expect(seed).toHaveLength(32);
+  });
+
+  it("resolves valid mnemonics via the mnemonic path", async () => {
+    const wallet = new InitServiceRefreshTestWallet({
+      createClients: jest.fn(async () => {}),
+    });
+    await wallet.initializeSignerForTest();
+    const validMnemonic =
+      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+    const { seed, mnemonic } =
+      await resolveSeedAndMnemonic(wallet).resolveSeedAndMnemonic(
+        validMnemonic,
+      );
+
+    expect(mnemonic).toBe(validMnemonic);
+    expect(seed).toHaveLength(64);
   });
 });
