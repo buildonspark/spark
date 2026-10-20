@@ -134,6 +134,7 @@
     "@lightsparkdev/eslint-config": "^0.0.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.2",
+    "@types/ua-parser-js": "^0.7.39",
     "depcheck": "^1.4.7",
     "eslint": "^9.25.0",
     "eslint-watch": "^8.0.0",
@@ -172,7 +173,7 @@
     "nice-grpc-client-middleware-retry": "^3.1.10",
     "nice-grpc-common": "^2.0.2",
     "nice-grpc-web": "^3.3.7",
-    "ua-parser-js": "^2.0.6",
+    "ua-parser-js": "^1.0.41",
     "uuidv7": "^1.0.2"
   },
   "peerDependencies": {
