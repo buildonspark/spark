@@ -1,26 +1,46 @@
-# Local Atlas configuration for migration generation
-# Run atlas commands from this directory (spark/so/ent/)
-#
-# NOTE: The signing_nonce table is excluded from Atlas management
-# and migrated manually. See external/schema.sql and README.md.
+# Ptah configuration. Ent owns ordinary tables; external SQL owns
+# the partitioned signing_nonces parent. The application owns dated children.
+data "external_schema" "ent" {
+  program     = ["go", "run", "./tools/entschema", "-database", "operator"]
+  working_dir = "../.."
+  format      = "hcl"
+}
+
+data "composite_schema" "operator" {
+  schema "public" {
+    url = data.external_schema.ent.url
+  }
+  schema "public" {
+    url = "file://external/schema.sql"
+  }
+}
 
 env "local" {
-  # Source schema (desired state) - Ent-generated schemas only
-  # Excludes manually-managed tables (signing_nonce)
-  src = "ent://schema"
-
-  # Dev database for Atlas to use for normalization and diffing
-  dev = "docker://postgres/15/test?search_path=public"
-
-  # Migration directory
+  src = data.composite_schema.operator.url
+  dev = getenv("SPARK_SCHEMA_DEV_URL")
+  exclude = ["signing_nonces_[0-9]*"]
   migration {
     dir = "file://migrate/migrations"
   }
-
-  # Exclude manually-managed tables from Atlas
   diff {
     skip {
-      drop_table = true  # Don't generate DROP TABLE for removed schemas
+      drop_table = true
+    }
+  }
+}
+
+# The original history predates the separate manual partition cutover.
+# Replay every migration, but keep that parent out of automatic authoring.
+env "authoring" {
+  src = data.composite_schema.operator.url
+  dev = getenv("SPARK_SCHEMA_DEV_URL")
+  exclude = ["signing_nonces", "signing_nonces_[0-9]*"]
+  migration {
+    dir = "file://migrate/migrations"
+  }
+  diff {
+    skip {
+      drop_table = true
     }
   }
 }

@@ -653,8 +653,8 @@ reset_databases() {
     for i in $(seq 0 $max_count); do
         db="sparkoperator_$i"
         ephemeraldb="spark_ephemeral_$i"
-        atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/$db?sslmode=disable"
-        atlas migrate apply --dir "file://so/entephemeral/migrate/migrations" --url "postgresql://127.0.0.1:5432/$ephemeraldb?sslmode=disable"
+        ptah-compat migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/$db?sslmode=disable"
+        ptah-compat migrate apply --dir "file://so/entephemeral/migrate/migrations" --url "postgresql://127.0.0.1:5432/$ephemeraldb?sslmode=disable"
     done
     cd -
 

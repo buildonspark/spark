@@ -1,3 +1,4 @@
+ARG PTAH_BUILD_IMAGE=golang:1.27.3-bookworm
 FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS builder-go
 
 ARG TARGETOS TARGETARCH BUILDARCH
@@ -102,7 +103,13 @@ RUN rustup target add "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu"
 RUN cargo build --target "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu" --release
 
 
-FROM --platform=$TARGETPLATFORM arigaio/atlas:1.0.0-community AS atlas
+# Build the pinned Ptah release.
+FROM --platform=$BUILDPLATFORM ${PTAH_BUILD_IMAGE} AS ptah
+ARG TARGETOS TARGETARCH
+ARG PTAH_VERSION=v0.15.0
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go install ptah.run/cmd/ptah-compat@${PTAH_VERSION} \
+    && mkdir /out \
+    && find /go/bin -type f -name ptah-compat -exec cp {} /out/ptah-compat \;
 
 FROM debian:bookworm-slim AS final
 
@@ -115,10 +122,7 @@ EXPOSE 9735 10009
 ENTRYPOINT ["spark-operator"]
 
 ARG DEBUG=0
-COPY --from=atlas /atlas /usr/local/bin/atlas
-# The amd64 atlas binary ships with restrictive permissions (0001) from the
-# upstream image, causing "Permission denied" when pods run as non-root.
-RUN chmod 0755 /usr/local/bin/atlas
+COPY --from=ptah /out/ptah-compat /usr/local/bin/ptah-compat
 COPY --from=builder-go /go/bin/spark-operator /usr/local/bin/spark-operator
 COPY --from=builder-go /go/bin/dlv /usr/local/bin/dlv
 COPY --from=builder-go /bin/grpc_health_probe /usr/local/bin/grpc_health_probe
