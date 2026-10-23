@@ -70,21 +70,21 @@ test-grpc-k8s-oss = """
 ent-field-lint = { depends = ["entfieldlint-build"], run = "./bin/entfieldlint check" }
 ent-field-diff = { depends = ["entfieldlint-build"], run = "./bin/entfieldlint diff" }
 
-[tasks.atlas-hash]
+[tasks.ptah-hash]
 dir = "so/ent"
-run = "atlas migrate hash --dir 'file://migrate/migrations'"
+run = "ptah-compat migrate hash --dir 'file://migrate/migrations'"
 
-[tasks.atlas-diff]
+[tasks.ptah-diff]
 dir = "so/ent"
-run = "atlas migrate diff \"$@\" --env local"
+run = "ptah-compat migrate diff \"$@\" --env authoring"
 
-[tasks.atlas-ephemeral-hash]
+[tasks.ptah-ephemeral-hash]
 dir = "so/entephemeral"
-run = "atlas migrate hash --dir 'file://migrate/migrations'"
+run = "ptah-compat migrate hash --dir 'file://migrate/migrations'"
 
-[tasks.atlas-ephemeral-diff]
+[tasks.ptah-ephemeral-diff]
 dir = "so/entephemeral"
-run = "atlas migrate diff \"$@\" --env local"
+run = "ptah-compat migrate diff \"$@\" --env local"
 
 # dbseed — populate transfers/transfer_senders/transfer_receivers with
 # prod-shaped synthetic data. See cmd/dbseed/README.md for details.

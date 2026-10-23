@@ -24,7 +24,6 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 	"github.com/peterldowns/pgtestdb"
-	"github.com/peterldowns/pgtestdb/migrators/atlasmigrator"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
@@ -210,7 +209,7 @@ func ConnectToTestPostgres(t testing.TB) (context.Context, *TestContext) {
 
 	// We have to find the module root in order to get the path to the migrations folder, since the working directory
 	// is based on the file running the test, not this file.
-	migrator := atlasmigrator.NewDirMigrator(moduleRoot)
+	migrator := ptahDirMigrator{dir: moduleRoot}
 	dbConn := pgtestdb.Custom(t, conf, migrator)
 	require.NotNil(t, dbConn)
 

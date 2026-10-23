@@ -7,11 +7,11 @@ SOCKET_PATH="/tmp/frost_${INDEX}.sock"
 KEY_DIR="/opt/spark/keys"
 TLS_DIR="/opt/spark/tls"
 
-echo "Running atlas migrations for operator $INDEX..."
-atlas migrate apply \
+echo "Running Ptah migrations for operator $INDEX..."
+ptah-compat migrate apply \
   --dir "file:///opt/spark/migrations" \
   --url "postgresql://postgres@postgres:5432/sparkoperator_${INDEX}?sslmode=disable"
-atlas migrate apply \
+ptah-compat migrate apply \
   --dir "file:///opt/spark/ephemeral_migrations" \
   --url "postgresql://postgres@postgres:5432/spark_ephemeral_${INDEX}?sslmode=disable"
 
