@@ -70,13 +70,7 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	var network btcnetwork.Network
-	for _, networkVariant := range []btcnetwork.Network{btcnetwork.Mainnet, btcnetwork.Regtest, btcnetwork.Testnet, btcnetwork.Signet} {
-		if utils.IsBitcoinAddressForNetwork(req.GetAddress(), networkVariant) {
-			network = networkVariant
-			break
-		}
-	}
+	network := utils.DetermineBitcoinNetworkForAddress(req.GetAddress(), h.config.SupportedNetworks)
 	if network == btcnetwork.Unspecified {
 		return nil, fmt.Errorf("can not determine network for address: %s", req.GetAddress())
 	}
