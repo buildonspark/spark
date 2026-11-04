@@ -1,5 +1,28 @@
 # @buildonspark/spark-sdk
 
+## 0.10.0
+
+### Minor Changes
+
+- e1a64dd: - Add `getLightningReceiveQuote` and a `quote` option on `createLightningInvoice`, so a receive can accept an SSP fee quote: the manifest is checked against the requested amount and basis, signed with the wallet identity key, and echoed back verbatim.
+  - Export `ReceiveQuoteAmountBasis`, `manifestGrossSats`, `manifestFeeSats`, `manifestNetSatsFor` and `validateQuotedManifestAmounts`.
+  - An invoice issued with a quote is issued for the manifest's gross rather than the requested amount. The two differ whenever a markup applies; without a quote nothing changes.
+- a9f808c: **Breaking:** `payLightningInvoice` no longer accepts `idempotencyKey`. Pass `transferId` (a UUID) instead, or omit it and one is generated per call.
+
+  Fixed an issue where `idempotencyKey` wasn't idempotent for Lightning sends: it was ignored entirely when the payment fell back to a Spark transfer, and it was never forwarded to the SSP, so it only ever deduplicated the preimage swap RPC. `transferId` replaces it as the single dedup identity across every rail a payment touches — Spark fallback transfer, preimage swap, and SSP admission — so retrying with the same ID cannot produce a second payment. `IdempotencyOptions` itself is unchanged and still applies to the generic call-option paths.
+
+- 484bb50: - `getLightningReceiveQuote` accepts a `partnerJwt`, sent as the `x-partner-jwt` header on the quote request only. Without one the quote comes back feeless and `attributionStatus` reports why.
+  - **Breaking:** `LightningReceiveQuote.attributionStatus` is now optional, so a quote rebuilt from its wire values (serialized manifest plus issuer signature) is representable. Consumers reading the field must narrow or default it.
+- e3b57d3: - Add the token allowance client surface: `createTokenAllowance`, `revokeTokenAllowance`, `queryTokenAllowances`, `startAllowancePull`, and `commitAllowancePull` on `SparkWallet`, plus `TokenAllowanceService`, the allowance statement hashers, and `verifyAllowanceRecord` for verifying queried grants client-side.
+- 269d015: Added `getWatchtowerExitedLeaves`, `recoverWatchtowerExitedLeaf`, and `recoverAndBroadcastWatchtowerExitedLeaf`, plus the exported `WatchtowerExitedLeaf` type.
+
+  A leaf stops being spendable on Spark once an ancestor's transaction confirms on L1, and until now nothing surfaced it: it left the balance and `getLeaves` with no way to learn it needed attention. `getWatchtowerExitedLeaves` lists those leaves and names the on-chain output each one can still spend; `recoverWatchtowerExitedLeaf` builds and signs a transaction sweeping that output to an address you choose, and the `recoverAndBroadcast` variant publishes it.
+
+### Patch Changes
+
+- 64252d7: - Add `verifyTypedSignature`, a scheme-aware helper for verifying per-leaf authorization signatures (legacy bare-bytes ECDSA or scheme-tagged ECDSA/Schnorr).
+- 2caf2f4: - Reject Bare RPCs immediately when the underlying request closes before response headers, avoiding a 15-second transport delay that could keep backgrounded Bare runtimes alive.
+
 ## 0.9.0
 
 ### Minor Changes
