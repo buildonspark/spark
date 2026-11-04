@@ -1,5 +1,19 @@
 # @buildonspark/bare
 
+## 0.0.78
+
+### Patch Changes
+
+- 2caf2f4: - Reject Bare RPCs immediately when the underlying request closes before response headers, avoiding a 15-second transport delay that could keep backgrounded Bare runtimes alive.
+- Updated dependencies [64252d7]
+- Updated dependencies [e1a64dd]
+- Updated dependencies [a9f808c]
+- Updated dependencies [2caf2f4]
+- Updated dependencies [484bb50]
+- Updated dependencies [e3b57d3]
+- Updated dependencies [269d015]
+  - @buildonspark/spark-sdk@0.10.0
+
 ## 0.0.77
 
 ### Patch Changes

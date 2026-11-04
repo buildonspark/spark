@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/cli",
-  "version": "0.0.134",
+  "version": "0.0.135",
   "description": "Spark CLI",
   "type": "module",
   "bin": {
@@ -35,8 +35,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@buildonspark/issuer-sdk": "0.1.45",
-    "@buildonspark/spark-sdk": "0.9.0",
+    "@buildonspark/issuer-sdk": "0.1.46",
+    "@buildonspark/spark-sdk": "0.10.0",
     "@lightsparkdev/core": "^1.5.0",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.7.0",
