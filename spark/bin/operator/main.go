@@ -1000,6 +1000,14 @@ func main() {
 			return true
 		}),
 		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
+		grpcweb.WithAllowedRequestHeaders([]string{
+			"*",
+			"Authorization",
+			"Content-Type",
+			"X-Grpc-Web",
+			"X-User-Agent",
+			"Grpc-Timeout",
+		}),
 	)
 	// Add a value to contexts that arrive via gRPC-web so downstream handlers can
 	// distinguish them from native gRPC requests.

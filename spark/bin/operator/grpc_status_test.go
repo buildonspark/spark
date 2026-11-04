@@ -5,10 +5,13 @@ import (
 	"encoding/binary"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 )
 
 // parseGrpcWebTrailerFrame decodes a single gRPC-web trailer frame and returns its trailer block.
@@ -55,3 +58,33 @@ func TestWriteGrpcResourceExhaustedNativeGrpcIsTrailersOnly(t *testing.T) {
 	assert.Equal(t, "too big", rec.Header().Get("Grpc-Message"))
 	assert.Empty(t, rec.Body.Bytes(), "a Trailers-Only response carries no body")
 }
+
+func TestGrpcWebCorsPreflightAllowsAuthorization(t *testing.T) {
+	wrapped := grpcweb.WrapServer(
+		grpc.NewServer(),
+		grpcweb.WithOriginFunc(func(_ string) bool { return true }),
+		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
+		grpcweb.WithAllowedRequestHeaders([]string{
+			"*",
+			"Authorization",
+			"Content-Type",
+			"X-Grpc-Web",
+			"X-User-Agent",
+			"Grpc-Timeout",
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodOptions, "/spark.SparkService/query_nodes", nil)
+	req.Header.Set("Origin", "https://example.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "authorization,content-type,x-grpc-web")
+
+	rec := httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	allowedHeaders := rec.Header().Get("Access-Control-Allow-Headers")
+	assert.NotEmpty(t, allowedHeaders)
+	assert.Contains(t, strings.ToLower(allowedHeaders), "authorization")
+}
+
