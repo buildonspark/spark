@@ -23,7 +23,9 @@
     "ios",
     "*.podspec",
     "react-native.config.js",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "THIRD_PARTY_NOTICES.txt",
+    "third-party"
   ],
   "exports": {
     ".": {
@@ -172,7 +174,6 @@
     "nice-grpc-client-middleware-retry": "^3.1.10",
     "nice-grpc-common": "^2.0.2",
     "nice-grpc-web": "^3.3.7",
-    "ua-parser-js": "^2.0.6",
     "uuidv7": "^1.0.2"
   },
   "peerDependencies": {

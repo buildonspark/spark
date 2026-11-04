@@ -6,29 +6,71 @@
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_frost.so": "dec449369bdf1dfed9eb54e38fe4a4d0870123fcaa0eddea46ecac397ecb3176",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_frost.so": "16faf7e5faee5e43a2d0d3ff9f816349136518de102d768953eb541aa706e2c4",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_frost.so": "6fc047d40d427a0ed70f0cd901ee0edea4501b309574dabee8a46b5e1b021157",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_frost.so": "f6c969f8c2601b977f98462ad538acc656dc755b0591ea45009d7111f9edd3f1"
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_frost.so": "f6c969f8c2601b977f98462ad538acc656dc755b0591ea45009d7111f9edd3f1",
+        "sdks/js/packages/spark-sdk/third-party/frost-android/NOTICES.txt": "33a57ebd5bdfa08c2086ded93f25fe0c805ea0379e8d3711ddb6a67f3d63e79a",
+        "sdks/js/packages/spark-sdk/third-party/frost-android/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-sdk/third-party/frost-android/inventory.json": "8c792f55d4fc4fd7048a39d63a5ee8ce38b9864409f504f8b490813d636ad745"
       },
-      "input_file_count": 28,
-      "input_sha256": "da93b5c1c0ffed9ebde9c3fabcbef9428695ad6b6f8c1bc59524b1d9a6dce328"
+      "input_file_count": 49,
+      "input_sha256": "57f28c5d267606df1e7953e1eac75e6f8a539e67da6ba55951c6f39716ed5d0b"
     },
     "frost-bare": {
       "artifacts": {
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/buildonspark__spark-frost-bare-addon.bare": "f65770782a091f21d1e717c14a1a0769b10b0e1afc7983f5dd8b02662f5052ac",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/licenses/inventory.json": "7171ffcb7e232e6a8b504dddd1f620279b7355339ff4134876fc1e1b7ace701b",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/buildonspark__spark-frost-bare-addon.bare": "bfd47aad208ff0695e4349c58930c72ebab153f103a21473b4641d6063d08c80",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/licenses/inventory.json": "b64752218d462450ca3dba1d9a77edae573f4713ba969576eaa11114c6588485",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/buildonspark__spark-frost-bare-addon.bare": "0a06d77bb63622840d605b490652ac75f13d8fb2c0578d1096f53fd5790459f8",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/licenses/inventory.json": "bcac25b2fe958503b2bf426a776dc3b9f4d6adf845d088ae7821398958bb20a6",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/buildonspark__spark-frost-bare-addon.bare": "19bb1080e149ecd39eab3ddebb0e1763f36b3ce7e4dae387f4f5d10dc392b910",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/licenses/inventory.json": "0de7a366daff9e8a5e19e5ba3e9d8454e02af401911ac1876ee98d62460ecc02",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/buildonspark__spark-frost-bare-addon.bare": "958f010d519a00beff7a846bf03aea318ceff0c98bf97d15b63ef1df4901d3c7",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/licenses/inventory.json": "0dcea94642a6f247b8199f4fbca1db8420775dfb3f7ca603df723c8fbcaf27c0",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/buildonspark__spark-frost-bare-addon.bare": "3b2b47d3319fb53667ef4c91f5c122d472e5b292a9981869dc8428115e3ec9c3",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/licenses/inventory.json": "cf97cb44ba387893e053d227eba1e1af3b2a051ae9c5e6f614b5ef9ce1508ead",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/buildonspark__spark-frost-bare-addon.bare": "d5acaafb4bd8d17eb39d7de27bf7288b055c1f93cf14e31c7e427710039fab5b",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/licenses/inventory.json": "f9a99404e3ffee170f471852ecb94a3b41731564f3d3a0d9fca5d4abf3fc6225",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/buildonspark__spark-frost-bare-addon.bare": "68f5e82966f8cb5f02847a97e3226aae5a91189e0d228b949d59c5888596a51a",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/licenses/inventory.json": "21c286a63c7c5cd9939e7721ce142a1b7b64f4eba59b79e809ad6fec9aae5ea9",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/buildonspark__spark-frost-bare-addon.bare": "6a96c211b4707930db20a1f12d602244c80d20298553208e0fa3ad420dc184f8",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/licenses/inventory.json": "cf333ba6f781d4a9ced931dd10c1cc008619ba932e9a3ce7648d06b7c783a5db",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/buildonspark__spark-frost-bare-addon.bare": "7ba59fbc9cec77dd845f428ce265233167fe3eada491bf9347948c3cb35c7e18",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/licenses/inventory.json": "fdc61a6c8c2c0c21bae2c4ee27ddea7ec16dc6b7c3e0d26094e3e199042d2838",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/buildonspark__spark-frost-bare-addon.bare": "9b6eb92f7da38c33f76a31031e5b2725b886b2962da384998500e3b1a34e7a54",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/licenses/inventory.json": "f30449468dcdc9359ec14ff25422e8edadac1d8255b49f1f5657d195edc4a3f3",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/buildonspark__spark-frost-bare-addon.bare": "ed5000d64b138e08b575edc8fc2517c645cd927d7a5f83fce0be2775a7421fda",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/buildonspark__spark-frost-bare-addon.bare": "0f54120461ee6830d50a9901ca237b9f3b36300e66dd39d711055f33f3303338"
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/licenses/inventory.json": "9b09fe45e65270e56227c93c218307ff8531716f4342e4973279c79685279b49",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/buildonspark__spark-frost-bare-addon.bare": "0f54120461ee6830d50a9901ca237b9f3b36300e66dd39d711055f33f3303338",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/licenses/NOTICES.txt": "a84ee929feaf3d0dda6aefd150e6c45c96a56440ec8ca04c82e2442687457141",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/licenses/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/licenses/inventory.json": "868bccb7575e3b54f53cbbcf895eb75efdd1df8fda746334f51983b667e179ec"
       },
-      "input_file_count": 34,
-      "input_sha256": "e9de6ca489e52dfefdfda8a2a145918efba61eeef73ddc54fca3238cb509c1b4"
+      "input_file_count": 55,
+      "input_sha256": "c2623a3196bba17d962ba0d5a76868fdfafa39792f9dd1b6987ca37c349d7c83"
     },
     "frost-ios": {
       "artifacts": {
@@ -47,10 +89,13 @@
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h": "ec3b3b20c54bc2dc5e410273d566adcc0c66249bd776c7d0f868ac3be74b544b",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI.h": "34a22281ef6fe86ddd66768c586753bc404cd7d3d75022c6cacfd42f3a03d151",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Modules/module.modulemap": "bcbfbc370bdae9ca7b964bae8fd007d883001d9e0a956d67024eee7da2324934",
-        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/spark_frostFFI": "7b0412c4597dcbf66d09ef6f43eb5c578701e64c55a9b20f21ba70e3c4eca453"
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/spark_frostFFI": "7b0412c4597dcbf66d09ef6f43eb5c578701e64c55a9b20f21ba70e3c4eca453",
+        "sdks/js/packages/spark-sdk/third-party/frost-ios/NOTICES.txt": "33a57ebd5bdfa08c2086ded93f25fe0c805ea0379e8d3711ddb6a67f3d63e79a",
+        "sdks/js/packages/spark-sdk/third-party/frost-ios/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-sdk/third-party/frost-ios/inventory.json": "15f1334369c685930718a141faa4ce009d78aa56892dba7d0e1d2d7ffd71dbb6"
       },
-      "input_file_count": 33,
-      "input_sha256": "86a416de960a301707b342cec2236afc76abc1d4acf0e8ce358b404995ca1217"
+      "input_file_count": 54,
+      "input_sha256": "dc79327ce17653200b248037137c5e65e3b2b237295026e1fd0f1c7380c150f0"
     },
     "frost-wasm": {
       "artifacts": {
@@ -61,10 +106,13 @@
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm": "4520ee6dcc89049eb2abb7c67216a1baeb5af25a42ecf9e44bd7efacac5a0037",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm.d.ts": "48f8a3a54bc1150f7397354135d30e8f550211a8662113dd2b34eb2dfca95cbd",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.d.ts": "e602f86f3cebffc4d7e6eb77d397e57fd6eaf05bc8b557d78110f093bd4387ce",
-        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.js": "e7e787f3fd271065bbecb72a3971262933c838e936abb5d547866d1170da5367"
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.js": "e7e787f3fd271065bbecb72a3971262933c838e936abb5d547866d1170da5367",
+        "sdks/js/packages/spark-sdk/third-party/frost-wasm/NOTICES.txt": "33a57ebd5bdfa08c2086ded93f25fe0c805ea0379e8d3711ddb6a67f3d63e79a",
+        "sdks/js/packages/spark-sdk/third-party/frost-wasm/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-sdk/third-party/frost-wasm/inventory.json": "994a3db535b76d6d51856397067fcf702437c56f801b3dd7cc6523444c664e86"
       },
-      "input_file_count": 30,
-      "input_sha256": "474b956a0fa74089695248007dfc2ff4c50c0f0d5e5595979b1aab9a1bb1562b"
+      "input_file_count": 51,
+      "input_sha256": "fa9a6e526a76886888ce4f1a61bb381ea3ccb918361033b918e4f5ca8ff67b52"
     },
     "token-android": {
       "artifacts": {
@@ -72,10 +120,13 @@
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_token_primitives.so": "fc357df128743e6b72fac74957407f5c2ba4dd59720ee7308cda574e530c73fd",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_token_primitives.so": "4afa62e41d8e9fd2d029447bc6509a4ad2bde08bc9546f99aaa5aeda8d623c11",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_token_primitives.so": "9e7cd054fd84ce601be89e32d659097ade73562e0095d93a9f39c7a2d54858bd",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_token_primitives.so": "beb891445ba4b60807c7de32a2544773399174737822e6cc32a78e853d5def3a"
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_token_primitives.so": "beb891445ba4b60807c7de32a2544773399174737822e6cc32a78e853d5def3a",
+        "sdks/js/packages/spark-sdk/third-party/token-android/NOTICES.txt": "ecbbbb8047e036410ba1cd596a5980aaaf2b03e60d3525251b4d8f2b9dd02531",
+        "sdks/js/packages/spark-sdk/third-party/token-android/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-sdk/third-party/token-android/inventory.json": "214d740bf29a5aea9bdff14f54999bf4490a63ca538fc2fbe8909bd9859cc3d0"
       },
-      "input_file_count": 40,
-      "input_sha256": "b374f298422ae4e7054bb7ef3cccb920a0dbf5c3a61ba9e50f8d0d612dada247"
+      "input_file_count": 61,
+      "input_sha256": "d1cb5ad7097773fe20b4a8f7237ce461f660a5ed73f3f57044ab6cf6fa20b224"
     },
     "token-ios": {
       "artifacts": {
@@ -94,10 +145,13 @@
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h": "a2c837a445a87bbe5722c3ff4613937b5d0c34647654419c0ac9d0d48de787f6",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI.h": "33eee021c0cf71a115ec2ca088769a94db492e946adcaf33b240d9e6a7947e46",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Modules/module.modulemap": "ddab14b9c53a9102359432d4d13bb2e91c29befe1a9b9495b3c7f62276ab4142",
-        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI": "4f6199635e9695d5ceb87464d8ead76c7d7662ebce03a552c27a08e8883f73fb"
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI": "4f6199635e9695d5ceb87464d8ead76c7d7662ebce03a552c27a08e8883f73fb",
+        "sdks/js/packages/spark-sdk/third-party/token-ios/NOTICES.txt": "ecbbbb8047e036410ba1cd596a5980aaaf2b03e60d3525251b4d8f2b9dd02531",
+        "sdks/js/packages/spark-sdk/third-party/token-ios/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-sdk/third-party/token-ios/inventory.json": "cdb1cbc9de0c8068ff243b85b0e11da5d24a0821a236e678b36a9aa27f531465"
       },
-      "input_file_count": 45,
-      "input_sha256": "166c5ab1f88d0945112ebeccc0c9fc557eaa8655e248df84831af72de4c2fdba"
+      "input_file_count": 66,
+      "input_sha256": "2445a48c37c269083ff785e0d8464d81891bff3c9173caefe02dd63800ec8fe2"
     },
     "token-wasm": {
       "artifacts": {
@@ -108,10 +162,13 @@
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm": "14f351ffec3d6c68416e0040b08dc782b7d754157d9def020aca180586d552e7",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm.d.ts": "3d39f8be7b22fd6eee5ff799498cad6608532e590b96ce60768d709491c4e547",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.d.ts": "8d930a554a37eae280b3f3bfedd0b1cfa16e96708fcc92e6264f3fb524e6e3cc",
-        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.js": "b758c9f5f73edab46c2af23d938b43648e6806595bdba182374ecb3dfa3eb1ed"
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.js": "b758c9f5f73edab46c2af23d938b43648e6806595bdba182374ecb3dfa3eb1ed",
+        "sdks/js/packages/spark-sdk/third-party/token-wasm/NOTICES.txt": "ecbbbb8047e036410ba1cd596a5980aaaf2b03e60d3525251b4d8f2b9dd02531",
+        "sdks/js/packages/spark-sdk/third-party/token-wasm/RUST-NOTICES.html": "c90d52b09be83ce6e930d00f4b26559611eadcee806b2307184e04f2c78ad522",
+        "sdks/js/packages/spark-sdk/third-party/token-wasm/inventory.json": "c874f8311b5a11e28a5d69de0db74c97f46e5cb7f0de67f0e1b69bc417daf69c"
       },
-      "input_file_count": 40,
-      "input_sha256": "b6fde88b7f4d17f42fdf8d7a56f2e1ca2c6fba6f8351f27555badac2ca90c317"
+      "input_file_count": 61,
+      "input_sha256": "ea7eabc2453a7f19a92c284ff763b59d8b02eecc2501dcac6e1d2202d35ccfe2"
     }
   },
   "schema_version": 2

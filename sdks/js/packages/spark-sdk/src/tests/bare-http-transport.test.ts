@@ -10,11 +10,14 @@ import {
   BareHttpTransport,
 } from "../services/connection/bare-http-transport.js";
 
-type MockIncomingMessage = IncomingMessage & {
+type MockIncomingMessage = Omit<IncomingMessage, "destroy"> & {
   destroy: jest.Mock<(error?: Error) => MockIncomingMessage>;
 };
 
-type MockClientRequest = ClientRequest & {
+type MockClientRequest = Omit<
+  ClientRequest,
+  "destroy" | "end" | "setHeader" | "setTimeout" | "write"
+> & {
   destroy: jest.Mock<(error?: Error) => MockClientRequest>;
   end: jest.Mock<() => MockClientRequest>;
   setHeader: jest.Mock<

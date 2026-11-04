@@ -1,0 +1,175 @@
+{
+  "bare-rust-ffi@0.0.2": {
+    "declared_license": "Apache-2.0",
+    "license": "Apache-2.0",
+    "revision": "688e63c8bf45f4acf0072b0733a1ad865d7de0a3",
+    "crate_sha256": "4a7608d0393139d012c1daf85347129a1da868fae33a51b96c9e712420750fcb",
+    "files": [
+      {
+        "file": "bare-rust-ffi-0.0.2/LICENSE",
+        "source_url": "https://raw.githubusercontent.com/holepunchto/bare-rust/688e63c8bf45f4acf0072b0733a1ad865d7de0a3/LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "file": "bare-rust-ffi-0.0.2/NOTICE",
+        "source_url": "https://raw.githubusercontent.com/holepunchto/bare-rust/688e63c8bf45f4acf0072b0733a1ad865d7de0a3/NOTICE",
+        "sha256": "785579b4afd80de50086733b862451c03085fcbe87c5ee3ae887276632b2f1eb"
+      }
+    ]
+  },
+  "bare-rust@0.0.8": {
+    "declared_license": "Apache-2.0",
+    "license": "Apache-2.0",
+    "revision": "a2a6ed982e6aaf71bfaed36f7b2f9ea8a241fe86",
+    "crate_sha256": "4bca490338883827fe23105e422b20ae7c5295441dab99c477cd7e613c52ff49",
+    "files": [
+      {
+        "file": "bare-rust-0.0.8/LICENSE",
+        "source_url": "https://raw.githubusercontent.com/holepunchto/bare-rust/a2a6ed982e6aaf71bfaed36f7b2f9ea8a241fe86/LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "file": "bare-rust-0.0.8/NOTICE",
+        "source_url": "https://raw.githubusercontent.com/holepunchto/bare-rust/a2a6ed982e6aaf71bfaed36f7b2f9ea8a241fe86/NOTICE",
+        "sha256": "785579b4afd80de50086733b862451c03085fcbe87c5ee3ae887276632b2f1eb"
+      }
+    ]
+  },
+  "gloo-utils@0.2.0": {
+    "declared_license": "MIT OR Apache-2.0",
+    "license": "MIT",
+    "revision": "f3bb1d1a1c33dbcccaf26446aca7d0cea8e9d574",
+    "crate_sha256": "0b5555354113b18c547c1d3a98fbf7fb32a9ff4f6fa112ce823a21641a0ba3aa",
+    "files": [
+      {
+        "file": "gloo-utils-0.2.0/LICENSE-MIT",
+        "source_url": "https://raw.githubusercontent.com/rustwasm/gloo/f3bb1d1a1c33dbcccaf26446aca7d0cea8e9d574/LICENSE-MIT",
+        "sha256": "5a6f5443ea473f130adbdcf84254761d1292bc79759b5253915d4b5e7afbef66"
+      }
+    ]
+  },
+  "hex_lit@0.1.1": {
+    "declared_license": "MITNFA",
+    "license": "MITNFA",
+    "revision": "a1b61585654a3280103a9622c272b2f8ba278a47",
+    "crate_sha256": "3011d1213f159867b13cfd6ac92d2cd5f1345762c63be3554e84092d85a50bbd",
+    "files": [
+      {
+        "file": "hex_lit-0.1.1/LICENSE-MITNFA.txt",
+        "source_url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/MITNFA.txt",
+        "sha256": "d436716f7a05466f52443893079761c8a88f4967d0ef490fabc0a1c9ef1c3a1d"
+      },
+      {
+        "file": "hex_lit-0.1.1/README.md",
+        "source_url": "https://crates.io/api/v1/crates/hex_lit/0.1.1/download",
+        "source_path": "README.md",
+        "sha256": "4817e234fa343ed48b5200ec7e3ddf2c5127a9bf5f8dd44253ccda360fc34493"
+      }
+    ],
+    "review_note": "The checksum-pinned published archive declares MITNFA in Cargo.toml and README.md and contains no copyright notices. Include its actual README and the standard MITNFA text without synthesizing a copyright holder or year; the recorded Git revision is not available upstream."
+  },
+  "postcard@1.1.2": {
+    "declared_license": "MIT OR Apache-2.0",
+    "license": "MIT",
+    "revision": "5cc1f54bf106c06066c57791db4050abd25102ef",
+    "crate_sha256": "6c1de96e20f51df24ca73cafcc4690e044854d803259db27a00a461cb3b9d17a",
+    "files": [
+      {
+        "file": "postcard-1.1.2/LICENSE-MIT",
+        "source_url": "https://raw.githubusercontent.com/jamesmunns/postcard/5cc1f54bf106c06066c57791db4050abd25102ef/LICENSE-MIT",
+        "sha256": "177540cad091a40e8071db310bc3b6115c4e329a92a234609b60c154b008a888"
+      }
+    ]
+  },
+  "prost-reflect-build@0.14.0": {
+    "declared_license": "MIT OR Apache-2.0",
+    "license": "MIT",
+    "revision": "be691b5670b5026ea75cc2fced50df2d31589fa7",
+    "crate_sha256": "50e2537231d94dd2778920c2ada37dd9eb1ac0325bb3ee3ee651bd44c1134123",
+    "files": [
+      {
+        "file": "prost-reflect-build-0.14.0/LICENSE-MIT",
+        "source_url": "https://raw.githubusercontent.com/andrewhickman/prost-reflect/be691b5670b5026ea75cc2fced50df2d31589fa7/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+      }
+    ]
+  },
+  "prost-reflect-derive@0.14.0": {
+    "declared_license": "MIT OR Apache-2.0",
+    "license": "MIT",
+    "revision": "be691b5670b5026ea75cc2fced50df2d31589fa7",
+    "crate_sha256": "f4fce6b22f15cc8d8d400a2b98ad29202b33bd56c7d9ddd815bc803a807ecb65",
+    "files": [
+      {
+        "file": "prost-reflect-derive-0.14.0/LICENSE-MIT",
+        "source_url": "https://raw.githubusercontent.com/andrewhickman/prost-reflect/be691b5670b5026ea75cc2fced50df2d31589fa7/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+      }
+    ]
+  },
+  "prost-reflect@0.14.7": {
+    "declared_license": "MIT OR Apache-2.0",
+    "license": "MIT",
+    "revision": "71c4c98d7565dfc30f76ebc7daaa139a443419e6",
+    "crate_sha256": "7b5edd582b62f5cde844716e66d92565d7faf7ab1445c8cebce6e00fba83ddb2",
+    "files": [
+      {
+        "file": "prost-reflect-0.14.7/LICENSE-MIT",
+        "source_url": "https://raw.githubusercontent.com/andrewhickman/prost-reflect/71c4c98d7565dfc30f76ebc7daaa139a443419e6/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+      }
+    ]
+  },
+  "r-efi@5.3.0": {
+    "declared_license": "MIT OR Apache-2.0 OR LGPL-2.1-or-later",
+    "license": "MIT",
+    "revision": "97b55bed1c2c91dcbf787674849f05337ff80b33",
+    "crate_sha256": "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f",
+    "files": [
+      {
+        "file": "r-efi-5.3.0/AUTHORS",
+        "source_url": "https://raw.githubusercontent.com/r-efi/r-efi/97b55bed1c2c91dcbf787674849f05337ff80b33/AUTHORS",
+        "sha256": "ff92bed461f50338dd703a9ba9aee496a425957873df1d91192776e4bdf5dda7"
+      }
+    ]
+  },
+  "valuable@0.1.1": {
+    "declared_license": "MIT",
+    "license": "MIT",
+    "revision": "9efc29b6e58cef28f6566a47aa7e142a55fead77",
+    "crate_sha256": "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65",
+    "files": [
+      {
+        "file": "valuable-0.1.1/LICENSE",
+        "source_url": "https://raw.githubusercontent.com/tokio-rs/valuable/9efc29b6e58cef28f6566a47aa7e142a55fead77/LICENSE",
+        "sha256": "ed60d479b8fd1f64e9cbc3de449a16a53ac1b3d1b6aeb9bf9d190a8e93061b44"
+      }
+    ]
+  },
+  "wasip2@1.0.1+wasi-0.2.4": {
+    "declared_license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "license": "Apache-2.0",
+    "revision": "3da562c06214feafc14d37bf290671636caa6718",
+    "crate_sha256": "0562428422c63773dad2c345a1882263bbf4d65cf3f42e90921f787ef5ad58e7",
+    "files": [
+      {
+        "file": "wasip2-1.0.1+wasi-0.2.4/LICENSE-APACHE",
+        "source_url": "https://raw.githubusercontent.com/bytecodealliance/wasi-rs/3da562c06214feafc14d37bf290671636caa6718/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      }
+    ]
+  },
+  "wit-bindgen-rt@0.39.0": {
+    "declared_license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "license": "Apache-2.0",
+    "revision": "f2393e6e98fa5f9236cac580db8a3fc9de6a4b70",
+    "crate_sha256": "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1",
+    "files": [
+      {
+        "file": "wit-bindgen-rt-0.39.0/LICENSE-APACHE",
+        "source_url": "https://raw.githubusercontent.com/bytecodealliance/wit-bindgen/f2393e6e98fa5f9236cac580db8a3fc9de6a4b70/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      }
+    ]
+  }
+}

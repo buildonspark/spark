@@ -497,6 +497,11 @@ function checkManifest(config, groupNames = [], options = {}) {
     }
   }
 
+  try {
+    require("./sdk-licenses").verifyReports(config, groupNames, { root });
+  } catch (error) {
+    errors.push(error.message);
+  }
   if (errors.length) {
     throw new Error(
       `Committed SDK bindings are stale:\n  - ${errors.join("\n  - ")}`,
@@ -735,6 +740,9 @@ function verifyPackages(config, options = {}) {
         ),
       );
     const packedFiles = new Set(report[0].files.map((entry) => entry.path));
+    if (!packedFiles.has("THIRD_PARTY_NOTICES.txt")) {
+      throw new Error(`${packageName} omits THIRD_PARTY_NOTICES.txt`);
+    }
     const missing = difference(expectedByPackage.get(packageName), packedFiles);
     if (missing.length) {
       throw new Error(

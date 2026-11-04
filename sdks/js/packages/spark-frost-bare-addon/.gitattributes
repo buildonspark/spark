@@ -1,1 +1,5 @@
 * text=auto eol=lf
+
+# Preserve the upstream Rust reports, including their original whitespace.
+prebuilds/*/licenses/RUST-NOTICES.html -text whitespace=-blank-at-eol
+prebuilds/*/licenses/** linguist-generated=true

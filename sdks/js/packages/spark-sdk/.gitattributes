@@ -1,0 +1,3 @@
+# Preserve the upstream Rust reports, including their original whitespace.
+third-party/*/RUST-NOTICES.html -text whitespace=-blank-at-eol
+third-party/** linguist-generated=true

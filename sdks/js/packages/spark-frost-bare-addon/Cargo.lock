@@ -666,13 +666,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "frost-core"
+version = "3.0.0"
+source = "git+https://github.com/lightsparkdev/frost?rev=997427e5c09e62459230ad711ef3a33fb64b9424#997427e5c09e62459230ad711ef3a33fb64b9424"
+dependencies = [
+ "byteorder",
+ "const-crc32-nostd",
+ "derive-getters",
+ "document-features",
+ "hex",
+ "itertools 0.14.0",
+ "postcard",
+ "rand_core",
+ "serde",
+ "serdect 0.2.0",
+ "thiserror",
+ "visibility",
+ "zeroize",
+ "zeroize_derive",
+]
+
+[[package]]
 name = "frost-rerandomized"
 version = "3.0.0"
 source = "git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
 dependencies = [
  "derive-getters",
  "document-features",
- "frost-core",
+ "frost-core 3.0.0 (git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls)",
+ "hex",
+ "rand_core",
+]
+
+[[package]]
+name = "frost-rerandomized"
+version = "3.0.0"
+source = "git+https://github.com/lightsparkdev/frost?rev=997427e5c09e62459230ad711ef3a33fb64b9424#997427e5c09e62459230ad711ef3a33fb64b9424"
+dependencies = [
+ "derive-getters",
+ "document-features",
+ "frost-core 3.0.0 (git+https://github.com/lightsparkdev/frost?rev=997427e5c09e62459230ad711ef3a33fb64b9424)",
  "hex",
  "rand_core",
 ]
@@ -683,8 +716,21 @@ version = "3.0.0"
 source = "git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls#20585f111a1702eaa0fe10601fca10c5d3e7a1f4"
 dependencies = [
  "document-features",
- "frost-core",
- "frost-rerandomized",
+ "frost-core 3.0.0 (git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls)",
+ "frost-rerandomized 3.0.0 (git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls)",
+ "k256",
+ "rand_core",
+ "sha2",
+]
+
+[[package]]
+name = "frost-secp256k1-tr"
+version = "3.0.0"
+source = "git+https://github.com/lightsparkdev/frost?rev=997427e5c09e62459230ad711ef3a33fb64b9424#997427e5c09e62459230ad711ef3a33fb64b9424"
+dependencies = [
+ "document-features",
+ "frost-core 3.0.0 (git+https://github.com/lightsparkdev/frost?rev=997427e5c09e62459230ad711ef3a33fb64b9424)",
+ "frost-rerandomized 3.0.0 (git+https://github.com/lightsparkdev/frost?rev=997427e5c09e62459230ad711ef3a33fb64b9424)",
  "k256",
  "rand_core",
  "sha2",
@@ -1918,8 +1964,8 @@ version = "0.1.0"
 dependencies = [
  "bitcoin",
  "ecies",
- "frost-core",
- "frost-secp256k1-tr",
+ "frost-core 3.0.0 (git+https://github.com/lightsparkdev/frost?rev=997427e5c09e62459230ad711ef3a33fb64b9424)",
+ "frost-secp256k1-tr 3.0.0 (git+https://github.com/lightsparkdev/frost?rev=997427e5c09e62459230ad711ef3a33fb64b9424)",
  "hex",
  "k256",
  "prost 0.13.5",
@@ -1937,7 +1983,7 @@ name = "spark-frost-bare-addon"
 version = "0.0.0"
 dependencies = [
  "bare-rust",
- "frost-secp256k1-tr",
+ "frost-secp256k1-tr 3.0.0 (git+https://github.com/lightsparkdev/frost?tag=frost-core%2Fv3.0.0-ls)",
  "hex",
  "spark-frost",
 ]

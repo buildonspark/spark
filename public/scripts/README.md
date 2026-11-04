@@ -18,3 +18,8 @@ The workflow generates and commits [`sdks/js/sdk-bindings-manifest.json`](../../
 node public/scripts/sdk-bindings.js check
 node public/scripts/sdk-bindings.js verify-packages
 ```
+
+The [license-report generator](sdk-licenses/README.md) produces notices and
+dependency inventories for those artifacts. `check` verifies the report hashes
+against the committed binaries and Cargo lockfiles; `verify-packages` also checks
+that npm packages include the reports and top-level third-party notices.

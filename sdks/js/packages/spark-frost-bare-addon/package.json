@@ -14,7 +14,8 @@
     "binding.js",
     "CMakeLists.txt",
     "CHANGELOG.md",
-    "prebuilds"
+    "prebuilds",
+    "THIRD_PARTY_NOTICES.txt"
   ],
   "addon": true,
   "scripts": {

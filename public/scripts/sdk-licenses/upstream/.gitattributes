@@ -1,0 +1,2 @@
+# Preserve the checksum-pinned upstream license and attribution files.
+* -text whitespace=-blank-at-eol
