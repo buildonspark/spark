@@ -9513,10 +9513,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-async-hooks@npm:^0.1.0":
-  version: 0.1.0
-  resolution: "bare-async-hooks@npm:0.1.0"
-  checksum: 10/99c76fa51ad75f4853f6b2b86f9e5eab56d31744340924724f260ee9530194253d8169c168e68ae7ced53a2129997a8948ddac256304111478e2d3c5a0511675
+"bare-async-hooks@npm:^0.0.0":
+  version: 0.0.0
+  resolution: "bare-async-hooks@npm:0.0.0"
+  checksum: 10/4f47445214db9e4d3d6195d44a87f959ab3347286815e12fb8053bb2f48a02395386a87987e65c6aa89e54e90e4896b244a00faa3ca852f3c8509039f2f04587
   languageName: node
   linkType: hard
 
@@ -9531,21 +9531,6 @@ __metadata:
   version: 3.7.1
   resolution: "bare-buffer@npm:3.7.1"
   checksum: 10/4cfda84f1eecf9b0936963ada6d7a4fecee4a0ee6151c1fde65b129dcb1dd46516e78d2b56057be353970193f830e0d52d370556ad0b374d6e2a7f45ef2b2598
-  languageName: node
-  linkType: hard
-
-"bare-bundle@npm:^1.11.0":
-  version: 1.11.0
-  resolution: "bare-bundle@npm:1.11.0"
-  peerDependencies:
-    bare-buffer: "*"
-    bare-url: "*"
-  peerDependenciesMeta:
-    bare-buffer:
-      optional: true
-    bare-url:
-      optional: true
-  checksum: 10/fb0099d19b634df0d0c543674e6f6c8e5efd6d6ca058cf6fa2aa3bdc83e6f78014e84fb576abc245524995bc803af4dce8c86dcb5621f1754196e227146511bf
   languageName: node
   linkType: hard
 
@@ -9677,6 +9662,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"bare-fetch@npm:^2.5.0":
+  version: 2.9.1
+  resolution: "bare-fetch@npm:2.9.1"
+  dependencies:
+    bare-form-data: "npm:^1.2.0"
+    bare-http1: "npm:^4.5.2"
+    bare-https: "npm:^3.0.0"
+    bare-mime: "npm:^1.0.0"
+    bare-stream: "npm:^2.9.1"
+    bare-url: "npm:^2.4.0"
+    bare-zlib: "npm:^1.3.0"
+  peerDependencies:
+    bare-abort-controller: "*"
+    bare-buffer: "*"
+  peerDependenciesMeta:
+    bare-abort-controller:
+      optional: true
+    bare-buffer:
+      optional: true
+  checksum: 10/484c36279156a507a60c9d9ee7229ad0170e016f450153570c2946d6462aa11ea6eef0eb7b4c1c311e56bc405334f56976c244c12e52a070202497e39e728f75
+  languageName: node
+  linkType: hard
+
 "bare-fetch@npm:^3.0.0":
   version: 3.4.1
   resolution: "bare-fetch@npm:3.4.1"
@@ -9745,7 +9753,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-hrtime@npm:^2.1.1, bare-hrtime@npm:^2.1.2":
+"bare-hrtime@npm:^2.1.1":
   version: 2.1.2
   resolution: "bare-hrtime@npm:2.1.2"
   checksum: 10/56d39e240e52cb4967c5b045fc4dbe3a67954dd1075962bdb215bac191cdb845d54f9b4fd4ec624d47b2385d51324e3eff0c9ebf8747a49e6b2445a7dbdea47c
@@ -9807,6 +9815,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"bare-https@npm:^2.0.0":
+  version: 2.1.3
+  resolution: "bare-https@npm:2.1.3"
+  dependencies:
+    bare-http1: "npm:^4.4.0"
+    bare-tcp: "npm:^2.2.0"
+    bare-tls: "npm:^2.0.0"
+  checksum: 10/5097765ba766e39eb3726d452059b76c0da7c58af29a1e8573589d7afa1a1fcc461e4a9e83c30f88ff28bb714b740ab28041a606ba83ecbecb964346eaaa5be7
+  languageName: node
+  linkType: hard
+
 "bare-https@npm:^3.0.0":
   version: 3.1.0
   resolution: "bare-https@npm:3.1.0"
@@ -9828,21 +9847,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-inspector@npm:^6.0.1":
-  version: 6.1.0
-  resolution: "bare-inspector@npm:6.1.0"
+"bare-inspector@npm:^5.0.0":
+  version: 5.0.0
+  resolution: "bare-inspector@npm:5.0.0"
   dependencies:
     bare-events: "npm:^2.1.0"
     bare-http1: "npm:^4.0.0"
     bare-stream: "npm:^2.0.0"
     bare-url: "npm:^2.0.0"
-    bare-ws: "npm:^3.0.0"
+    bare-ws: "npm:^2.0.0"
   peerDependencies:
     bare-tcp: "*"
   peerDependenciesMeta:
     bare-tcp:
       optional: true
-  checksum: 10/a9e65c1a8955d2607b51f52e9c61a5e173f5b2f00cec831d8383b254f4c56812c2f65194619a7d46965a5b6f8e9d5c0204e574e0180d2e33f6ce4432a1717f40
+  checksum: 10/a8a98c6db06c2a882164919b9403cb46b74270cbd9142785da25bb3ab45c991e960d7059c111b57bea1a52d17ba0116e7ec00ddb9c1c8b129b8ad08e60556f43
   languageName: node
   linkType: hard
 
@@ -9900,20 +9919,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-module-lexer@npm:^1.6.0, bare-module-lexer@npm:^1.7.0":
-  version: 1.7.0
-  resolution: "bare-module-lexer@npm:1.7.0"
-  dependencies:
-    require-addon: "npm:^1.0.2"
-  peerDependencies:
-    bare-buffer: "*"
-  peerDependenciesMeta:
-    bare-buffer:
-      optional: true
-  checksum: 10/70b1206c4f95f01a1047a6a90745f453705117f0e74341b3b012ac4122d23838ec9b789442f09c50864fa2621f777169218a5f7ba19135cc2d6364407d9d4c91
-  languageName: node
-  linkType: hard
-
 "bare-module-resolve@npm:^1.10.0, bare-module-resolve@npm:^1.11.2, bare-module-resolve@npm:^1.6.2, bare-module-resolve@npm:^1.7.0, bare-module-resolve@npm:^1.8.0":
   version: 1.12.0
   resolution: "bare-module-resolve@npm:1.12.0"
@@ -9925,20 +9930,6 @@ __metadata:
     bare-url:
       optional: true
   checksum: 10/1d9fe23e83c477f504476ebaea85ed120ac57a6c10d21b8af5c510ceab193ab8fb571048ff4e87e3e7f99bce3fb170741099764a33e1b9f53da8acba81c96c98
-  languageName: node
-  linkType: hard
-
-"bare-module-resolve@npm:^1.12.6":
-  version: 1.12.6
-  resolution: "bare-module-resolve@npm:1.12.6"
-  dependencies:
-    bare-semver: "npm:^1.0.0"
-  peerDependencies:
-    bare-url: "*"
-  peerDependenciesMeta:
-    bare-url:
-      optional: true
-  checksum: 10/df0ca0f9bcd9a0fcbadeb116dc88675baf98e42f6323b7866f699a414e84f7242658f7280035a597d237a6e58cbe13cdc566f037fd7948dbb0722f5ba828e9a1
   languageName: node
   linkType: hard
 
@@ -9961,27 +9952,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-module-traverse@npm:~2.7.0":
-  version: 2.7.2
-  resolution: "bare-module-traverse@npm:2.7.2"
-  dependencies:
-    bare-addon-resolve: "npm:^1.5.0"
-    bare-bundle: "npm:^1.11.0"
-    bare-mime: "npm:^1.0.0"
-    bare-module-lexer: "npm:^1.6.0"
-    bare-module-resolve: "npm:^1.7.0"
-  peerDependencies:
-    bare-buffer: "*"
-    bare-url: "*"
-  peerDependenciesMeta:
-    bare-buffer:
-      optional: true
-    bare-url:
-      optional: true
-  checksum: 10/2dc05cabdef8e4d94ece88e5d652771e6e0996746ad918dbc3cdcfc3da1b983c7829743ffa58a2648ca28e5ad98eca2486567cf3b863b029d991591f8700cf86
-  languageName: node
-  linkType: hard
-
 "bare-module@npm:^6.0.1":
   version: 6.1.2
   resolution: "bare-module@npm:6.1.2"
@@ -10000,25 +9970,22 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-module@npm:^7.5.0":
-  version: 7.5.0
-  resolution: "bare-module@npm:7.5.0"
+"bare-module@npm:^6.1.2, bare-module@npm:^6.4.0":
+  version: 6.4.0
+  resolution: "bare-module@npm:6.4.0"
   dependencies:
-    bare-bundle: "npm:^1.11.0"
-    bare-module-lexer: "npm:^1.7.0"
-    bare-module-resolve: "npm:^1.12.6"
-    bare-module-traverse: "npm:~2.7.0"
+    bare-bundle: "npm:^1.3.0"
+    bare-module-lexer: "npm:^1.0.0"
+    bare-module-resolve: "npm:^1.8.0"
     bare-path: "npm:^3.0.0"
     bare-type-stripper: "npm:^0.1.2"
     bare-url: "npm:^2.0.1"
-    bare-wasm-abi: "npm:^0.1.0"
-    promaphore: "npm:^1.0.0"
   peerDependencies:
     bare-buffer: "*"
   peerDependenciesMeta:
     bare-buffer:
       optional: true
-  checksum: 10/4da5b5884b66f68ce2f3c8d50f4953c20ce221c9d0cd00b6bd7f863a2fc23553cd97744a9f570f3d5e6b69ab9f34458e3ff860504170d426a6770f297f492da7
+  checksum: 10/11bcf304869d3c6bf1a289ec7fe5949ae05f1bbca8a4ae7bcb867b7d899fff25d6045838bba090db57e510058849578887181c4fb7559ae2dc0a06cea24d5535
   languageName: node
   linkType: hard
 
@@ -10035,12 +10002,12 @@ __metadata:
   linkType: hard
 
 "bare-node-runtime@npm:^1.2.0":
-  version: 1.5.3
-  resolution: "bare-node-runtime@npm:1.5.3"
+  version: 1.2.0
+  resolution: "bare-node-runtime@npm:1.2.0"
   dependencies:
     bare-abort-controller: "npm:^1.0.0"
     bare-assert: "npm:^1.1.0"
-    bare-async-hooks: "npm:^0.1.0"
+    bare-async-hooks: "npm:^0.0.0"
     bare-buffer: "npm:^3.3.1"
     bare-console: "npm:^6.0.1"
     bare-crypto: "npm:^1.11.2"
@@ -10048,36 +10015,35 @@ __metadata:
     bare-diagnostics-channel: "npm:^1.1.0"
     bare-dns: "npm:^2.1.4"
     bare-events: "npm:^2.7.0"
-    bare-fetch: "npm:^3.0.0"
+    bare-fetch: "npm:^2.5.0"
     bare-fs: "npm:^4.2.3"
     bare-http1: "npm:^4.0.4"
-    bare-https: "npm:^3.0.0"
-    bare-inspector: "npm:^6.0.1"
-    bare-module: "npm:^7.5.0"
+    bare-https: "npm:^2.0.0"
+    bare-inspector: "npm:^5.0.0"
+    bare-module: "npm:^6.1.2"
     bare-net: "npm:^2.0.2"
     bare-os: "npm:^3.6.2"
     bare-path: "npm:^3.0.0"
-    bare-performance: "npm:^2.0.0"
+    bare-performance: "npm:^1.1.0"
     bare-process: "npm:^4.2.1"
-    bare-punycode: "npm:^0.1.0"
+    bare-punycode: "npm:^0.0.0"
     bare-querystring: "npm:^1.0.0"
     bare-readline: "npm:^1.1.0"
-    bare-repl: "npm:^7.1.0"
-    bare-sqlite: "npm:^0.1.4"
+    bare-repl: "npm:^6.0.1"
     bare-stream: "npm:^2.7.0"
     bare-string-decoder: "npm:^1.0.0"
-    bare-subprocess: "npm:^6.0.0"
+    bare-subprocess: "npm:^5.1.1"
     bare-timers: "npm:^3.0.3"
-    bare-tls: "npm:^3.1.13"
+    bare-tls: "npm:^2.1.3"
     bare-tty: "npm:^5.0.3"
     bare-url: "npm:^2.2.2"
     bare-utils: "npm:^1.5.1"
     bare-v8: "npm:^1.0.1"
     bare-vm: "npm:^1.0.0"
     bare-worker: "npm:^4.0.0"
-    bare-ws: "npm:^3.0.0"
+    bare-ws: "npm:^2.1.0"
     bare-zlib: "npm:^1.3.1"
-  checksum: 10/39a20dee1795e326755a2982acc82337c5129250ba4961ef7ffea5d79f112776816231870c7a98ce9bf5e610e871139d63cc00a0ab2797290a752185ea67b971
+  checksum: 10/a1d2568d483b8be159b4edb4bc90294d05c91483584790a49f79edbebbcbcd1432c209c625315263c3879b636bf41e16de0f8506de551a04637442a578ed1af8
   languageName: node
   linkType: hard
 
@@ -10097,7 +10063,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-performance@npm:^2.0.0, bare-performance@npm:^2.1.1":
+"bare-performance@npm:^1.1.0":
+  version: 1.3.0
+  resolution: "bare-performance@npm:1.3.0"
+  checksum: 10/835f79a57d450a5705744ad61408ceead6c7004d20e97d1bbb7561bbe95b0eeed0f33048c86d2b81bc143d0d00e542d0bbf1e1a5bda831edf97d8f486a57ea03
+  languageName: node
+  linkType: hard
+
+"bare-performance@npm:^2.1.1":
   version: 2.1.1
   resolution: "bare-performance@npm:2.1.1"
   dependencies:
@@ -10116,21 +10089,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-pipe@npm:^4.2.0":
-  version: 4.4.0
-  resolution: "bare-pipe@npm:4.4.0"
-  dependencies:
-    bare-events: "npm:^2.5.4"
-    bare-stream: "npm:^2.6.4"
-  peerDependencies:
-    bare-buffer: "*"
-  peerDependenciesMeta:
-    bare-buffer:
-      optional: true
-  checksum: 10/3a7e0f3a2e1d07f2e94ff9313ddc8378636462b8cc6de58e54198eb516053a936e6913e82d8ce386893a523e43e6c5e7bb1e7cf1e2e1e735073b4a89157e110e
-  languageName: node
-  linkType: hard
-
 "bare-process@npm:^4.0.0, bare-process@npm:^4.2.1":
   version: 4.2.2
   resolution: "bare-process@npm:4.2.2"
@@ -10146,12 +10104,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-punycode@npm:^0.1.0":
-  version: 0.1.0
-  resolution: "bare-punycode@npm:0.1.0"
+"bare-punycode@npm:^0.0.0":
+  version: 0.0.0
+  resolution: "bare-punycode@npm:0.0.0"
   dependencies:
     punycode: "npm:^2.3.1"
-  checksum: 10/6c37d7623afa69601852efd1a6b33aef7db263e830e2d05062f75e3f3235df01c66db16966a2c310281c98681825b1e69b9ea8bb8e386dc9f64a54db24441b95
+  checksum: 10/6faf4ad71fe81c953d592ac86e49c260501925be26e53f7c25e3c3fd2d406b55adbeaa6592395e33d1b44becc893aa07e8f7e335501cf5527887ab47e61b87b4
   languageName: node
   linkType: hard
 
@@ -10179,23 +10137,24 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-repl@npm:^7.1.0":
-  version: 7.1.0
-  resolution: "bare-repl@npm:7.1.0"
+"bare-repl@npm:^6.0.1":
+  version: 6.1.1
+  resolution: "bare-repl@npm:6.1.1"
   dependencies:
     bare-inspect: "npm:^3.0.0"
+    bare-module: "npm:^6.4.0"
+    bare-path: "npm:^3.0.0"
     bare-pipe: "npm:^4.0.0"
     bare-readline: "npm:^1.0.0"
     bare-stream: "npm:^2.0.0"
     bare-tty: "npm:^5.0.0"
-    bare-url: "npm:^2.0.1"
-  checksum: 10/800de37ded268c3605bee4036ba163b3c13f457cdd0b99a24495cd0f07e47d03eba5b421a91c292c1313ea08d33a173d11e6a517da0a5d7993349854ba268914
+  checksum: 10/9e06be247e8964fe99bf0c11c3a02fd41ba7580992670cd629df505c68a90c6d87b2e34b21020b4da4f8e3e7f1f9e147b35df52be31a6a64f16161bf63c49db6
   languageName: node
   linkType: hard
 
-"bare-runtime-android-arm64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-android-arm64@npm:1.36.0"
+"bare-runtime-android-arm64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-android-arm64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10204,9 +10163,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-android-arm@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-android-arm@npm:1.36.0"
+"bare-runtime-android-arm@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-android-arm@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10215,9 +10174,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-android-ia32@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-android-ia32@npm:1.36.0"
+"bare-runtime-android-ia32@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-android-ia32@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10226,9 +10185,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-android-x64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-android-x64@npm:1.36.0"
+"bare-runtime-android-x64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-android-x64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10237,9 +10196,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-darwin-arm64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-darwin-arm64@npm:1.36.0"
+"bare-runtime-darwin-arm64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-darwin-arm64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10248,9 +10207,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-darwin-x64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-darwin-x64@npm:1.36.0"
+"bare-runtime-darwin-x64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-darwin-x64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10259,9 +10218,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-ios-arm64-simulator@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-ios-arm64-simulator@npm:1.36.0"
+"bare-runtime-ios-arm64-simulator@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-ios-arm64-simulator@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10270,9 +10229,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-ios-arm64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-ios-arm64@npm:1.36.0"
+"bare-runtime-ios-arm64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-ios-arm64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10281,9 +10240,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-ios-x64-simulator@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-ios-x64-simulator@npm:1.36.0"
+"bare-runtime-ios-x64-simulator@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-ios-x64-simulator@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10292,9 +10251,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-linux-arm64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-linux-arm64@npm:1.36.0"
+"bare-runtime-linux-arm64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-linux-arm64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10303,9 +10262,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-linux-x64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-linux-x64@npm:1.36.0"
+"bare-runtime-linux-x64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-linux-x64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10314,9 +10273,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-win32-arm64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-win32-arm64@npm:1.36.0"
+"bare-runtime-win32-arm64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-win32-arm64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10325,9 +10284,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-runtime-win32-x64@npm:1.36.0":
-  version: 1.36.0
-  resolution: "bare-runtime-win32-x64@npm:1.36.0"
+"bare-runtime-win32-x64@npm:1.28.4":
+  version: 1.28.4
+  resolution: "bare-runtime-win32-x64@npm:1.28.4"
   dependencies:
     require-asset: "npm:^1.0.2"
   bin:
@@ -10337,27 +10296,27 @@ __metadata:
   linkType: hard
 
 "bare-runtime@npm:^1.28.4":
-  version: 1.36.0
-  resolution: "bare-runtime@npm:1.36.0"
+  version: 1.28.4
+  resolution: "bare-runtime@npm:1.28.4"
   dependencies:
     bare-fs: "npm:^4.4.4"
     bare-os: "npm:^3.0.1"
     bare-path: "npm:^3.0.0"
     bare-process: "npm:^4.2.1"
-    bare-runtime-android-arm: "npm:1.36.0"
-    bare-runtime-android-arm64: "npm:1.36.0"
-    bare-runtime-android-ia32: "npm:1.36.0"
-    bare-runtime-android-x64: "npm:1.36.0"
-    bare-runtime-darwin-arm64: "npm:1.36.0"
-    bare-runtime-darwin-x64: "npm:1.36.0"
-    bare-runtime-ios-arm64: "npm:1.36.0"
-    bare-runtime-ios-arm64-simulator: "npm:1.36.0"
-    bare-runtime-ios-x64-simulator: "npm:1.36.0"
-    bare-runtime-linux-arm64: "npm:1.36.0"
-    bare-runtime-linux-x64: "npm:1.36.0"
-    bare-runtime-win32-arm64: "npm:1.36.0"
-    bare-runtime-win32-x64: "npm:1.36.0"
-    bare-subprocess: "npm:^6.1.0"
+    bare-runtime-android-arm: "npm:1.28.4"
+    bare-runtime-android-arm64: "npm:1.28.4"
+    bare-runtime-android-ia32: "npm:1.28.4"
+    bare-runtime-android-x64: "npm:1.28.4"
+    bare-runtime-darwin-arm64: "npm:1.28.4"
+    bare-runtime-darwin-x64: "npm:1.28.4"
+    bare-runtime-ios-arm64: "npm:1.28.4"
+    bare-runtime-ios-arm64-simulator: "npm:1.28.4"
+    bare-runtime-ios-x64-simulator: "npm:1.28.4"
+    bare-runtime-linux-arm64: "npm:1.28.4"
+    bare-runtime-linux-x64: "npm:1.28.4"
+    bare-runtime-win32-arm64: "npm:1.28.4"
+    bare-runtime-win32-x64: "npm:1.28.4"
+    bare-subprocess: "npm:^5.0.0"
   dependenciesMeta:
     bare-runtime-android-arm:
       optional: true
@@ -10387,7 +10346,7 @@ __metadata:
       optional: true
   bin:
     bare: bin/bare
-  checksum: 10/0b601f3238242d3f68703b5801b2a1def51129943df89c981db7c835b6ffc41b27c8f949fdc4e101de009d81957059ffe0ad679f87d7a7b76aa03cbec52042e9
+  checksum: 10/262929afce47b684e9f727b52d98ad68b0a3a2ab65b80276ef8fbf89b84ca93a515506a2224011253484a2915ebf8283ec49bc654611b2fb0431d83408d077b3
   languageName: node
   linkType: hard
 
@@ -10405,18 +10364,6 @@ __metadata:
     bare-events: "npm:^2.5.3"
     bare-os: "npm:^3.3.1"
   checksum: 10/c913efc147181cbeb9383b1244f7456e170ae84bef1399ef987df2f550c78c7f6aa6dc9b79bfb375fa2be89f27e293eeda3d6cf899a26a4b87c2d60fee0506ec
-  languageName: node
-  linkType: hard
-
-"bare-sqlite@npm:^0.1.4":
-  version: 0.1.6
-  resolution: "bare-sqlite@npm:0.1.6"
-  peerDependencies:
-    bare-buffer: "*"
-  peerDependenciesMeta:
-    bare-buffer:
-      optional: true
-  checksum: 10/93fc7d1cb8257d838674bb2082c9a79315581886bc5a5946d9de0d0a04b46fb0d6c02ab21d1a56c25baf09fcd81d2f06cbb44eac68b9ba831af092446d655f71
   languageName: node
   linkType: hard
 
@@ -10491,18 +10438,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-structured-clone@npm:^2.0.0":
-  version: 2.0.1
-  resolution: "bare-structured-clone@npm:2.0.1"
-  dependencies:
-    bare-buffer: "npm:^3.6.0"
-    bare-type: "npm:^1.3.0"
-    bare-url: "npm:^2.4.0"
-    compact-encoding: "npm:^3.0.1"
-  checksum: 10/caa0d2973399ba604ea34e00a480160763cef5f9ab3ff1cee335b22754f5b73a195264e28c44b378da68bdd226dec667688d3f5be5d8d9ff281953253030f39b
-  languageName: node
-  linkType: hard
-
 "bare-subprocess@npm:^5.0.0":
   version: 5.2.1
   resolution: "bare-subprocess@npm:5.2.1"
@@ -10521,23 +10456,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-subprocess@npm:^6.0.0, bare-subprocess@npm:^6.1.0":
-  version: 6.2.2
-  resolution: "bare-subprocess@npm:6.2.2"
+"bare-subprocess@npm:^5.1.1":
+  version: 5.2.3
+  resolution: "bare-subprocess@npm:5.2.3"
   dependencies:
     bare-env: "npm:^3.0.0"
     bare-events: "npm:^2.5.4"
     bare-os: "npm:^3.0.1"
-    bare-pipe: "npm:^4.2.0"
-    bare-structured-clone: "npm:^2.0.0"
-    bare-tcp: "npm:^2.4.1"
+    bare-pipe: "npm:^4.0.0"
     bare-url: "npm:^2.2.2"
   peerDependencies:
     bare-buffer: "*"
   peerDependenciesMeta:
     bare-buffer:
       optional: true
-  checksum: 10/ac83427962570a9c5566ae7187e29b676bd438659e6f5e89e3a612c35e2c780011dd4d5c486e3c9193d1bb1bf1bc00542f5e11674dca21ac6e5f72fd1751bc05
+  checksum: 10/93caec6c88df946ff0ed1ba5e21350b2786638a6e7ead9976d5c211084790456dcad87a85ad33883da43f080d19d286c0bebf295fbf344151f94da376a1985ee
   languageName: node
   linkType: hard
 
@@ -10549,22 +10482,6 @@ __metadata:
     bare-events: "npm:^2.5.4"
     bare-stream: "npm:^2.6.4"
   checksum: 10/45afcc1fb3c972e70ec0e5e761e27548568f12c769fe5fd4c7773a60ea5f3eef877f2dcc5095ce81923b77dfc983f6d3bf08f59b0097b5495956301d89d8e695
-  languageName: node
-  linkType: hard
-
-"bare-tcp@npm:^2.4.1":
-  version: 2.6.1
-  resolution: "bare-tcp@npm:2.6.1"
-  dependencies:
-    bare-dns: "npm:^2.0.4"
-    bare-events: "npm:^2.5.4"
-    bare-stream: "npm:^2.6.4"
-  peerDependencies:
-    bare-pipe: "*"
-  peerDependenciesMeta:
-    bare-pipe:
-      optional: true
-  checksum: 10/964d1b02cff6773e8a4ff34f594cc2359148f57cbb98127b091abdb8031f6375bb85a67b59d7cb68e824c61d0fa516a0700c7d8d6834398315643081e28ab230
   languageName: node
   linkType: hard
 
@@ -10591,7 +10508,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-tls@npm:^3.0.0, bare-tls@npm:^3.1.13":
+"bare-tls@npm:^2.0.0, bare-tls@npm:^2.1.3":
+  version: 2.2.3
+  resolution: "bare-tls@npm:2.2.3"
+  dependencies:
+    bare-net: "npm:^2.0.1"
+    bare-stream: "npm:^2.6.4"
+  checksum: 10/36ad51adeec427c7f96e9075ef0b7422bc11c7d657bfbaa2001fb665f8eeb552b3627fb1dec5161d7e233c414c024220d4d14b1d3ef7758e25331a2f3e47c77f
+  languageName: node
+  linkType: hard
+
+"bare-tls@npm:^3.0.0":
   version: 3.2.0
   resolution: "bare-tls@npm:3.2.0"
   dependencies:
@@ -10630,13 +10557,6 @@ __metadata:
   version: 1.1.0
   resolution: "bare-type@npm:1.1.0"
   checksum: 10/fa942bd48393d74e7fcd4ae0cf1e2c07b90a726e816bf0a8f3316f6dffae4426b57533f07934658cbac71aabef5c500b5524c344b402de7bcc090887253e4a4f
-  languageName: node
-  linkType: hard
-
-"bare-type@npm:^1.3.0, bare-type@npm:^1.4.0":
-  version: 1.4.0
-  resolution: "bare-type@npm:1.4.0"
-  checksum: 10/7c54a928c0af4f0e32d914587c417411e2027fbc86161be6bbc3a508f00f72662e166a33250c293b09fb36e55098031628caced25e7fd3b1cc287827a8d21e4c
   languageName: node
   linkType: hard
 
@@ -10687,39 +10607,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-wasi@npm:^0.1.0":
-  version: 0.1.2
-  resolution: "bare-wasi@npm:0.1.2"
-  dependencies:
-    bare-hrtime: "npm:^2.1.2"
-    bare-wasm: "npm:^0.1.0"
-  peerDependencies:
-    bare-directory: "*"
-  peerDependenciesMeta:
-    bare-directory:
-      optional: true
-  checksum: 10/e2a050787a51c16d1551ee83fb875dfc616c2018d0828b758d511f3be5679bc0d65a63876d684d8d481fcfa32eed3d95134bd3eb059df47472a06649555afdfa
-  languageName: node
-  linkType: hard
-
-"bare-wasm-abi@npm:^0.1.0":
-  version: 0.1.1
-  resolution: "bare-wasm-abi@npm:0.1.1"
-  dependencies:
-    bare-type: "npm:^1.4.0"
-    bare-wasi: "npm:^0.1.0"
-    bare-wasm: "npm:^0.1.0"
-  checksum: 10/dc8744655dc4f67209f4d696acc0c746fe187ce6b3a64adb9dda721c9e2881f51a5fea0517af9d3c254aa379d2fd2a3c3bd5633c41a6a5df35eb392f93bcd6d9
-  languageName: node
-  linkType: hard
-
-"bare-wasm@npm:^0.1.0":
-  version: 0.1.1
-  resolution: "bare-wasm@npm:0.1.1"
-  checksum: 10/b207190fe4a0bc8812c169dec0fa34c3931986a9d39bd5eeff3f4a195edb66e0e721a23438b81910e4e79c0eed052753c0bcde5747a1873f5cc573554bc088df
-  languageName: node
-  linkType: hard
-
 "bare-worker@npm:^4.0.0":
   version: 4.1.0
   resolution: "bare-worker@npm:4.1.0"
@@ -10732,14 +10619,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bare-ws@npm:^3.0.0":
-  version: 3.2.0
-  resolution: "bare-ws@npm:3.2.0"
+"bare-ws@npm:^2.0.0, bare-ws@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "bare-ws@npm:2.1.0"
   dependencies:
     bare-crypto: "npm:^1.2.0"
     bare-events: "npm:^2.3.1"
     bare-http1: "npm:^4.0.0"
-    bare-https: "npm:^3.0.0"
+    bare-https: "npm:^2.0.0"
     bare-stream: "npm:^2.1.2"
   peerDependencies:
     bare-buffer: "*"
@@ -10749,7 +10636,7 @@ __metadata:
       optional: true
     bare-url:
       optional: true
-  checksum: 10/4142d2191dd7fb44db7f83598c90cd87259f4e444abb8c9ecb72da8bfa5b57d26ea504548a05cad92fd1e5566d6c24e38f9a0545e2b42b1b3a97da6469a26b14
+  checksum: 10/c5d9a20bdcd2872e17e752e3313ff0e07936232463af82168fe870ab7913c3642785595f891e72a61dc9b8e1720231830b55af75979acfa267c3bfd8d30a4cbd
   languageName: node
   linkType: hard
 
@@ -10763,15 +10650,14 @@ __metadata:
   linkType: hard
 
 "bare@npm:^1.28.4":
-  version: 1.36.2
-  resolution: "bare@npm:1.36.2"
+  version: 1.28.4
+  resolution: "bare@npm:1.28.4"
   peerDependencies:
     bare-buffer: "*"
     bare-console: "*"
     bare-events: "*"
     bare-queue-microtask: "*"
     bare-runtime: "*"
-    bare-stream: "*"
     bare-structured-clone: "*"
     bare-timers: "*"
     bare-url: "*"
@@ -10784,8 +10670,6 @@ __metadata:
       optional: true
     bare-queue-microtask:
       optional: true
-    bare-stream:
-      optional: true
     bare-structured-clone:
       optional: true
     bare-timers:
@@ -10794,7 +10678,7 @@ __metadata:
       optional: true
   bin:
     bare: bin/bare
-  checksum: 10/278c734fe95b599cf514c97a3e0b2a1c62727e07703d75b7f7c892527d9f5e08644613894b41a14b40637dc92651de54889e51633688dc7d935b09402dd0ee47
+  checksum: 10/e07cbc0f9e1f5c1776beba8e092674c957e9f7dfceb23206f293eeb818637481585ba174811d3d1b7ec243bc1276e8aceaa26249a90a05017ac3adb3c57aa736
   languageName: node
   linkType: hard
 
@@ -12071,15 +11955,6 @@ __metadata:
   dependencies:
     b4a: "npm:^1.3.0"
   checksum: 10/ab5215f3e2be9bed16a0d10f511c221e7c38db1328649de8e11fcde2868db434d600accafc0edc39a3b2c15cee3016b190707da873127895a57e7e77d1d50394
-  languageName: node
-  linkType: hard
-
-"compact-encoding@npm:^3.0.1":
-  version: 3.5.2
-  resolution: "compact-encoding@npm:3.5.2"
-  dependencies:
-    b4a: "npm:^1.3.0"
-  checksum: 10/3501758a72a32da5a323a7878019ab8b57b78b51ffd2afafb4870c16468ae577ec78dd806f3843c4b0ab77de598f5525eb724f04fff22bf09120a8a76c74bc1d
   languageName: node
   linkType: hard
 
@@ -20694,13 +20569,6 @@ __metadata:
   version: 2.0.3
   resolution: "progress@npm:2.0.3"
   checksum: 10/e6f0bcb71f716eee9dfac0fe8a2606e3704d6a64dd93baaf49fbadbc8499989a610fe14cf1bc6f61b6d6653c49408d94f4a94e124538084efd8e4cf525e0293d
-  languageName: node
-  linkType: hard
-
-"promaphore@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "promaphore@npm:1.0.0"
-  checksum: 10/d3e603bbbd6613654e7eddbcc94fdb3db22ed2f8ca3f6f35fee3d6574b7880ccf89deb968f0b7bd503c41069babcf6706d520e2567990b3c7c9d8a82d8e10294
   languageName: node
   linkType: hard
 
