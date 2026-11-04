@@ -7,8 +7,10 @@ import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";
 
 import { TreeNode } from "../proto/spark.js";
+import { getTxFromRawTxHex, getTxId } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
 import { constructUnilateralExitFeeBumpPackages } from "../utils/unilateral-exit.js";
+import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 function hash160(data: Uint8Array): Uint8Array {
   return ripemd160(sha256(data));
@@ -160,4 +162,150 @@ describe("unilateral exit", () => {
     }
     expect(collisions).toEqual([]);
   });
+});
+
+describe("unilateral exit stateless resume", () => {
+  // A unilateral exit is two-phase: the exit chain is broadcast first, and
+  // the leaf's CSV-timelocked refund is broadcast once the timelock matures.
+  // A caller that rebuilds packages from chain state on a later run must
+  // keep receiving the leaf's refund until that refund (or an equivalent
+  // direct variant, which is what a watchtower broadcasts) is itself on
+  // chain; otherwise the exit silently completes with the leaf's value
+  // stranded in the timelock-encumbered node output.
+  const fundingPrivateKey = hexToBytes("07".repeat(32));
+  const fundingPublicKey = secp256k1.getPublicKey(fundingPrivateKey);
+  const fundingUtxo = {
+    txid: "11".repeat(32),
+    vout: 0,
+    value: 100_000n,
+    script: bytesToHex(
+      new Uint8Array([0x00, 0x14, ...hash160(fundingPublicKey)]),
+    ),
+    publicKey: bytesToHex(fundingPublicKey),
+  };
+
+  const makeLeaf = (id: string, parentSeed: string): TreeNode =>
+    TreeNode.fromPartial({
+      id,
+      nodeTx: makeTrucParentBytes(parentSeed, 0),
+      refundTx: makeTrucParentBytes(parentSeed, 1),
+      status: "AVAILABLE",
+    });
+
+  const txidOf = (txBytes: Uint8Array): string =>
+    getTxId(getTxFromRawTxHex(bytesToHex(txBytes)));
+
+  let getRawTransactionSpy: jest.SpiedFunction<
+    BitcoinFaucet["getRawTransaction"]
+  >;
+
+  // isTxBroadcast(Network.LOCAL) resolves through the faucet's
+  // getRawTransaction: a resolved call means the tx is on chain, a rejected
+  // call means it is not.
+  const setOnChainTxids = (onChainTxids: ReadonlySet<string>) => {
+    getRawTransactionSpy.mockImplementation((txid: string) => {
+      if (onChainTxids.has(txid)) {
+        return Promise.resolve(
+          {} as Awaited<ReturnType<BitcoinFaucet["getRawTransaction"]>>,
+        );
+      }
+      return Promise.reject(
+        new Error("No such mempool or blockchain transaction"),
+      );
+    });
+  };
+
+  const buildPackages = (leaf: TreeNode) =>
+    constructUnilateralExitFeeBumpPackages(
+      [bytesToHex(TreeNode.encode(leaf).finish())],
+      [fundingUtxo],
+      { satPerVbyte: 5 },
+      Network.LOCAL,
+    );
+
+  beforeEach(() => {
+    getRawTransactionSpy = jest.spyOn(
+      BitcoinFaucet.prototype,
+      "getRawTransaction",
+    );
+  });
+
+  afterEach(() => {
+    getRawTransactionSpy.mockRestore();
+  });
+
+  it("emits the leaf's node tx and refund when neither is on chain", async () => {
+    const leaf = makeLeaf("leaf-a", "aa".repeat(32));
+    setOnChainTxids(new Set());
+
+    expect.assertions(4);
+
+    const result = await buildPackages(leaf);
+
+    expect(result).toHaveLength(1);
+    const txPackages = result[0]!.txPackages;
+    expect(txPackages.map((pkg) => pkg.tx)).toEqual([
+      bytesToHex(leaf.nodeTx),
+      bytesToHex(leaf.refundTx),
+    ]);
+    for (const pkg of txPackages) {
+      expect(pkg.feeBumpPsbt).toBeDefined();
+    }
+  });
+
+  it("still surfaces the pending refund when the leaf's node tx is already on chain", async () => {
+    const leaf = makeLeaf("leaf-a", "aa".repeat(32));
+    setOnChainTxids(new Set([txidOf(leaf.nodeTx)]));
+
+    const result = await buildPackages(leaf);
+
+    expect(result).toHaveLength(1);
+    const txPackages = result[0]!.txPackages;
+    expect(txPackages.map((pkg) => pkg.tx)).toEqual([
+      bytesToHex(leaf.refundTx),
+    ]);
+    // The emitted refund must carry a well-formed fee bump so it can be
+    // broadcast once its CSV timelock matures.
+    btc.Transaction.fromPSBT(hexToBytes(txPackages[0]!.feeBumpPsbt!));
+  });
+
+  it("omits the refund once the refund itself is on chain", async () => {
+    const leaf = makeLeaf("leaf-a", "aa".repeat(32));
+    setOnChainTxids(new Set([txidOf(leaf.nodeTx), txidOf(leaf.refundTx)]));
+
+    const result = await buildPackages(leaf);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.txPackages).toHaveLength(0);
+  });
+
+  it.each([
+    ["directRefundTx", 2],
+    ["directFromCpfpRefundTx", 3],
+  ])(
+    "omits the refund when the leaf's %s is on chain",
+    async (directField, vout) => {
+      const leaf = TreeNode.fromPartial({
+        id: "leaf-a",
+        nodeTx: makeTrucParentBytes("aa".repeat(32), 0),
+        refundTx: makeTrucParentBytes("aa".repeat(32), 1),
+        [directField]: makeTrucParentBytes("aa".repeat(32), vout),
+        status: "AVAILABLE",
+      });
+      const onChainTxids = new Set([
+        txidOf(leaf.nodeTx),
+        txidOf(
+          directField === "directRefundTx"
+            ? leaf.directRefundTx
+            : leaf.directFromCpfpRefundTx,
+        ),
+      ]);
+      setOnChainTxids(onChainTxids);
+
+      const result = await buildPackages(leaf);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.txPackages).toHaveLength(0);
+    },
+  );
 });

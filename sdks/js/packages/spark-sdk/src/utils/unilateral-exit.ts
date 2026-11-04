@@ -165,6 +165,42 @@ export async function buildUnilateralExitChain(
   return chain;
 }
 
+// A leaf's refund is still pending (and must be surfaced) until the refund
+// itself — or an equivalent direct variant, which is what a watchtower
+// broadcasts — is on chain. Unparseable variants are treated as not on chain
+// so we err on the side of emitting the refund rather than silently dropping
+// it.
+async function isRefundPending(
+  node: TreeNode,
+  network: Network,
+  logger?: Logger,
+): Promise<boolean> {
+  const variants: Array<{ label: string; bytes: Uint8Array }> = [
+    { label: "refundTx", bytes: node.refundTx },
+    { label: "directRefundTx", bytes: node.directRefundTx },
+    { label: "directFromCpfpRefundTx", bytes: node.directFromCpfpRefundTx },
+  ];
+
+  for (const { label, bytes } of variants) {
+    if (!bytes || bytes.length === 0) {
+      continue;
+    }
+    try {
+      const txid = getTxId(getTxFromRawTxHex(bytesToHex(bytes)));
+      if (await isTxBroadcast(txid, network)) {
+        return false;
+      }
+    } catch (error) {
+      warnUnilateralExit(
+        logger,
+        `unable to parse ${label} for broadcast check on node ${node.id}: ${formatErrorForLog(error)}. Treating the refund as still pending.`,
+      );
+    }
+  }
+
+  return true;
+}
+
 export function isEphemeralAnchorOutput(
   script?: Uint8Array,
   amount?: bigint,
@@ -289,19 +325,28 @@ export async function constructUnilateralExitFeeBumpPackages(
       // Add node tx and its fee bump
       const nodeTxHex = bytesToHex(chainNode.nodeTx);
 
+      // A unilateral exit is two-phase: the exit chain is broadcast first,
+      // then the leaf's CSV-timelocked refund once the timelock matures. The
+      // refund must keep surfacing until the refund (or an equivalent direct
+      // variant, which is what a watchtower broadcasts) is itself on chain,
+      // independent of whether the leaf's node tx has already been broadcast.
+      // Otherwise a stateless resume (rebuilding packages from chain state
+      // after the node tx confirmed) returns a package list with no refund
+      // and the leaf's value is left stranded in the timelock-encumbered node
+      // output.
+      const isLeafNode = chainNode.id === node.id;
+      let nodeTxBroadcast = false;
+
       // We skip tx's which have already been broadcasted, or we've seen in the past
       try {
         const txObj = getTxFromRawTxHex(nodeTxHex);
         const txid = getTxId(txObj);
         if (broadcastTxs.get(txid)) {
           // We already created a package for this node in another leaf.
-          continue;
-        }
-        broadcastTxs.set(txid, true);
-        const isBroadcast = await isTxBroadcast(txid, network);
-        if (isBroadcast) {
-          // This node has already been broadcast, so we don't need to do so.
-          continue;
+          nodeTxBroadcast = true;
+        } else {
+          broadcastTxs.set(txid, true);
+          nodeTxBroadcast = await isTxBroadcast(txid, network);
         }
       } catch (parseError) {
         warnUnilateralExit(
@@ -310,49 +355,52 @@ export async function constructUnilateralExitFeeBumpPackages(
         );
       }
 
-      const { feeBumpPsbt: nodeFeeBumpPsbt, usedUtxos } = constructFeeBumpTx(
-        nodeTxHex,
-        availableUtxos,
-        feeRate,
-        undefined,
-        logger,
-      );
-
-      const feeBumpTx = btc.Transaction.fromPSBT(hexToBytes(nodeFeeBumpPsbt));
-
-      // Get the fee bump transaction's output, if any
-      const feeBumpOut: psbt.TransactionOutput | null =
-        feeBumpTx.outputsLength === 1 ? feeBumpTx.getOutput(0) : null;
-      let feeBumpOutPubKey: string | null = null;
-
-      // Remove used UTXOs from the available list
-      for (const usedUtxo of usedUtxos) {
-        if (feeBumpOut && bytesToHex(feeBumpOut.script!) == usedUtxo.script) {
-          feeBumpOutPubKey = usedUtxo.publicKey;
-        }
-        const index = availableUtxos.findIndex(
-          (u) => u.txid === usedUtxo.txid && u.vout === usedUtxo.vout,
+      if (!nodeTxBroadcast) {
+        const { feeBumpPsbt: nodeFeeBumpPsbt, usedUtxos } = constructFeeBumpTx(
+          nodeTxHex,
+          availableUtxos,
+          feeRate,
+          undefined,
+          logger,
         );
-        if (index !== -1) {
-          availableUtxos.splice(index, 1);
+
+        const feeBumpTx = btc.Transaction.fromPSBT(hexToBytes(nodeFeeBumpPsbt));
+
+        // Get the fee bump transaction's output, if any
+        const feeBumpOut: psbt.TransactionOutput | null =
+          feeBumpTx.outputsLength === 1 ? feeBumpTx.getOutput(0) : null;
+        let feeBumpOutPubKey: string | null = null;
+
+        // Remove used UTXOs from the available list
+        for (const usedUtxo of usedUtxos) {
+          if (feeBumpOut && bytesToHex(feeBumpOut.script!) == usedUtxo.script) {
+            feeBumpOutPubKey = usedUtxo.publicKey;
+          }
+          const index = availableUtxos.findIndex(
+            (u) => u.txid === usedUtxo.txid && u.vout === usedUtxo.vout,
+          );
+          if (index !== -1) {
+            availableUtxos.splice(index, 1);
+          }
         }
+
+        // If the fee bump TX has an output, it should have the same key as the
+        // input. We can add the output to the beginning of the list.
+        if (feeBumpOut)
+          availableUtxos.unshift({
+            txid: getTxId(feeBumpTx),
+            vout: 0,
+            value: feeBumpOut.amount!,
+            script: bytesToHex(feeBumpOut.script!),
+            publicKey: feeBumpOutPubKey!,
+          });
+
+        txPackages.push({ tx: nodeTxHex, feeBumpPsbt: nodeFeeBumpPsbt });
       }
 
-      // If the fee bump TX has an output, it should have the same key as the
-      // input. We can add the output to the beginning of the list.
-      if (feeBumpOut)
-        availableUtxos.unshift({
-          txid: getTxId(feeBumpTx),
-          vout: 0,
-          value: feeBumpOut.amount!,
-          script: bytesToHex(feeBumpOut.script!),
-          publicKey: feeBumpOutPubKey!,
-        });
-
-      txPackages.push({ tx: nodeTxHex, feeBumpPsbt: nodeFeeBumpPsbt });
-
       // If this is the original node we started with, also add its refund tx
-      if (chainNode.id === node.id) {
+      // unless the refund (or an equivalent direct variant) is already on chain.
+      if (isLeafNode && (await isRefundPending(chainNode, network, logger))) {
         const refundTxHex = bytesToHex(chainNode.refundTx);
 
         const refundFeeBump = constructFeeBumpTx(
