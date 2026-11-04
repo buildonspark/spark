@@ -77,13 +77,32 @@ export function decodeInvoice(invoice: string): DecodedInvoice {
   let signatureSection: Section | undefined;
 
   for (const section of decodedInvoice.sections) {
+    // BOLT-11: a reader "MUST fail the payment unless exactly one `p` field and
+    // exactly one `s` field are present". Keeping the last copy of a repeated
+    // field lets a second payment_hash or payment_secret override the first.
     if (section.name === PAYMENT_HASH_NAME) {
+      if (paymentSection !== undefined) {
+        throw new SparkValidationError(
+          "Duplicate payment hash found in invoice",
+          {
+            invoice,
+          },
+        );
+      }
       paymentSection = section;
     }
     if (section.name === AMOUNT_MSATS_NAME) {
       amountSection = section;
     }
     if (section.name === PAYMENT_SECRET_NAME) {
+      if (paymentSecretSection !== undefined) {
+        throw new SparkValidationError(
+          "Duplicate payment secret found in invoice",
+          {
+            invoice,
+          },
+        );
+      }
       paymentSecretSection = section;
     }
     if ((section.name as string) === PAYEE_NAME) {

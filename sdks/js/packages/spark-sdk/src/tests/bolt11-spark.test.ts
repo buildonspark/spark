@@ -177,3 +177,40 @@ describe("spark bolt11 invoice decoding", () => {
     expect(decodeInvoice(invoice).signedPayeePubkey).toBeUndefined();
   });
 });
+
+// https://github.com/lightning/bolts/blob/master/11-payment-encoding.md: a reader
+// "MUST fail the payment unless exactly one `p` field and exactly one `s` field are
+// present". Before the singularity checks, decodeInvoice kept the last copy of a
+// repeated field, so a second payment_hash replaced the one the payee was paid for.
+describe("decodeInvoice BOLT 11 repeated field handling", () => {
+  // Official BOLT 11 vector "Two distinct p fields in an otherwise valid invoice"
+  // (lightning/bolts invoice-test.json, valid false). It carries payment_hash
+  // 0001020304050607080900010203040506070809000102030405060708090102 followed by
+  // ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.
+  it("rejects an invoice with two payment_hash fields", () => {
+    const invoice =
+      "lnbc1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqpp5lllllllllllllllllllllllllllllllllllllllllllllllllllsdpyv36hqmrfvdshgefqwpshjmt9de6zq6rpwd5qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs9g3f93cqturay6zk2fyfcmeflphlzew9wfq0n5nf9hqnlwxthtzqcljcuurljyd2vngkya5hndakf33ghly97qm5nc3umj7jep22nfsq3nr0w8";
+
+    expect(() => {
+      decodeInvoice(invoice);
+    }).toThrow("Duplicate payment hash found in invoice");
+  });
+
+  it("rejects an invoice with two payment_secret fields", () => {
+    const invoice =
+      "lnbc1pvjluezpp5tjl3se45sgmj3ksgsnzy7w492yhxpmeuvrs3kw96em6v3druvzessp5zcvv9h5frsk0un8ume59xznpz35cmlz369ks7m3krpy74d5kpy7ssp5zcvv9h5frsk0un8ume59xznpz35cmlz369ks7m3krpy74d5kpy7sqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsd6hvq";
+
+    expect(() => {
+      decodeInvoice(invoice);
+    }).toThrow("Duplicate payment secret found in invoice");
+  });
+
+  it("accepts the same invoice with one payment_hash and one payment_secret", () => {
+    const invoice =
+      "lnbc1pvjluezpp5tjl3se45sgmj3ksgsnzy7w492yhxpmeuvrs3kw96em6v3druvzessp5zcvv9h5frsk0un8ume59xznpz35cmlz369ks7m3krpy74d5kpy7sqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqrks2jf";
+
+    expect(decodeInvoice(invoice).paymentHash).toBe(
+      "5cbf1866b4823728da0884c44f3aa5512e60ef3c60e11b38bacef4c8b47c60b3",
+    );
+  });
+});
