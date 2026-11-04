@@ -1,0 +1,14 @@
+Spark FROST Bare addon embedded dependencies
+==========================================
+
+Spark is licensed under Apache-2.0. Embedded third-party components
+are subject to their own licenses.
+
+Each prebuilds/<platform>/licenses/ directory contains inventory.json,
+NOTICES.txt, and RUST-NOTICES.html for the corresponding addon binary. These
+reports contain license texts, attribution, exact source links, native library
+notices, and Rust standard-library notices. The Rust report is supplied unchanged.
+Preserve the applicable notices when redistributing the addon binary.
+
+The inventories include a conservative superset of build and runtime dependencies;
+it is not necessarily the case that every listed crate is linked into every artifact.

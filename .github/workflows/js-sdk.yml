@@ -8,12 +8,14 @@ on:
       - "signer/**"
       - "protos/**"
       - "sdks/js/**"
+      - "public/scripts/**"
       - ".github/workflows/js-sdk.yml"
   pull_request:
     paths:
       - "signer/**"
       - "protos/**"
       - "sdks/js/**"
+      - "public/scripts/**"
       - ".github/workflows/js-sdk.yml"
 
 concurrency:
@@ -35,6 +37,11 @@ jobs:
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
+
+      - name: "Verify committed SDK bindings and notices"
+        run: |
+          node --test public/scripts/tests/test-sdk-bindings.js public/scripts/tests/test-sdk-licenses.js
+          node public/scripts/sdk-bindings.js check
 
       - name: "Run JS SDK checks"
         uses: ./public/actions/js-sdk-checks

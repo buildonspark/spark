@@ -503,7 +503,16 @@ test("package verification rejects an artifact omitted from npm pack", () => {
       sdkBindings.verifyPackages(localConfig, {
         checkManifest: () => {},
         manifest,
-        packageReports: { "@example/sdk": [{ files: [{ path: "index.js" }] }] },
+        packageReports: {
+          "@example/sdk": [
+            {
+              files: [
+                { path: "index.js" },
+                { path: "THIRD_PARTY_NOTICES.txt" },
+              ],
+            },
+          ],
+        },
       }),
     /omits generated/,
   );
@@ -525,6 +534,26 @@ test("package verification rejects artifacts without a published package owner",
         manifest,
       }),
     /No npm package owns/,
+  );
+});
+
+test("package verification rejects missing third-party notices", () => {
+  assert.throws(
+    () =>
+      sdkBindings.verifyPackages(
+        {
+          packages: { "@example/sdk": "packages/sdk" },
+          groups: {},
+        },
+        {
+          checkManifest: () => {},
+          manifest: { groups: {} },
+          packageReports: {
+            "@example/sdk": [{ files: [{ path: "index.js" }] }],
+          },
+        },
+      ),
+    /omits THIRD_PARTY_NOTICES/,
   );
 });
 

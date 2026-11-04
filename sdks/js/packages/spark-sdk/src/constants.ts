@@ -1,5 +1,4 @@
 import { isNode, isBare } from "@lightsparkdev/core";
-import { UAParser } from "ua-parser-js";
 
 type BunGlobal = {
   version?: unknown;
@@ -34,7 +33,7 @@ export const isWebExtensionBackgroundScript =
 /* navigator.userAgent exists in browsers and extension contexts: */
 const userAgent =
   "navigator" in globalThis
-    ? parseUserAgent(globalThis.navigator.userAgent) || "unknown-user-agent"
+    ? parseUserAgent(globalThis.navigator.userAgent)
     : undefined;
 
 declare const __PACKAGE_VERSION__: string;
@@ -69,19 +68,50 @@ if (isBun) {
   baseEnvStr = `browser/${userAgent}`;
 }
 
-function parseUserAgent(userAgent: string) {
-  const parser = UAParser(userAgent);
-  const browserName = parser.browser.name
-    ? parser.browser.name.toLowerCase().replaceAll(" ", "-")
-    : "unknown-browser";
-  const browserVersion = parser.browser.version
-    ? parser.browser.version
-    : "unknown-version";
-  const osName = parser.os.name
-    ? parser.os.name.toLowerCase().replaceAll(" ", "-")
-    : "unknown-os";
-  const osVersion = parser.os.version ? parser.os.version : "unknown-version";
-  return `${browserName}-${browserVersion}/${osName}-${osVersion}`;
+function parseUserAgent(userAgent: unknown) {
+  if (typeof userAgent !== "string" || !userAgent) {
+    return "unknown-user-agent";
+  }
+
+  // Diagnostic labels only: more specific browsers must precede their
+  // compatibility tokens (e.g. Edge also advertises Chrome and Safari).
+  const browser = parseUserAgentPart(userAgent, "unknown-browser", [
+    ["electron", /\bElectron\/([\d.]+)/i],
+    ["vivaldi", /\bVivaldi\/([\d.]+)/i],
+    ["microsoft-edge", /\b(?:EdgA|EdgiOS|Edg|Edge)\/([\d.]+)/i],
+    ["opera", /\b(?:OPR|OPiOS)\/([\d.]+)/i],
+    ["samsung-internet-for-android", /\bSamsungBrowser\/([\d.]+)/i],
+    ["firefox", /\b(?:Firefox|FxiOS)\/([\d.]+)/i],
+    ["chrome-webview", /\bAndroid\b.*;\s*wv\b.*\bChrome\/([\d.]+)/i],
+    ["chromium", /\bChromium\/([\d.]+)/i],
+    ["chrome", /\b(?:Chrome|CriOS)\/([\d.]+)/i],
+    ["safari", /\bVersion\/([\d.]+).*\bSafari\//i],
+    // Embedded WebKit clients may omit browser tokens; retain the engine version.
+    ["webkit", /\bAppleWebKit\/([\d.]+)/i],
+  ]);
+  const os = parseUserAgentPart(userAgent, "unknown-os", [
+    ["windows", /\bWindows (NT [\d.]+)/i],
+    ["ios", /\b(?:iPhone|iPad|iPod).*?\bOS ([\d_]+)/i],
+    ["android", /\bAndroid(?:[ /]([\d.]+))?/i],
+    ["chrome-os", /\bCrOS\b/i],
+    ["macos", /\bMac OS X(?:[ /]([\d_.]+))?/i],
+    ["linux", /\bLinux\b/i],
+  ]);
+  return `${browser}/${os}`;
+}
+
+function parseUserAgentPart(
+  userAgent: string,
+  fallback: string,
+  patterns: [string, RegExp][],
+) {
+  for (const [name, pattern] of patterns) {
+    const match = pattern.exec(userAgent);
+    if (match) {
+      return `${name}-${match[1]?.replaceAll("_", ".") || "unknown-version"}`;
+    }
+  }
+  return `${fallback}-unknown-version`;
 }
 
 export function setReactNativeEnvDetails(

@@ -111,4 +111,5 @@ build_family() {
 
 for family in "$@"; do
   build_family "$family"
+  node "$ROOT/public/scripts/sdk-licenses.js" generate "$family-ios"
 done

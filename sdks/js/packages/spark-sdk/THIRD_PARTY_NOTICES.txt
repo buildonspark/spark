@@ -1,0 +1,31 @@
+Spark SDK embedded dependencies
+===============================
+
+Spark is licensed under Apache-2.0. Embedded third-party components
+are subject to their own licenses.
+
+The third-party/ directory contains per-binding dependency inventories and
+NOTICES.txt files with license texts, attribution, source links, native
+library notices, and references to Rust standard-library notices. Rust's upstream
+report is supplied unchanged as RUST-NOTICES.html in each binding directory.
+Preserve the applicable notices when redistributing the embedded binaries.
+
+UniFFI 0.28.3 is included under Mozilla Public License 2.0 (MPL-2.0). Its covered
+source, including the runtime, is available in these release archives:
+
+https://crates.io/api/v1/crates/uniffi/0.28.3/download
+https://crates.io/api/v1/crates/uniffi_core/0.28.3/download
+https://crates.io/api/v1/crates/uniffi_bindgen/0.28.3/download
+https://crates.io/api/v1/crates/uniffi_macros/0.28.3/download
+
+The full MPL-2.0 text and additional UniFFI component source links are included in
+the applicable NOTICES.txt reports. MPL-covered source is still subject to its MPL license;
+the Apache license for Spark does not replace those terms.
+
+The generated Swift and Kotlin bindings contain helper code from UniFFI templates.
+Their template source is included in the uniffi_bindgen archive above. Preserve
+the applicable MPL licensing of that helper code. The generated binding source files
+are included under ios/ and android/src/main/java/uniffi/ and are available under MPL-2.0.
+
+The inventories include a conservative superset of build and runtime dependencies;
+it is not necessarily the case that every listed crate is linked into every artifact.

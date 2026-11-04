@@ -31,7 +31,8 @@
     "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/**",
     "sdks/js/packages/spark-sdk/ios/spark_token_primitives.swift",
     "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/**",
-    "sdks/js/packages/spark-frost-bare-addon/prebuilds/**"
+    "sdks/js/packages/spark-frost-bare-addon/prebuilds/**",
+    "sdks/js/packages/spark-sdk/third-party/**"
   ],
   "executable_output_patterns": [
     "sdks/js/packages/spark-sdk/android/src/main/jniLibs/**"
@@ -64,7 +65,9 @@
     "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.mjs",
     "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.test.mjs",
     "signer/spark-frost-uniffi/build-bindings.sh",
-    "signer/spark-token-primitives-uniffi/build-bindings.sh"
+    "signer/spark-token-primitives-uniffi/build-bindings.sh",
+    "public/scripts/sdk-licenses.js",
+    "public/scripts/sdk-licenses/**"
   ],
   "common_inputs": [
     "public/scripts/sdk-bindings.json",
@@ -72,7 +75,10 @@
     "signer/.cargo/config.toml",
     "signer/Cargo.lock",
     "signer/Cargo.toml",
-    "signer/rust-toolchain.toml"
+    "signer/rust-toolchain.toml",
+    "public/scripts/sdk-licenses.js",
+    "public/scripts/sdk-licenses/licenses/**",
+    "public/scripts/sdk-licenses/upstream/**"
   ],
   "packages": {
     "@buildonspark/spark-sdk": "sdks/js/packages/spark-sdk",
@@ -98,7 +104,8 @@
         "sdks/js/packages/spark-sdk/wasm/patch-wasm-browser.mjs",
         "sdks/js/packages/spark-sdk/wasm/patch-wasm-browser.test.mjs",
         "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.mjs",
-        "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.test.mjs"
+        "sdks/js/packages/spark-sdk/wasm/patch-wasm-nodejs.test.mjs",
+        "sdks/js/packages/spark-sdk/THIRD_PARTY_NOTICES.txt"
       ],
       "outputs": [
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-browser-bg.wasm",
@@ -108,7 +115,10 @@
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs-bg.wasm.d.ts",
         "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.d.ts",
-        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.js"
+        "sdks/js/packages/spark-sdk/src/spark-bindings/wasm/wasm-nodejs.js",
+        "sdks/js/packages/spark-sdk/third-party/frost-wasm/inventory.json",
+        "sdks/js/packages/spark-sdk/third-party/frost-wasm/NOTICES.txt",
+        "sdks/js/packages/spark-sdk/third-party/frost-wasm/RUST-NOTICES.html"
       ]
     },
     "token-wasm": {
@@ -130,7 +140,8 @@
         "signer/spark-token-primitives-uniffi/src/**",
         "signer/spark-token-primitives-uniffi/uniffi-bindgen.rs",
         "sdks/js/packages/spark-sdk/wasm/patch-token-primitives-wasm-browser.mjs",
-        "sdks/js/packages/spark-sdk/wasm/patch-token-primitives-wasm-nodejs.mjs"
+        "sdks/js/packages/spark-sdk/wasm/patch-token-primitives-wasm-nodejs.mjs",
+        "sdks/js/packages/spark-sdk/THIRD_PARTY_NOTICES.txt"
       ],
       "outputs": [
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-browser-bg.wasm",
@@ -140,7 +151,10 @@
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs-bg.wasm.d.ts",
         "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.d.ts",
-        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.js"
+        "sdks/js/packages/spark-sdk/src/token-primitives-bindings/wasm/wasm-nodejs.js",
+        "sdks/js/packages/spark-sdk/third-party/token-wasm/inventory.json",
+        "sdks/js/packages/spark-sdk/third-party/token-wasm/NOTICES.txt",
+        "sdks/js/packages/spark-sdk/third-party/token-wasm/RUST-NOTICES.html"
       ]
     },
     "frost-android": {
@@ -160,14 +174,18 @@
         "signer/spark-frost-uniffi/Cargo.toml",
         "signer/spark-frost-uniffi/build.rs",
         "signer/spark-frost-uniffi/src/**",
-        "signer/spark-frost-uniffi/uniffi-bindgen.rs"
+        "signer/spark-frost-uniffi/uniffi-bindgen.rs",
+        "sdks/js/packages/spark-sdk/THIRD_PARTY_NOTICES.txt"
       ],
       "outputs": [
         "sdks/js/packages/spark-sdk/android/src/main/java/uniffi/uniffi/spark_frost/spark_frost.kt",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_frost.so",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_frost.so",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_frost.so",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_frost.so"
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_frost.so",
+        "sdks/js/packages/spark-sdk/third-party/frost-android/inventory.json",
+        "sdks/js/packages/spark-sdk/third-party/frost-android/NOTICES.txt",
+        "sdks/js/packages/spark-sdk/third-party/frost-android/RUST-NOTICES.html"
       ]
     },
     "token-android": {
@@ -189,14 +207,18 @@
         "signer/spark-token-primitives-uniffi/Cargo.toml",
         "signer/spark-token-primitives-uniffi/build.rs",
         "signer/spark-token-primitives-uniffi/src/**",
-        "signer/spark-token-primitives-uniffi/uniffi-bindgen.rs"
+        "signer/spark-token-primitives-uniffi/uniffi-bindgen.rs",
+        "sdks/js/packages/spark-sdk/THIRD_PARTY_NOTICES.txt"
       ],
       "outputs": [
         "sdks/js/packages/spark-sdk/android/src/main/java/uniffi/uniffi/spark_token_primitives/spark_token_primitives.kt",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/arm64-v8a/libuniffi_spark_token_primitives.so",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/armeabi-v7a/libuniffi_spark_token_primitives.so",
         "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86/libuniffi_spark_token_primitives.so",
-        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_token_primitives.so"
+        "sdks/js/packages/spark-sdk/android/src/main/jniLibs/x86_64/libuniffi_spark_token_primitives.so",
+        "sdks/js/packages/spark-sdk/third-party/token-android/inventory.json",
+        "sdks/js/packages/spark-sdk/third-party/token-android/NOTICES.txt",
+        "sdks/js/packages/spark-sdk/third-party/token-android/RUST-NOTICES.html"
       ]
     },
     "frost-ios": {
@@ -215,7 +237,8 @@
         "signer/spark-frost-uniffi/build.rs",
         "signer/spark-frost-uniffi/spark-frost-swift/**",
         "signer/spark-frost-uniffi/src/**",
-        "signer/spark-frost-uniffi/uniffi-bindgen.rs"
+        "signer/spark-frost-uniffi/uniffi-bindgen.rs",
+        "sdks/js/packages/spark-sdk/THIRD_PARTY_NOTICES.txt"
       ],
       "outputs": [
         "sdks/js/packages/spark-sdk/ios/spark_frost.swift",
@@ -233,7 +256,10 @@
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI.h",
         "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Modules/module.modulemap",
-        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/spark_frostFFI"
+        "sdks/js/packages/spark-sdk/ios/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/spark_frostFFI",
+        "sdks/js/packages/spark-sdk/third-party/frost-ios/inventory.json",
+        "sdks/js/packages/spark-sdk/third-party/frost-ios/NOTICES.txt",
+        "sdks/js/packages/spark-sdk/third-party/frost-ios/RUST-NOTICES.html"
       ]
     },
     "token-ios": {
@@ -254,7 +280,8 @@
         "signer/spark-token-primitives-uniffi/build.rs",
         "signer/spark-token-primitives-uniffi/spark-token-primitives-swift/**",
         "signer/spark-token-primitives-uniffi/src/**",
-        "signer/spark-token-primitives-uniffi/uniffi-bindgen.rs"
+        "signer/spark-token-primitives-uniffi/uniffi-bindgen.rs",
+        "sdks/js/packages/spark-sdk/THIRD_PARTY_NOTICES.txt"
       ],
       "outputs": [
         "sdks/js/packages/spark-sdk/ios/spark_token_primitives.swift",
@@ -272,7 +299,10 @@
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI-umbrella.h",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Headers/spark_token_primitivesFFI.h",
         "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/Modules/module.modulemap",
-        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI"
+        "sdks/js/packages/spark-sdk/ios/spark_token_primitivesFFI.xcframework/macos-arm64_x86_64/spark_token_primitivesFFI.framework/spark_token_primitivesFFI",
+        "sdks/js/packages/spark-sdk/third-party/token-ios/inventory.json",
+        "sdks/js/packages/spark-sdk/third-party/token-ios/NOTICES.txt",
+        "sdks/js/packages/spark-sdk/third-party/token-ios/RUST-NOTICES.html"
       ]
     },
     "frost-bare": {
@@ -298,7 +328,8 @@
         "sdks/js/packages/spark-frost-bare-addon/package.json",
         "sdks/js/packages/spark-frost-bare-addon/rust-toolchain.toml",
         "sdks/js/packages/spark-frost-bare-addon/scripts/normalize-win32-prebuilds.js",
-        "sdks/js/postinstall.sh"
+        "sdks/js/postinstall.sh",
+        "sdks/js/packages/spark-frost-bare-addon/THIRD_PARTY_NOTICES.txt"
       ],
       "trigger_inputs": [
         "public/actions/setup-node-yarn-install/**",
@@ -318,7 +349,46 @@
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/buildonspark__spark-frost-bare-addon.bare",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/buildonspark__spark-frost-bare-addon.bare",
         "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/buildonspark__spark-frost-bare-addon.bare",
-        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/buildonspark__spark-frost-bare-addon.bare"
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/buildonspark__spark-frost-bare-addon.bare",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-arm64/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-ia32/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/android-x64/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-arm64/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/darwin-x64/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64-simulator/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-arm64/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/ios-x64-simulator/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-arm64/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/linux-x64/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-arm64/licenses/RUST-NOTICES.html",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/licenses/inventory.json",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/licenses/NOTICES.txt",
+        "sdks/js/packages/spark-frost-bare-addon/prebuilds/win32-x64/licenses/RUST-NOTICES.html"
       ]
     }
   }
