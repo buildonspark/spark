@@ -17,7 +17,7 @@ Source: https://crates.io/api/v1/crates/aho-corasick/1.1.4/download
 
 anstream 0.6.21
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/anstream/0.6.21/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -25,7 +25,7 @@ Source: https://crates.io/api/v1/crates/anstream/0.6.21/download
 
 anstyle-parse 0.2.7
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/anstyle-parse/0.2.7/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -33,7 +33,7 @@ Source: https://crates.io/api/v1/crates/anstyle-parse/0.2.7/download
 
 anstyle-query 1.1.5
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/anstyle-query/1.1.5/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -41,7 +41,7 @@ Source: https://crates.io/api/v1/crates/anstyle-query/1.1.5/download
 
 anstyle-wincon 3.0.11
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/anstyle-wincon/3.0.11/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -49,7 +49,7 @@ Source: https://crates.io/api/v1/crates/anstyle-wincon/3.0.11/download
 
 anstyle 1.0.13
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/anstyle/1.0.13/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -65,7 +65,7 @@ Source: https://crates.io/api/v1/crates/anyhow/1.0.100/download
 
 askama_derive 0.12.5
 License: MIT/Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/askama_derive/0.12.5/download
 
   LICENSE-APACHE: see Notice 87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3
@@ -73,7 +73,7 @@ Source: https://crates.io/api/v1/crates/askama_derive/0.12.5/download
 
 askama_escape 0.10.3
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/askama_escape/0.10.3/download
 
   LICENSE-APACHE: see Notice 87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3
@@ -81,7 +81,7 @@ Source: https://crates.io/api/v1/crates/askama_escape/0.10.3/download
 
 askama_parser 0.2.1
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/askama_parser/0.2.1/download
 
   LICENSE-APACHE: see Notice 87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3
@@ -89,7 +89,7 @@ Source: https://crates.io/api/v1/crates/askama_parser/0.2.1/download
 
 askama 0.12.1
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/askama/0.12.1/download
 
   LICENSE-APACHE: see Notice 87cb0d734c723c083e51c825930ff42bce28596b52dee15567f6b28f19c195e3
@@ -181,7 +181,7 @@ Source: https://crates.io/api/v1/crates/cargo_metadata/0.15.4/download
 
 cargo-platform 0.1.9
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/cargo-platform/0.1.9/download
 
   LICENSE-APACHE: see Notice 8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb
@@ -197,7 +197,7 @@ Source: https://crates.io/api/v1/crates/cfg-if/1.0.4/download
 
 clap_builder 4.5.53
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/clap_builder/4.5.53/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -205,7 +205,7 @@ Source: https://crates.io/api/v1/crates/clap_builder/4.5.53/download
 
 clap_derive 4.5.49
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/clap_derive/4.5.49/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -213,7 +213,7 @@ Source: https://crates.io/api/v1/crates/clap_derive/4.5.49/download
 
 clap_lex 0.7.6
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/clap_lex/0.7.6/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -221,7 +221,7 @@ Source: https://crates.io/api/v1/crates/clap_lex/0.7.6/download
 
 clap 4.5.53
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/clap/4.5.53/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -229,7 +229,7 @@ Source: https://crates.io/api/v1/crates/clap/4.5.53/download
 
 colorchoice 1.0.4
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/colorchoice/1.0.4/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -253,7 +253,7 @@ Source: https://crates.io/api/v1/crates/cpufeatures/0.2.17/download
 
 critical-section 1.2.0
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/critical-section/1.2.0/download
 
   LICENSE-APACHE: see Notice a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2
@@ -285,7 +285,7 @@ Source: https://crates.io/api/v1/crates/either/1.15.0/download
 
 equivalent 1.0.2
 License: Apache-2.0 OR MIT
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/equivalent/1.0.2/download
 
   LICENSE-APACHE: see Notice a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2
@@ -340,7 +340,7 @@ Source: https://crates.io/api/v1/crates/fs-err/2.11.0/download
 
 futures-core 0.3.31
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/futures-core/0.3.31/download
 
   LICENSE-APACHE: see Notice 275c491d6d1160553c32fd6127061d7f9606c3ea25abfad6ca3f6ed088785427
@@ -348,7 +348,7 @@ Source: https://crates.io/api/v1/crates/futures-core/0.3.31/download
 
 futures-task 0.3.31
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/futures-task/0.3.31/download
 
   LICENSE-APACHE: see Notice 275c491d6d1160553c32fd6127061d7f9606c3ea25abfad6ca3f6ed088785427
@@ -356,7 +356,7 @@ Source: https://crates.io/api/v1/crates/futures-task/0.3.31/download
 
 futures-util 0.3.31
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/futures-util/0.3.31/download
 
   LICENSE-APACHE: see Notice 275c491d6d1160553c32fd6127061d7f9606c3ea25abfad6ca3f6ed088785427
@@ -402,7 +402,7 @@ Source: https://crates.io/api/v1/crates/hashbrown/0.16.0/download
 
 heck 0.5.0
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/heck/0.5.0/download
 
   LICENSE-APACHE: see Notice a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2
@@ -410,7 +410,7 @@ Source: https://crates.io/api/v1/crates/heck/0.5.0/download
 
 indexmap 2.12.0
 License: Apache-2.0 OR MIT
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/indexmap/2.12.0/download
 
   LICENSE-APACHE: see Notice a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2
@@ -418,7 +418,7 @@ Source: https://crates.io/api/v1/crates/indexmap/2.12.0/download
 
 is_terminal_polyfill 1.70.2
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/is_terminal_polyfill/1.70.2/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -555,7 +555,7 @@ Source: https://crates.io/api/v1/crates/nom/7.1.3/download
 
 once_cell_polyfill 1.70.2
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/once_cell_polyfill/1.70.2/download
 
   LICENSE-APACHE: see Notice b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
@@ -588,7 +588,7 @@ Source: https://crates.io/api/v1/crates/petgraph/0.7.1/download
 
 pin-project-lite 0.2.16
 License: Apache-2.0 OR MIT
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/pin-project-lite/0.2.16/download
 
   LICENSE-APACHE: see Notice 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594
@@ -612,7 +612,7 @@ Source: https://crates.io/api/v1/crates/plain/0.2.3/download
 
 portable-atomic 1.11.1
 License: Apache-2.0 OR MIT
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/portable-atomic/1.11.1/download
 
   LICENSE-APACHE: see Notice 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594
@@ -696,7 +696,7 @@ Source: https://crates.io/api/v1/crates/quote/1.0.42/download
 
 r-efi 5.3.0
 License: MIT OR Apache-2.0 OR LGPL-2.1-or-later; selected option: MIT
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/r-efi/5.3.0/download
 
   Upstream/r-efi-5.3.0/AUTHORS: see Notice ff92bed461f50338dd703a9ba9aee496a425957873df1d91192776e4bdf5dda7
@@ -988,7 +988,7 @@ This component's source is available under MPL-2.0 at the source download above.
 
 uniffi_meta 0.28.3
 License: MPL-2.0; selected option: MPL-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/uniffi_meta/0.28.3/download
 This component's source is available under MPL-2.0 at the source download above. The source was verified against the published crate checksums.
 
@@ -1004,7 +1004,7 @@ This component's source is available under MPL-2.0 at the source download above.
 
 uniffi_udl 0.28.3
 License: MPL-2.0; selected option: MPL-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/uniffi_udl/0.28.3/download
 This component's source is available under MPL-2.0 at the source download above. The source was verified against the published crate checksums.
 
@@ -1044,7 +1044,7 @@ Source: https://crates.io/api/v1/crates/version_check/0.9.5/download
 
 wasip2 1.0.1+wasi-0.2.4
 License: Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT; selected option: Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/wasip2/1.0.1+wasi-0.2.4/download
 
   Upstream/wasip2-1.0.1+wasi-0.2.4/LICENSE-APACHE: see Notice a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2
@@ -1091,7 +1091,7 @@ Source: https://crates.io/api/v1/crates/weedle2/5.0.0/download
 
 windows-link 0.2.1
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/windows-link/0.2.1/download
 
   license-apache-2.0: see Notice c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b
@@ -1099,7 +1099,7 @@ Source: https://crates.io/api/v1/crates/windows-link/0.2.1/download
 
 windows-sys 0.61.2
 License: MIT OR Apache-2.0
-Authors: 
+Authors:
 Source: https://crates.io/api/v1/crates/windows-sys/0.61.2/download
 
   license-apache-2.0: see Notice c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b
@@ -6856,4 +6856,3 @@ AUTHORS: (ordered alphabetically)
         Rob Bradford <robert.bradford@intel.com>, <rbradford@rivosinc.com>
         Tom Gundersen <teg@jklm.no>
         Trevor Gross <tmgross@umich.edu>
-

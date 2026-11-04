@@ -344,7 +344,7 @@ ${texts.join("\n")}
 `;
   return {
     "inventory.json": `${JSON.stringify(inventory, null, 2)}\n`,
-    "NOTICES.txt": text,
+    "NOTICES.txt": normalizeNotice(text),
     "RUST-NOTICES.html": options.rustNotices,
   };
 }
