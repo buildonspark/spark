@@ -177,3 +177,32 @@ describe("spark bolt11 invoice decoding", () => {
     expect(decodeInvoice(invoice).signedPayeePubkey).toBeUndefined();
   });
 });
+
+// BOLT-11 lines 225-228: given a valid `n` field a reader MUST validate the signature
+// against it and MUST fail the payment when the signature is not low-S. Recovery cannot
+// tell the two forms apart on its own: a high-S twin recovers the same payee key as the
+// low-S signature it was malleated from, so accepting it makes a tampered invoice look
+// identical to the original. The pair below is the spec example key
+// (11-payment-encoding.md line 378) signed once with S and once with the curve order
+// minus S, recovery byte flipped. Only the first is low-S, which the two assertions
+// together pin down: the low-S form must decode, the high-S form must not.
+describe("decodeInvoice BOLT 11 n field signature validation", () => {
+  const signedPayeePubkey =
+    "03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad";
+
+  it("accepts the low-S signature over an n field", () => {
+    const invoice =
+      "lnbc1pvjluezpp5fjf6730hcumq5d7nhmdtfmlyxas7mfh24ssnkv6tc2308g6nmhpssp5pgkj6ek9sy68a927tdpjqsl2ru0wyle59z5sh826y3dfkw5v6xksdq6wdcxzuntyp5kgdfjypex2urjdunp4q0n326hr8v9zprg8gsvezcch06gfaqqhde2aj730yg0durunfhv66a70vxcx20sww4rpj0lqpnhuqc3gur2ru733ykzwaw8chup39n4749xl4mj7v7urnfrrze6gss32hgs30rpdm8k9ljuraygcghmvxevspf3uwnv";
+
+    expect(decodeInvoice(invoice).signedPayeePubkey).toBe(signedPayeePubkey);
+  });
+
+  it("rejects the high-S twin of the same invoice", () => {
+    const invoice =
+      "lnbc1pvjluezpp5fjf6730hcumq5d7nhmdtfmlyxas7mfh24ssnkv6tc2308g6nmhpssp5pgkj6ek9sy68a927tdpjqsl2ru0wyle59z5sh826y3dfkw5v6xksdq6wdcxzuntyp5kgdfjypex2urjdunp4q0n326hr8v9zprg8gsvezcch06gfaqqhde2aj730yg0durunfhv66a70vxcx20sww4rpj0lqpnhuqc3gur2ru733ykzwaw8chup39n4766eq2ydpnpruvkuuax9h00w4g57rlcj90kmlq5juqqwuyz9wafrcq7wulfa";
+
+    expect(() => {
+      decodeInvoice(invoice);
+    }).toThrow("Invoice signature is not low-S");
+  });
+});

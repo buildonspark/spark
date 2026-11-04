@@ -204,6 +204,17 @@ function verifiedPayeeFromSignature(
     });
   }
 
+  // BOLT-11: given an `n` field, a reader "MUST fail the payment if the signature
+  // is not low-S". Recovery cannot detect the malleated form on its own, because a
+  // high-S twin recovers the same public key as the low-S signature it came from.
+  if (
+    secp256k1.Signature.fromBytes(signature.slice(0, 64), "compact").hasHighS()
+  ) {
+    throw new SparkValidationError("Invoice signature is not low-S", {
+      invoice,
+    });
+  }
+
   if (payeeTag !== recoveredPayee) {
     throw new SparkValidationError(
       "Invoice signature does not match invoice payee",
