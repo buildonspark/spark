@@ -62,25 +62,25 @@ brew install bitcoin
 
 ## DB Migrations
 
-We use atlas to manage our database migrations. Install via `mise install`.
+We use Ptah Compat to manage our database migrations. Install the pinned release via `mise install`. See [the schema guide](spark/so/ent/README.md) for its development-server and partition ownership requirements.
 
 To make a migration, follow these steps:
 
 - Make your change to the schema, run `mise gen-ent`
-- Generate migration files by running `./scripts/gen-migration.sh <name>`:
+- Generate operator migration files from `spark/` with `mise ptah-diff <name>`; use `mise ptah-ephemeral-diff <name>` for the ephemeral database.
 - With `run-everything.sh`, the migration will be automatically
   applied to each operator's database. But if you want to apply a migration manually, you can run (e.g. DB name is `sparkoperator_0`):
 
 ```
-atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/sparkoperator_0?sslmode=disable"
+ptah-compat migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/sparkoperator_0?sslmode=disable"
 ```
 
 - Commit the migration files, and submit a PR.
 
-If you are adding atlas migrations for the first time to an existing DB, you will need to run the migration command with the `--baseline` flag.
+If you are adding versioned migrations for the first time to an existing DB, you will need to run the migration command with the `--baseline` flag.
 
 ```
-atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/sparkoperator_0?sslmode=disable" --baseline 20250228224813
+ptah-compat migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/sparkoperator_0?sslmode=disable" --baseline 20250228224813
 ```
 
 ## VSCode

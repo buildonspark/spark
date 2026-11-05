@@ -1,5 +1,5 @@
 [tools]
-atlas-community = "1.0.0"
+"go:ptah.run/cmd/ptah-compat" = "v0.15.0"
 github-cli = "latest"
 go = "1.27.0"
 golangci-lint = "2.13.0"
@@ -219,7 +219,7 @@ echo "Generating ent schemas..."
 go generate ./so/ent/...
 echo ""
 echo "!!!!"
-echo "Ents generated. Remember to add migration changes with atlas! See README.md for more info."
+echo "Ents generated. Remember to add migration changes with ptah-compat! See README.md for more info."
 echo "!!!!"
 """
 

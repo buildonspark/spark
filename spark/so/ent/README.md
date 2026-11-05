@@ -1,343 +1,86 @@
 # Ent Schema and Migration Management
 
-This directory contains the Ent schema definitions and migration tooling for the Spark Operator database.
+Ent defines the Go clients and ordinary database tables. Ptah combines those
+tables with the partitioned parent in `external/schema.sql`. Spark owns the
+dated `signing_nonces_YYYYMMDD` children through
+`PurgeAndCreateSigningNoncePartitions`.
 
-## Overview
+## Pinned Ptah version
 
-We use [Ent](https://entgo.io/) for schema definitions and code generation, combined with [Atlas](https://atlasgo.io/) for database migrations. Most tables are managed automatically by Ent/Atlas, but some tables require manual management due to advanced database features.
+The root mise configuration and Dockerfile pin the same Ptah release, v0.15.0.
+It replays migrations in a session-local temporary schema and applies the
+environment's migration diff exclusions. The SQL migration format, original
+files, and `atlas.sum` remain unchanged.
 
-## Directory Structure
+The Ent exporter in `tools/entschema` uses Ent's PostgreSQL schema conversion
+and the open-source Atlas HCL marshaler. It omits `signing_nonces` from the
+operator schema export only. Ent still generates that table's Go client. The
+SQL source supplies its partitioned definition to the composite schema.
 
-```
-ent/
-├── schema/              # Ent schema definitions (Go code)
-├── external/            # Manual SQL schemas for special tables
-│   └── schema.sql      # Externally-managed table definitions
-├── migrate/
-│   └── migrations/     # Atlas migration files
-└── README.md           # This file
-```
+## Author a migration
 
-## Migration Workflows
-
-### Standard Workflow (Most Tables)
-
-For tables managed by Ent/Atlas:
-
-1. **Modify Ent schema** in `schema/*.go`
-2. **Regenerate Ent code**: `make ent`
-3. **Generate migration**:
-   ```bash
-   mise atlas-diff my_migration_name.sql
-   ```
-4. **Review generated migration** in `migrate/migrations/`
-5. **Test on staging** database
-6. **Deploy** - Atlas automatically applies on startup
-
-#### Raw SQL Result Shape Safety
-
-When writing raw SQL against Ent-managed tables, avoid `SELECT *` and `RETURNING *`.
-Prefer an explicit column list instead.
-
-With PostgreSQL prepared statement caching, additive schema changes such as `ALTER TABLE ...
-ADD COLUMN ...` can change the result shape of `*` queries on existing connections and cause:
-
-```text
-ERROR: cached plan must not change result type (SQLSTATE 0A000)
-```
-
-Using explicit column lists makes these queries more stable across migrations and avoids
-silently changing which fields are loaded into Ent models.
-
-### External Table Workflow (Manual Management)
-
-Some tables require manual management due to advanced features that Ent/Atlas cannot handle:
-- Partitioning
-- Advanced indexes
-- Custom constraints
-
-**Example: `signing_nonces` (partitioned table)**
-
-#### Why External?
-
-The `signing_nonces` table uses:
-- **Range partitioning** by `id` (UUIDv7, 24-hour intervals)
-- **Simple primary key** `(id)` - cleaner than composite key
-- **Dynamic partition management** (created/dropped by application code)
-- **UUID-based boundaries** - leverages UUIDv7's time-ordering property
-
-These features can't be expressed in Ent's schema language and require manual SQL management.
-
-#### Setup
-
-**1. Ent Schema (generates Go types)**
-
-Keep the normal Ent schema in `schema/signing_nonce.go`:
-- Defines fields and types
-- Generates Go client code
-- Primary key shown as `(id)` for simplicity (composite PK is transparent to application)
-
-**2. External SQL Schema (documentation)**
-
-Document the actual database structure in `external/schema.sql`:
-```sql
--- This file is for DOCUMENTATION ONLY
--- Atlas does not use it (composite schemas require Atlas Pro)
-
-CREATE TABLE signing_nonces (
-    id                UUID NOT NULL PRIMARY KEY,
-    create_time       TIMESTAMP WITH TIME ZONE NOT NULL,
-    -- ... other fields ...
-) PARTITION BY RANGE (id);  -- Partition by UUIDv7 id
-```
-
-**Note**: This file documents the real structure but Atlas ignores it. We accept schema drift between Ent schema and actual database for manually-managed tables.
-
-**Why partition by `id` (UUIDv7)?**
-- Simple `PRIMARY KEY (id)` - no composite key needed
-- UUIDv7 encodes timestamp in first 48 bits, enabling time-based partitions
-- Current cleanup query uses `WHERE id < cutoff_uuid` - benefits from partition pruning
-- UNIQUE constraint on `id` works (would fail with `create_time` partitioning)
-
-**3. Atlas Exclusion**
-
-Atlas is configured to skip certain operations on external tables:
-```hcl
-# In atlas.hcl
-diff {
-  skip {
-    drop_table = true  # Don't generate DROP for removed Ent schemas
-  }
-}
-```
-
-This prevents Atlas from trying to "fix" manually-managed tables.
-
-#### Migration Process
-
-For external tables, migrations are manual:
-
-**1. Create migration script**
-
-Example: `scripts/migrate_signing_nonce_to_partitioned.sql`
-- Handles data migration
-- Creates partitions
-- Atomic cutover
-
-**2. Run manually at chosen time**
-```bash
-# Test on staging
-psql -h staging-db < scripts/migrate_signing_nonce_to_partitioned.sql
-
-# Run on production during maintenance window
-psql -h prod-db < scripts/migrate_signing_nonce_to_partitioned.sql
-```
-
-**3. Deploy code**
-
-Deploy application code that includes:
-- Updated `external/schema.sql` (documents new structure)
-- Application code that works with new structure
-- Partition management functions
-
-**4. Accept schema drift**
-
-Atlas will see drift between Ent schema and actual database:
-- **Ent schema**: Defines `signing_nonces` with PK `(id)` (no partitioning)
-- **Actual database**: Has PK `(id)` + RANGE partitioning by `id`
-- This drift is **expected and acceptable** for manually-managed tables
-
-Atlas won't try to "fix" it because `drop_table` skip is configured.
-
-**Note**: The primary key is the same in both schemas (`id`), but the database adds partitioning which Ent doesn't know about. This is transparent to application code.
-
-#### Why Keep Both Schemas?
-
-**Ent schema (`schema/signing_nonce.go`)**:
-- ✅ Generates Go types and client code
-- ✅ Used by application for queries
-- ✅ Simple PK definition `(id)` - sufficient for app code
-- ❌ Doesn't reflect actual database structure
-
-**External SQL schema (`external/schema.sql`)**:
-- ✅ Documents actual database structure
-- ✅ Shows PK `(id)` + UUID-based partitioning
-- ❌ **NOT used by Atlas** (would require Atlas Pro for composite schemas)
-- ❌ For documentation only
-
-The partitioning is **completely transparent to application code** - queries work normally whether by `id`, `nonce_commitment`, or any other column. The Ent schema generates correct Go types even though it doesn't know about partitioning.
-
-## Atlas Configuration
-
-### Local Development
-
-Use the `mise` task for generating migrations:
+From `spark/`, after changing an ordinary Ent schema:
 
 ```bash
-# Generate migration from Ent schemas only
-mise atlas-diff my_migration_name.sql
-
-# Hash migrations after manual edits
-mise atlas-hash
+go generate ./so/ent
+mise ptah-diff describe_change
 ```
 
-This runs:
+For the ephemeral database:
+
 ```bash
-cd so/ent && atlas migrate diff "$@" --env local
+go generate ./so/entephemeral
+mise ptah-ephemeral-diff describe_change
 ```
 
-The `atlas.hcl` configuration:
-```hcl
-env "local" {
-  src = "ent://schema"  # Ent schemas only
-  dev = "docker://postgres/15/test?search_path=public"
-  migration {
-    dir = "file://migrate/migrations"
-  }
-  diff {
-    skip {
-      drop_table = true  # Don't DROP manually-managed tables
-    }
-  }
-}
+Review the new SQL before applying it. The hash tasks are `mise ptah-hash` and
+`mise ptah-ephemeral-hash`. Existing migration files must not be rewritten.
+
+Set `SPARK_SCHEMA_DEV_URL` to a disposable PostgreSQL database with
+`search_path=public`. Enable external schema execution with
+`PTAH_ALLOW_EXTERNAL_SCHEMA=1`. The operator history contains a `DO` block, so
+replay also requires `PTAH_DEV_SERVER_DISPOSABLE=1` on a dedicated disposable
+server. Never make that declaration for a shared server or an application
+database. Ptah replays the entire history; the temporary tables remain local
+to the replay connection and disappear when that connection is discarded.
+
+## Compare the live partitioned schema
+
+The operator's `local` environment includes the external parent and excludes
+only Spark's dated children:
+
+```bash
+cd so/ent
+ptah-compat schema diff --env local --from "$OPERATOR_DB_URL" --to env://src --schema public
 ```
 
-**Note**: Composite schemas (mixing Ent + SQL) require Atlas Pro. We use Ent-only schema and accept drift on manually-managed tables.
+The `authoring` environment also excludes the parent from automatic migration
+generation. The original operator history creates an ordinary parent and
+predates the separate manual partition cutover. Every historical SQL statement
+still runs during replay. The exclusion applies to schema comparison, not to
+execution of migration files.
 
-### Production
+Converting an existing ordinary table to a partitioned table requires a
+reviewed manual cutover with a data-copy, validation, and rollback plan. The
+full live comparison refuses an ordinary/partitioned mismatch or a changed
+partition key. The `drop_table` guard alone is not a partition conversion plan.
+Additive changes to a correctly partitioned parent can use a reviewed Ptah
+plan; PostgreSQL propagates those changes to the existing children. Spark
+continues to create and retire dated children.
 
-Atlas configuration is deployed via Helm ConfigMap (in ops repo):
-```hcl
-env "aws" {
-  url = "postgres://..."
-  migration {
-    dir = "file:///opt/spark/migrations"
-  }
-  diff {
-    skip {
-      drop_table = true  # Don't DROP manually-managed tables
-    }
-  }
-}
+## Apply migrations
+
+The entrypoint applies the operator history before the ephemeral history:
+
+```bash
+ptah-compat migrate apply --dir file://so/ent/migrate/migrations --url "$OPERATOR_DB_URL"
+ptah-compat migrate apply --dir file://so/entephemeral/migrate/migrations --url "$EPHEMERAL_DB_URL"
 ```
 
-## Adding a New External Table
+The Docker image builds the pinned `ptah-compat` binary from its Go module.
+The pgtestdb adapter in `so/db/ptah_migrator.go` runs the same executable and
+includes its version in the template hash. No executable alias is needed.
 
-If you need to manage a new table externally:
-
-**1. Add to `external/schema.sql`**
-```sql
--- Add your table definition
-CREATE TABLE my_special_table (
-    ...
-) PARTITION BY ... -- or other special feature
-```
-
-**2. Keep or create Ent schema**
-
-You can keep the Ent schema to generate Go types:
-- Define fields normally
-- Don't worry about special DB features (partitioning, etc.)
-- Ent generates client code, SQL schema defines actual structure
-
-**3. Create manual migration script**
-
-For initial creation or conversion:
-- Write SQL script in `scripts/`
-- Test on staging
-- Run manually on production
-- Deploy code afterward
-
-**4. Application manages special features**
-
-For dynamic features like partitions:
-- Add management code (e.g., `PurgeAndCreateSigningNoncePartitions()`)
-- Run periodically via cron/task
-
-## Best Practices
-
-### When to Use External Tables
-
-Use external management when:
-- ✅ **Partitioning** (range, list, hash)
-- ✅ **Advanced indexes** (partial, expression-based)
-- ✅ **Custom constraints** not expressible in Ent
-- ✅ **Performance-critical structures** needing manual tuning
-
-Keep using Ent/Atlas when:
-- ❌ Standard tables with simple indexes
-- ❌ Foreign key relationships
-- ❌ Basic constraints (NOT NULL, UNIQUE, CHECK)
-
-### Migration Safety
-
-For risky migrations (large tables, partitioning, etc.):
-
-1. **Test thoroughly** on staging with production-like data
-2. **Write manual scripts** with:
-   - Bulk copy phase (no locks)
-   - Atomic cutover (brief lock)
-   - Verification steps
-   - Rollback plan
-3. **Schedule maintenance window** if needed
-4. **Monitor closely** after deployment
-
-### External Schema Documentation
-
-Always document in `external/schema.sql`:
-- **Why** the table is external
-- **What** special features it uses
-- **How** it's managed (which functions, scripts)
-- **References** to related code
-
-Example:
-```sql
--- External table: signing_nonces
--- Reason: Uses range partitioning by id (UUIDv7)
--- Management: PurgeAndCreateSigningNoncesPartitions() in signingnonce_extension.go
--- Migration: scripts/migrate_signing_nonce_to_partitioned.sql
-```
-
-## Troubleshooting
-
-### Atlas Detects Drift
-
-If Atlas shows schema drift for external tables:
-
-**Symptom**: Atlas wants to create a migration for an external table
-
-**Cause**: Database doesn't match `external/schema.sql`
-
-**Solution**:
-1. Check if manual migration ran correctly
-2. Update `external/schema.sql` to match actual DB if intentional
-3. Ensure composite schema is configured correctly
-
-### Ent Code Generation Fails
-
-**Symptom**: `make ent` fails after schema changes
-
-**Cause**: Schema syntax error or missing dependency
-
-**Solution**:
-1. Check Ent schema syntax
-2. Ensure all imports are correct
-3. Run `go mod tidy` if needed
-
-### Migration Conflicts
-
-**Symptom**: Manual migration conflicts with Atlas migration
-
-**Cause**: Timing - both tried to modify same table
-
-**Solution**:
-1. External tables should NEVER have Atlas migrations
-2. Ensure table is in `external/schema.sql`
-3. Remove any Atlas migrations for external tables
-
-## Further Reading
-
-- [Ent Documentation](https://entgo.io/docs/getting-started)
-- [Atlas Documentation](https://atlasgo.io/getting-started)
-- [Atlas Composite Schemas](https://atlasgo.io/atlas-schema/projects#data-source-composite_schema)
-- [Postgres Partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html)
+Use explicit columns in raw SQL instead of `SELECT *` or `RETURNING *`.
+Adding columns can otherwise invalidate the result shape of cached prepared
+statements on existing connections.
