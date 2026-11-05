@@ -1369,6 +1369,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     } else if (validateMnemonic(mnemonicOrSeed, wordlist)) {
       mnemonic = mnemonicOrSeed;
       seed = await this.config.signer.mnemonicToSeed(mnemonicOrSeed);
+    } else if (mnemonicOrSeed.includes(" ")) {
+      // Whitespace means the input was intended as a mnemonic; it can
+      // never be a valid hex seed, so report the checksum failure.
+      throw new SparkValidationError(
+        "Invalid mnemonic: BIP-39 checksum validation failed",
+        { field: "mnemonicOrSeed" },
+      );
     } else {
       seed = hexToBytes(mnemonicOrSeed);
     }
