@@ -8,7 +8,7 @@ Scaffold a new [Spark](https://github.com/buildonspark/spark) application from a
 npx @buildonspark/create-spark-app my-app --template vite
 cd my-app
 npm install
-npm run dev
+npm run start
 ```
 
 Or use the `npm create` shorthand:

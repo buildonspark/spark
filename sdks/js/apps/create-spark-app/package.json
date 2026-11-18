@@ -16,6 +16,7 @@
     "format": "prettier . --check",
     "lint:fix": "eslint --fix .",
     "lint": "eslint .",
+    "test": "tsx --test src/tests/start-commands.test.ts",
     "types": "tsc",
     "package:checks": "yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\""
   },
@@ -31,6 +32,7 @@
     "prettier": "^3.7.4",
     "publint": "^0.3.9",
     "tsdown": "^0.20.3",
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   },
   "engines": {
