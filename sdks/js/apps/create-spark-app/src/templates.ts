@@ -6,7 +6,6 @@ export interface Template {
 }
 
 const WEB_STEPS = ["{pm} install", "{run} dev"];
-const VITE_STEPS = ["{pm} install", "{run} start"];
 const SERVER_STEPS = ["{pm} install", "{run} start:dev"];
 const START_STEPS = ["{pm} install", "{run} start"];
 
@@ -14,7 +13,7 @@ export const TEMPLATES = {
   vite: {
     dir: "spark-vite-app",
     description: "React + Vite",
-    steps: VITE_STEPS,
+    steps: START_STEPS,
   },
   nextjs: {
     dir: "spark-nextjs-app",
@@ -41,7 +40,7 @@ export const TEMPLATES = {
   express: {
     dir: "spark-node-express",
     description: "Express.js server",
-    steps: SERVER_STEPS,
+    steps: START_STEPS,
   },
   nestjs: {
     dir: "nestjs-app",

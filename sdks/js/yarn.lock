@@ -1856,6 +1856,7 @@ __metadata:
     publint: "npm:^0.3.9"
     tar: "npm:^7.5.20"
     tsdown: "npm:^0.20.3"
+    tsx: "npm:^4.19.3"
     typescript: "npm:^5.7.3"
   bin:
     create-spark-app: ./dist/index.cjs
